@@ -798,24 +798,24 @@
   <h2><span class="secnum">9</span>Results</h2>
 
   <p>
-    We validate Act-PRMs on multi-turn agent tasks spanning real-world tool calling —
-    <strong>τ²-bench Airline</strong>, <strong>τ²-bench Retail</strong>,
-    <strong>Snorkel Finance Reasoning</strong> — and embodied text games —
-    <strong>TextWorld Coin Collector</strong> and <strong>Treasure Hunter</strong>. Base model:
-    Qwen3-4B-Instruct-2507 with LoRA, trained with
-    <a href="https://thinkingmachines.ai/blog/announcing-tinker/">Tinker</a> as the rollout and update
-    driver, $G = 8$ thoughts per state, and the self-normalized EM reward. The central question:
-    do Act-PRM-trained models actually generate thoughts that close the action-only context gap from
-    Section 3?
+    We evaluate Act-PRMs on multi-turn agent tasks spanning real-world tool calling 
+    (<strong>τ²-bench Airline</strong>, <strong>τ²-bench Retail</strong>,
+    <strong>Snorkel Finance Reasoning</strong>) and embodied text games
+    (<strong>TextWorld Coin Collector</strong> and <strong>Treasure Hunter</strong>). We train
+    Qwen3-4B-Instruct-2507 with LoRA using
+    <a href="https://thinkingmachines.ai/blog/announcing-tinker/">Tinker</a>, with
+    group size $G = 8$ thoughts per state. We found the simple un-normalized EM reward (likelihoods)
+    worked, where (spoiler) we could get Act-PRM-trained models to generate thoughts that close the
+    action-only context gap from Section 3. To expand on this, we discuss three simple results next.
   </p>
 
   <h3>Result 1 — Back to the land of climbable hills</h3>
   <p>
-    First, sanity: is the action-likelihood reward a hill we can climb at all? Yes — over Act-PRM
-    training, the reward (the model's likelihood over held-out logged actions, conditioned on its own
-    sampled thoughts) rises smoothly, on both training and evaluation trajectories. We can train models
-    to get <em>better at thinking</em>, where “better” is measured by an <strong>un-gameable
-    quantity</strong>: <em>did your thought make the human's actual next action more likely?</em>
+    First, as a sanity check, is the action-likelihood reward a hill we can climb at all? 
+    Yes! Over Act-PRM training, we found that we could train models to get <em>"better" at thinking</em>,
+    where "better" is measured by the how likely an expert action is to follow, when given the state and the 
+    model's thoughts. To keep this honest, we also measured on held-out evaluation trajectories, finding
+    that over RL this "better" thinking could generalize to unseen logs.
   </p>
   <div class="fig-row">
     <figure class="card">
@@ -832,10 +832,11 @@
 
   <h3>Result 2 — Thinking models, from action-only logs</h3>
   <p>
-    From easy-to-collect traces of raw action-only logs, we can now generate full thinking + action
-    traces. Below, a trained model relabels a finance workflow: every gray reasoning block was
-    <em>inferred</em> by the model; only the blue question and the tool calls existed in the original
-    log.
+    Next, does this hill-climbing suffice to generate real reasoning traces? Also yes! From easy-to-collect 
+    traces of raw action-only logs, we found we could now generate full thinking + action traces, saving annotators
+    from having to write out or narrate their full inner monologues. 
+    As an example, we show this thought-generation on a Snorkel finance workflow. Here every gray reasoning block 
+    was <em>inferred</em> by the model; only the blue question and the tool calls existed in the original log.
   </p>
   <figure class="card">
     <img src="assets/img/finance-trace-example.png" alt="A multi-turn finance workflow where model-generated reasoning precedes each logged tool call" loading="lazy">
@@ -846,8 +847,9 @@
 
   <h3>Result 3 — Act-PRM traces close the context gap</h3>
   <p>
-    The payoff. We compare three downstream agents trained from <em>the same</em> corpus of successful
-    action-only trajectories, differing only in supervision:
+    Finally, how do these trained thinking transfer to actual expert behavioral cloning? 
+    We compare three LLMs trained from <em>the same</em> corpus of successful action-only trajectories,
+    differing only in supervision:
   </p>
   <ul>
     <li><strong>Action-only BC</strong> — SFT on the raw logs; the “half the picture” lower bound.</li>
