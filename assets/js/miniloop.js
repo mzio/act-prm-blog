@@ -1,9 +1,12 @@
-/* Mini Act-PRM animation ("at a glance"): a FIXED stage that replays the loop —
-   the prompt/observation and the LOGGED action are always visible (spaced apart);
-   each cycle samples 3 candidate thoughts between them, scores them with
-   p(x | s, z), keeps the best, resolves the action, holds, then fades and replays
-   with fresh candidates (a carousel of iterations, no scrolling). Scales itself
-   down to fit narrow/mobile viewports. */
+/* Mini Act-PRM animation ("at a glance"), two-step story with a gentle pan:
+   (1) the prompt node, the LOGGED action node, and the next observation node
+       are laid out from the start (the chain is given by the log);
+   (2) candidate thoughts are sampled between o and x, typed, scored with
+       p(x | s, z), and the best is selected;
+   (3) the action resolves and the stage pans one step to the next
+       observation / logged-action pair (already in place);
+   (4) the sampling replays there — then the whole thing fades and restarts
+       with fresh candidates. Scales itself to fit narrow/mobile viewports. */
 (function () {
   const canvas = document.getElementById('miniloop-canvas');
   if (!canvas) return;
@@ -18,24 +21,25 @@
   };
   const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-  const DESIGN_W = 340;           // fixed design width of the stage (one step)
-  const DESIGN_H = 250;           // design height (matches the canvas CSS height)
-  const CYCLE = 9500;             // ms per full replay (incl. holds + fade)
-  const G = 3;
+  const DESIGN_W = 400;           // visible stage width (design coordinates)
+  const DESIGN_H = 250;
+  const SEG = 340;                // horizontal distance between chain steps
+  const O_X = 28, CAND_X = 100, X_X = 268;   // node anchors within a segment
   const CAND_W = 96, CAND_H = 34;
+  const G = 3;
+  const CYCLE = 16000;            // ms for the full two-step story + fade
 
   let W = 0, H = 0, dpr = 1, scale = 1, offX = 0;
   function resize() {
     dpr = Math.min(window.devicePixelRatio || 1, 2);
     W = canvas.clientWidth;
     scale = Math.min(1, W / DESIGN_W);
-    // shrink the canvas itself on narrow screens so nothing is clipped
     canvas.style.height = Math.round(DESIGN_H * scale) + 'px';
     H = canvas.clientHeight;
     offX = (W / scale - DESIGN_W) / 2;
     canvas.width = W * dpr;
     canvas.height = H * dpr;
-    if (reduceMotion) draw(0.9, 0);
+    if (reduceMotion) draw(0.42, 0);
   }
   window.addEventListener('resize', resize);
   resize();
@@ -45,6 +49,10 @@
     return x - Math.floor(x);
   }
   const easeOut = (t) => 1 - Math.pow(1 - Math.min(Math.max(t, 0), 1), 3);
+  const easeInOut = (t) => {
+    t = Math.min(Math.max(t, 0), 1);
+    return t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+  };
   const clamp01 = (t) => Math.min(Math.max(t, 0), 1);
 
   function roundRect(x, y, w, h, r) {
@@ -64,61 +72,63 @@
     ctx.fillText(text, x, y);
   }
 
-  /* one full frame of the replay: p ∈ [0,1] is the cycle phase; iter varies the
-     sampled candidates. Everything is drawn in DESIGN_W × DESIGN_H coordinates,
-     scaled + centered to the actual canvas. */
-  function draw(p, iter) {
-    ctx.setTransform(dpr * scale, 0, 0, dpr * scale, 0, 0);
-    ctx.clearRect(0, 0, W / scale, H / scale);
-    ctx.translate(offX, 0);
-
-    // fade in/out at the cycle boundaries (the carousel transition)
-    let alpha = 1;
-    if (p < 0.03) alpha = easeOut(p / 0.03);
-    else if (p > 0.96) alpha = 1 - easeOut((p - 0.96) / 0.04);
-    ctx.globalAlpha = alpha;
-
-    // sub-phases: fan → type → score → pick → (hold) → resolve → (hold) → fade
-    const pFan = easeOut(p / 0.10);
-    const pType = clamp01((p - 0.07) / 0.20);
-    const pScore = clamp01((p - 0.29) / 0.13);
-    const pPick = clamp01((p - 0.46) / 0.08);     // winner chosen by ~0.54
-    const pAct = clamp01((p - 0.70) / 0.10);      // ~1.5s hold, then action resolves
-
-    const cy = DESIGN_H / 2;
-    const sx = 30, candX = 118, ax = 292;
-    const winner = Math.floor(prand(iter, 9) * G);
-
-    // --- observation node ---
+  function obsNode(x, cy, text) {
     ctx.lineWidth = 1.5;
     ctx.fillStyle = COL.stateFill;
     ctx.strokeStyle = COL.state;
-    ctx.beginPath(); ctx.arc(sx, cy, 15, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    ctx.beginPath(); ctx.arc(x, cy, 15, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
     ctx.fillStyle = COL.ink;
     ctx.font = 'italic 12px Georgia, serif';
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.fillText('o', sx, cy + 1);
-    label('prompt', sx, cy + 32);
+    ctx.fillText('o', x, cy + 1);
+    if (text) label(text, x, cy + 32);
+  }
 
-    // --- logged action node (always visible; dashed until resolved) ---
-    const solid = pAct > 0.5;
+  function actionNode(x, cy, solid, text) {
     ctx.save();
     ctx.lineWidth = 1.6;
     ctx.strokeStyle = COL.action;
     ctx.fillStyle = solid ? COL.actionFill : 'rgba(27,175,122,0.05)';
     if (!solid) ctx.setLineDash([4, 3]);
-    ctx.beginPath(); ctx.arc(ax, cy, 15, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    ctx.beginPath(); ctx.arc(x, cy, 15, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
     ctx.setLineDash([]);
     ctx.fillStyle = '#0e7a54';
     ctx.font = 'italic 12px Georgia, serif';
-    ctx.fillText('x', ax, cy + 1);
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText('x', x, cy + 1);
     ctx.restore();
-    label('logged action', ax, cy + 32);
+    if (text) label(text, x, cy + 32);
+  }
 
-    // --- candidate thoughts ---
+  function bezierPartial(x1, y1, x2, y2, t) {
+    ctx.beginPath();
+    const steps = 20;
+    for (let i = 0; i <= steps * t; i++) {
+      const u = i / steps;
+      const bx = (1 - u) * (1 - u) * x1 + 2 * (1 - u) * u * ((x1 + x2) / 2) + u * u * x2;
+      const by = (1 - u) * (1 - u) * y1 + 2 * (1 - u) * u * ((y1 + y2) / 2) + u * u * y2;
+      if (i === 0) ctx.moveTo(bx, by); else ctx.lineTo(bx, by);
+    }
+    ctx.stroke();
+  }
+
+  /* the sampling animation for one segment; q ∈ [0,1] local phase, iter varies
+     candidates; alpha = global fade; labeled = show the score annotation */
+  function drawSampling(baseX, q, iter, alpha, labeled) {
+    const cy = DESIGN_H / 2;
+    const sx = baseX + O_X, candX = baseX + CAND_X, ax = baseX + X_X;
+    const winner = Math.floor(prand(iter, 9) * G);
+
+    const pFan = easeOut(q / 0.14);
+    const pType = clamp01((q - 0.10) / 0.26);
+    const pScore = clamp01((q - 0.40) / 0.16);
+    const pPick = clamp01((q - 0.62) / 0.10);   // pick by ~0.72, hold to 0.85
+    const pAct = clamp01((q - 0.85) / 0.12);
+
     const band = Math.min(DESIGN_H - 58, 152);
     const spread = band / (G - 1);
     const bandTop = cy - band / 2 - CAND_H / 2 + 6;
+
     for (let g = 0; g < G; g++) {
       const ty = bandTop + spread * g;
       const isWin = g === winner;
@@ -130,16 +140,7 @@
         ctx.globalAlpha = alpha * fade * 0.9;
         ctx.strokeStyle = isWin && pPick > 0 ? COL.thought : COL.ghost;
         ctx.lineWidth = isWin && pPick > 0 ? 1.6 : 1;
-        ctx.beginPath();
-        const x1 = sx + 15, y1 = cy, x2 = candX - 6, y2 = ty + CAND_H / 2;
-        const steps = 20;
-        for (let i = 0; i <= steps * t; i++) {
-          const u = i / steps;
-          const bx = (1 - u) * (1 - u) * x1 + 2 * (1 - u) * u * ((x1 + x2) / 2) + u * u * x2;
-          const by = (1 - u) * (1 - u) * y1 + 2 * (1 - u) * u * ((y1 + y2) / 2) + u * u * y2;
-          if (i === 0) ctx.moveTo(bx, by); else ctx.lineTo(bx, by);
-        }
-        ctx.stroke();
+        bezierPartial(sx + 15, cy, candX - 6, ty + CAND_H / 2, t);
         ctx.restore();
       }
       if (pType <= 0) continue;
@@ -164,7 +165,6 @@
         ctx.restore();
       }
 
-      // typing text lines (vary with the carousel iteration)
       for (let l = 0; l < 2; l++) {
         const full = CAND_W - 34 - prand(iter, g * 7 + l) * 22;
         const lineP = clamp01(pType * 2.6 - l);
@@ -182,7 +182,6 @@
       ctx.textAlign = 'left';
       ctx.fillText('z', candX + 8, ty + 17);
 
-      // reward bar
       if (pScore > 0) {
         const rw = 0.22 + 0.75 * prand(iter, g * 3 + 1);
         const rewardW = (CAND_W - 16) * (isWin ? Math.max(rw, 0.85) : Math.min(rw, 0.55));
@@ -201,8 +200,7 @@
       ctx.restore();
     }
 
-    // scoring annotation
-    if (pScore > 0.4) {
+    if (labeled && pScore > 0.4) {
       ctx.save();
       ctx.globalAlpha = alpha * clamp01((pScore - 0.4) / 0.4);
       ctx.fillStyle = '#9a6900';
@@ -215,19 +213,63 @@
     // winner connects to the logged action
     if (pAct > 0) {
       const wy = bandTop + spread * winner + CAND_H / 2;
+      ctx.save();
+      ctx.globalAlpha = alpha;
       ctx.strokeStyle = COL.thought;
       ctx.lineWidth = 1.6;
-      ctx.beginPath();
-      const x1 = candX + CAND_W, y1 = wy, x2 = ax - 17, y2 = cy;
-      const steps = 20, tt = easeOut(pAct);
-      for (let i = 0; i <= steps * tt; i++) {
-        const u = i / steps;
-        const bx = (1 - u) * (1 - u) * x1 + 2 * (1 - u) * u * ((x1 + x2) / 2) + u * u * x2;
-        const by = (1 - u) * (1 - u) * y1 + 2 * (1 - u) * u * ((y1 + y2) / 2) + u * u * y2;
-        if (i === 0) ctx.moveTo(bx, by); else ctx.lineTo(bx, by);
-      }
-      ctx.stroke();
+      bezierPartial(candX + CAND_W, wy, ax - 17, cy, easeOut(pAct));
+      ctx.restore();
     }
+    return pAct;
+  }
+
+  /* one full frame: p ∈ [0,1] global phase, iter varies both segments */
+  function draw(p, iter) {
+    ctx.setTransform(dpr * scale, 0, 0, dpr * scale, 0, 0);
+    ctx.clearRect(0, 0, W / scale, H / scale);
+
+    let alpha = 1;
+    if (p < 0.02) alpha = easeOut(p / 0.02);
+    else if (p > 0.97) alpha = 1 - easeOut((p - 0.97) / 0.03);
+
+    // story timeline: segment 0 → pan → segment 1 → fade
+    const q0 = clamp01(p / 0.44);
+    const pPan = easeInOut((p - 0.45) / 0.08);
+    const q1 = clamp01((p - 0.54) / 0.42);
+    const cam = SEG * pPan;
+
+    ctx.translate(offX - cam, 0);
+    ctx.globalAlpha = alpha;
+
+    const cy = DESIGN_H / 2;
+
+    // the chain is given from the start: o1 … x1 → o2 (and o2 … x2 → o3 after the pan)
+    const seg0Solid = q0 >= 0.91;
+    const seg1Solid = q1 >= 0.91;
+
+    // connectors x_k → o_{k+1}, drawn once each segment's action resolves
+    ctx.strokeStyle = COL.ghost;
+    ctx.lineWidth = 1;
+    if (seg0Solid) {
+      ctx.beginPath(); ctx.moveTo(X_X + 15, cy); ctx.lineTo(SEG + O_X - 15, cy); ctx.stroke();
+    }
+    if (seg1Solid) {
+      ctx.beginPath(); ctx.moveTo(SEG + X_X + 15, cy); ctx.lineTo(2 * SEG + O_X - 15, cy); ctx.stroke();
+    }
+
+    // segment 0 nodes + sampling
+    obsNode(O_X, cy, 'prompt');
+    actionNode(X_X, cy, seg0Solid, 'logged action');
+    drawSampling(0, q0, iter * 2, alpha, pPan < 0.5);
+
+    // segment 1 nodes (visible from the start — "already there") + sampling after pan
+    obsNode(SEG + O_X, cy, 'next obs');
+    actionNode(SEG + X_X, cy, seg1Solid, pPan > 0.5 ? 'logged action' : null);
+    if (q1 > 0) drawSampling(SEG, q1, iter * 2 + 1, alpha, pPan >= 0.5);
+
+    // the observation after segment 1 (chain continues …)
+    obsNode(2 * SEG + O_X, cy, null);
+
     ctx.globalAlpha = 1;
   }
 
@@ -241,7 +283,7 @@
   }
 
   if (reduceMotion) {
-    draw(0.9, 0);   // fully-resolved static frame with annotations
+    draw(0.42, 0);   // segment 0 resolved, pre-pan, annotations visible
     return;
   }
   const io = new IntersectionObserver((entries) => {

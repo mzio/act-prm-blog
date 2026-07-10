@@ -193,10 +193,10 @@ def build_thought_prompt(templater, state_messages, target_action, committed):
 # reward: length-penalized action likelihood
 # ---------------------------------------------------------------------------
 async def score_thought(sampling_client, templater, scoring_state, thought,
-                        target_action, n_thought_tokens, cfg):
-    """Returns (penalized_reward, raw_likelihood, len_frac, full_tokens,
-    full_logprobs, prefix_len). Scoring uses the natural order — state, thought,
-    action — under the task's original system prompt."""
+                        target_action, n_thought_tokens, cfg, base_client=None):
+    """Score one thought; returns a dict of reward ingredients. Scoring uses the
+    natural order — state, thought, action — under the task's original system
+    prompt."""
     prefix_msgs = scoring_state + [{"role": "assistant", "content": thought}]
     prefix_tokens = templater(prefix_msgs, continue_final_message=True)
     full_msgs = scoring_state + [
@@ -210,12 +210,38 @@ async def score_thought(sampling_client, templater, scoring_state, thought,
     )
     action_lp = np.array([lp for lp in full_logprobs[-n_action:]], dtype=np.float64)
     likelihood = float(np.exp(action_lp.mean()))            # in (0, 1]
+    sum_action_lp = float(action_lp.sum())                  # total log p(x | s, z)
 
     len_frac = min(1.0, n_thought_tokens / cfg.max_thought_tokens)
     penalized = likelihood - cfg.length_penalty * len_frac  # may be negative
 
     prefix_len = len(templater(scoring_state, add_generation_prompt=True))
-    return penalized, likelihood, len_frac, full_tokens, full_logprobs, prefix_len
+
+    # per-token KL of the *thought* against the frozen base model (KL anchor)
+    kl_mean = 0.0
+    if base_client is not None:
+        n_thought = max(1, len(prefix_tokens) - prefix_len)
+        base_logprobs = await base_client.compute_logprobs_async(
+            types.ModelInput.from_ints(full_tokens)
+        )
+        cur = np.array([lp or 0.0 for lp in full_logprobs[prefix_len: prefix_len + n_thought]])
+        base = np.array([lp or 0.0 for lp in base_logprobs[prefix_len: prefix_len + n_thought]])
+        kl_mean = float((cur - base).mean())
+
+    return dict(penalized=penalized, likelihood=likelihood, len_frac=len_frac,
+                sum_action_lp=sum_action_lp, kl_mean=kl_mean,
+                full_tokens=full_tokens, full_logprobs=full_logprobs,
+                prefix_len=prefix_len)
+
+
+async def action_baseline(sampling_client, templater, scoring_state, target_action):
+    """Total log p(x | s, ∅): the action's log-likelihood with NO thought."""
+    prefix_tokens = templater(scoring_state, add_generation_prompt=True)
+    full_tokens = templater(scoring_state + [{"role": "assistant", "content": target_action}])
+    n_action = len(full_tokens) - len(prefix_tokens)
+    logprobs = await sampling_client.compute_logprobs_async(
+        types.ModelInput.from_ints(full_tokens))
+    return float(np.array([lp for lp in logprobs[-n_action:]], dtype=np.float64).sum())
 
 
 def em_weights(penalized_rewards, likelihoods):
@@ -235,7 +261,8 @@ def em_weights(penalized_rewards, likelihoods):
 # ---------------------------------------------------------------------------
 # E-step over one trajectory
 # ---------------------------------------------------------------------------
-async def rollout_trajectory(sampling_client, templater, traj, cfg, verbose=True):
+async def rollout_trajectory(sampling_client, templater, traj, cfg, verbose=True,
+                             base_client=None):
     """Sample + score thoughts at each step; commit the best; return the datum
     ingredients for the M-step and per-step metrics."""
     messages = traj["messages"]
@@ -268,26 +295,46 @@ async def rollout_trajectory(sampling_client, templater, traj, cfg, verbose=True
             thoughts.append(text if text else "(no thought)")
             thought_lens.append(len(seq.tokens))
 
-        # --- score: likelihood minus length penalty ---
+        # --- score each candidate ---
         scoring_state = ([{"role": "system", "content": system_prompt}]
                          + [m for m in state if m["role"] != "system"])
         scored = await asyncio.gather(*[
-            score_thought(sampling_client, templater, scoring_state, z, x_t, n, cfg)
+            score_thought(sampling_client, templater, scoring_state, z, x_t, n, cfg,
+                          base_client=base_client)
             for z, n in zip(thoughts, thought_lens)
         ])
-        penalized = [s[0] for s in scored]
-        likelihoods = [s[1] for s in scored]
-        weights = em_weights(penalized, likelihoods)
-        best = int(np.argmax(penalized))
+        likelihoods = [s["likelihood"] for s in scored]
+        kls = [s["kl_mean"] for s in scored]
+
+        if cfg.reward_method == "lift":
+            # (1) likelihood LIFT over the no-thought baseline, per thought token,
+            # (3) minus a small per-token KL to the frozen base model
+            baseline = await action_baseline(sampling_client, templater, scoring_state, x_t)
+            rewards = [
+                (s["sum_action_lp"] - baseline) / (n + cfg.lift_c) - cfg.kl_coef * s["kl_mean"]
+                for s, n in zip(scored, thought_lens)
+            ]
+            # (2) lexicographic selection: shortest among near-best-likelihood candidates
+            p_max = max(likelihoods)
+            eligible = [g for g in range(len(thoughts))
+                        if likelihoods[g] >= p_max * (1 - cfg.select_epsilon)]
+            best = min(eligible, key=lambda g: thought_lens[g])
+        else:
+            rewards = [s["penalized"] for s in scored]
+            best = int(np.argmax(rewards))
+
+        weights = em_weights(rewards, likelihoods)
 
         committed.append(thoughts[best])
-        for (_, _, _, full_tokens, full_logprobs, prefix_len), w in zip(scored, weights):
-            step_data.append(dict(full_tokens=full_tokens, full_logprobs=full_logprobs,
-                                  prefix_len=prefix_len, weight=float(w)))
+        for s, w in zip(scored, weights):
+            step_data.append(dict(full_tokens=s["full_tokens"],
+                                  full_logprobs=s["full_logprobs"],
+                                  prefix_len=s["prefix_len"], weight=float(w)))
         metrics.append(dict(
             step=t,
             likelihoods=likelihoods,
-            penalized=penalized,
+            penalized=rewards,          # the reward actually used, whatever the method
+            kl=kls,
             weights=weights.tolist(),
             thought_tokens=thought_lens,
             best=best,
@@ -296,7 +343,7 @@ async def rollout_trajectory(sampling_client, templater, traj, cfg, verbose=True
         if verbose:
             print(f"    step {t + 1}/{len(action_indices)}: "
                   f"best p(x|s,z)={likelihoods[best]:.4f}, "
-                  f"penalized={penalized[best]:+.4f}, "
+                  f"reward={rewards[best]:+.4f}, "
                   f"|z| tokens={thought_lens[best]} "
                   f"(group mean |z|={np.mean(thought_lens):.0f})")
     return step_data, metrics
@@ -340,24 +387,25 @@ def summarize(all_metrics):
     )
 
 
-async def safe_rollout(sampling_client, templater, traj, cfg):
+async def safe_rollout(sampling_client, templater, traj, cfg, base_client=None):
     """A rollout that degrades gracefully: one bad trajectory (transient API
     error, context overflow) shouldn't kill a long training run."""
     try:
-        return await rollout_trajectory(sampling_client, templater, traj, cfg, verbose=False)
+        return await rollout_trajectory(sampling_client, templater, traj, cfg, verbose=False,
+                                        base_client=base_client)
     except Exception as e:  # noqa: BLE001 — log and drop this trajectory this iteration
         print(f"  [warn] trajectory rollout failed: {type(e).__name__}: {str(e)[:200]}", flush=True)
         return None
 
 
-async def probe_generations(sampling_client, templater, traj, cfg):
+async def probe_generations(sampling_client, templater, traj, cfg, base_client=None):
     """Checkpoint snapshot: sample + score one group for the probe trajectory's
     first step, without training on it."""
     cfg1 = argparse.Namespace(**{**vars(cfg), "max_steps_per_traj": 1})
     _, metrics = await rollout_trajectory(
         sampling_client, templater,
         {"messages": traj["messages"], "system_prompt": traj["system_prompt"]},
-        cfg1, verbose=False,
+        cfg1, verbose=False, base_client=base_client,
     )
     return metrics[0]
 
@@ -384,9 +432,13 @@ async def train(cfg):
         training_client = await service_client.create_lora_training_client_async(
             cfg.model, rank=cfg.lora_rank
         )
+    base_client = None
+    if cfg.reward_method == "lift" and cfg.kl_coef > 0:
+        base_client = service_client.create_sampling_client(base_model=cfg.model)
     print(f"training client: {cfg.model} (LoRA r={cfg.lora_rank}), "
-          f"lambda_len={cfg.length_penalty}, G={cfg.group_size}, "
-          f"iterations {cfg.start_iteration}..{cfg.em_iterations}", flush=True)
+          f"reward={cfg.reward_method} "
+          f"({'lift_c=' + str(cfg.lift_c) + ', eps=' + str(cfg.select_epsilon) + ', kl=' + str(cfg.kl_coef) if cfg.reward_method == 'lift' else 'lambda_len=' + str(cfg.length_penalty)}), "
+          f"G={cfg.group_size}, iterations {cfg.start_iteration}..{cfg.em_iterations}", flush=True)
 
     out = Path(cfg.log_path)
     out.parent.mkdir(parents=True, exist_ok=True)
@@ -406,7 +458,8 @@ async def train(cfg):
             name=f"lenpen-iter-{n}")).result_async()
         state = await (await training_client.save_state_async(
             name=f"lenpen-state-{n}", overwrite=True)).result_async()
-        probe = await probe_generations(sampling_client, templater, eval_trajs[0], cfg)
+        probe = await probe_generations(sampling_client, templater, eval_trajs[0], cfg,
+                                        base_client=base_client)
         log["checkpoints"].append(dict(iteration=n, sampler_path=resp.path,
                                        state_path=state.path, probe=probe))
         flush_log()
@@ -431,12 +484,12 @@ async def train(cfg):
 
         # E-step: all train trajectories in parallel, then held-out eval
         results = [r for r in await asyncio.gather(*[
-            safe_rollout(sampling_client, templater, tr, cfg) for tr in train_trajs
+            safe_rollout(sampling_client, templater, tr, cfg, base_client) for tr in train_trajs
         ]) if r is not None]
         if not results:
             raise RuntimeError("every trajectory rollout failed this iteration")
         eval_results = [r for r in await asyncio.gather(*[
-            safe_rollout(sampling_client, templater, tr, cfg) for tr in eval_trajs
+            safe_rollout(sampling_client, templater, tr, cfg, base_client) for tr in eval_trajs
         ]) if r is not None]
 
         data = [make_datum(**sd) for step_data, _ in results for sd in step_data]
@@ -548,6 +601,16 @@ def main():
     p.add_argument("--group-size", type=int, default=4, help="G thoughts per state")
     p.add_argument("--length-penalty", type=float, default=0.15,
                    help="lambda: reward = p(x|s,z) - lambda * |z|/max_thought_tokens")
+    p.add_argument("--reward-method", choices=["lenpen", "lift"], default="lenpen",
+                   help="lenpen: additive length penalty; lift: likelihood lift over the "
+                        "no-thought baseline per thought token, lexicographic selection, "
+                        "small KL anchor to the base model")
+    p.add_argument("--lift-c", type=float, default=15.0,
+                   help="lift method: token-count smoothing constant in the denominator")
+    p.add_argument("--select-epsilon", type=float, default=0.02,
+                   help="lift method: commit the shortest thought within eps of best likelihood")
+    p.add_argument("--kl-coef", type=float, default=0.05,
+                   help="lift method: per-token KL-to-base-model penalty coefficient")
     p.add_argument("--max-thought-tokens", type=int, default=200)
     p.add_argument("--num-trajectories", type=int, default=2)
     p.add_argument("--eval-trajectories", type=int, default=1,
