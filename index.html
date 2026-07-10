@@ -81,15 +81,62 @@
 </div>
 
 <section id="at-a-glance">
-  <figure class="card" style="margin:2rem 0 0.6rem;">
-    <div class="figbody" style="border-radius:8px; background:#fff;">
-      <canvas id="miniloop-canvas" style="display:block;width:100%;height:250px;" aria-label="Animated loop: given a state and a logged action, candidate thoughts are sampled between them, scored by the likelihood of the logged action, and the best one is kept before moving to the next step"></canvas>
+  <p class="smallnote" style="margin-bottom:0.4rem;"><strong>Four kinds of learning signal</strong> for training long-horizon agents; this post builds up to Act-PRMs:</p>
+<div class="signal-grid">
+    <div class="signal-card">
+      <h5>RL rollouts</h5>
+      <ul>
+        <li class="bad">Sparse rewards</li>
+        <li class="good">Easy to collect</li>
+      </ul>
+      <div class="strip" data-strip="rl"></div>
+      <div class="note">Generate both thoughts and actions during RL; get one reward at the very end.</div>
     </div>
-    <figcaption><span class="figlabel">The whole method in one loop.</span> Given the current
+    <div class="signal-card">
+      <h5>Complete-trace SFT</h5>
+      <ul>
+        <li class="good">Dense signal</li>
+        <li class="bad">Expensive to collect</li>
+      </ul>
+      <div class="strip" data-strip="full"></div>
+      <div class="note">Humans write down both thoughts and actions for every step.</div>
+    </div>
+    <div class="signal-card">
+      <h5>Action-only SFT</h5>
+      <ul>
+        <li class="bad">Insufficient context</li>
+        <li class="good">Easy to collect</li>
+      </ul>
+      <div class="strip" data-strip="actiononly"></div>
+      <div class="note">Log only explicit actions; the reasoning between them is lost.</div>
+    </div>
+    <div class="signal-card ours">
+      <h5>Act-PRM (ours)</h5>
+      <ul>
+        <li class="good">Dense rewards</li>
+        <li class="good">Sufficient context</li>
+        <li class="good">Easy to collect</li>
+      </ul>
+      <div class="strip" data-strip="actprm"></div>
+      <div class="note">Infer latent thoughts from logged actions; use action likelihood as dense reward.</div>
+    </div>
+  </div>
+  <p class="smallnote">
+    Hollow blue nodes are latent <span class="chip chip-z">thoughts z</span>; filled green nodes are
+    explicit <span class="chip chip-x">actions x</span>; gray nodes are
+    <span class="chip chip-s">states s</span>.
+  </p>
+
+  <figure class="card" style="margin:2.2rem 0 0.6rem;">
+    <div class="figbody" style="border-radius:8px; background:#fff;">
+      <canvas id="miniloop-canvas" style="display:block;width:100%;height:250px;" aria-label="Animated loop: given observations and a logged action, candidate thoughts are sampled between them, scored by the likelihood of the logged action, and the best one is kept before moving to the next step"></canvas>
+    </div>
+    <figcaption><span class="figlabel">Act-PRMs in one loop.</span> Given the current
     <span class="chip chip-s">state</span> and the next <span class="chip chip-x">logged action</span>
     (already recorded — dashed), we sample candidate <span class="chip chip-z">thoughts</span> between
-    them, score each by <span class="chip chip-r">p(x&thinsp;|&thinsp;s,&thinsp;z)</span>, keep the
-    best, and repeat for the next logged action.</figcaption>
+    them, score each by <span class="chip chip-r">p(x&thinsp;|&thinsp;s,&thinsp;z)</span> — where the
+    state s is a concatenation of prior observations o, selected thoughts z, and explicit actions x —
+    keep the best, and repeat for the next logged action.</figcaption>
   </figure>
 </section>
 
@@ -1158,7 +1205,7 @@ howpublished={\url{https://michaelzhang.xyz/act-prm-blog/}}
 <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
 <script defer src="assets/js/hero.js?v=4"></script>
 <script defer src="assets/js/charts.js?v=4"></script>
-<script defer src="assets/js/miniloop.js?v=1"></script>
+<script defer src="assets/js/miniloop.js?v=2"></script>
 <script defer src="assets/js/demo.js?v=4"></script>
 <script defer src="assets/js/main.js?v=4"></script>
 </body>

@@ -31,7 +31,7 @@
 
   const G = 3;                    // candidate thoughts per step
   const STEP_W = 360;             // horizontal span per timestep
-  const PERIOD = 4600;            // ms per timestep
+  const PERIOD = 7200;            // ms per timestep (incl. ~1.7s hold after the pick)
   const CAND_W = 96, CAND_H = 34;
 
   function prand(i, j) {
@@ -64,11 +64,12 @@
     const sx = x0, candX = x0 + 96, ax = x0 + 262;
     const winner = Math.floor(prand(stepIdx, 9) * G);
 
-    const pFan = easeOut(p / 0.16);
-    const pType = clamp01((p - 0.10) / 0.26);
-    const pScore = clamp01((p - 0.38) / 0.18);
-    const pPick = clamp01((p - 0.58) / 0.14);
-    const pAct = clamp01((p - 0.74) / 0.14);
+    const pFan = easeOut(p / 0.12);
+    const pType = clamp01((p - 0.08) / 0.22);
+    const pScore = clamp01((p - 0.32) / 0.14);
+    const pPick = clamp01((p - 0.48) / 0.09);
+    // hold: winner stays highlighted from ~0.57 to 0.80 before the action resolves
+    const pAct = clamp01((p - 0.80) / 0.12);
 
     // --- state node (visible immediately) ---
     ctx.lineWidth = 1.5;
@@ -78,8 +79,8 @@
     ctx.fillStyle = COL.ink;
     ctx.font = 'italic 12px Georgia, serif';
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.fillText('s', sx, cy + 1);
-    if (labeled) label(stepIdx === 0 ? 'prompt' : 'state', sx, cy + 32);
+    ctx.fillText('o', sx, cy + 1);
+    if (labeled) label(stepIdx === 0 ? 'prompt' : 'observation', sx, cy + 32);
 
     // --- LOGGED action node: dashed outline from the start (it's given!) ---
     const solid = pAct > 0.5;
