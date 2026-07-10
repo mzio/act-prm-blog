@@ -8,7 +8,7 @@
 
 <link rel="preconnect" href="https://cdn.jsdelivr.net">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
-<link rel="stylesheet" href="assets/css/style.css?v=3">
+<link rel="stylesheet" href="assets/css/style.css?v=4">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>💭</text></svg>">
 </head>
 <body>
@@ -79,6 +79,54 @@
     as plain policy-gradient RL.
   </p>
 </div>
+
+<section id="at-a-glance">
+  <p class="smallnote" style="margin-bottom:0.4rem;"><strong>At a glance</strong> — the four kinds of learning signal for long-horizon agents; this post builds up to the fourth:</p>
+<div class="signal-grid">
+    <div class="signal-card">
+      <h5>RL rollouts</h5>
+      <ul>
+        <li class="bad">Sparse rewards</li>
+        <li class="good">Easy to collect</li>
+      </ul>
+      <div class="strip" data-strip="rl"></div>
+      <div class="note">Generate both thoughts and actions during RL; get one reward at the very end.</div>
+    </div>
+    <div class="signal-card">
+      <h5>Complete-trace SFT</h5>
+      <ul>
+        <li class="good">Dense signal</li>
+        <li class="bad">Expensive to collect</li>
+      </ul>
+      <div class="strip" data-strip="full"></div>
+      <div class="note">Humans write down both thoughts and actions for every step.</div>
+    </div>
+    <div class="signal-card">
+      <h5>Action-only SFT</h5>
+      <ul>
+        <li class="bad">Insufficient context</li>
+        <li class="good">Easy to collect</li>
+      </ul>
+      <div class="strip" data-strip="actiononly"></div>
+      <div class="note">Log only explicit actions; the reasoning between them is lost.</div>
+    </div>
+    <div class="signal-card ours">
+      <h5>Act-PRM (ours)</h5>
+      <ul>
+        <li class="good">Dense rewards</li>
+        <li class="good">Sufficient context</li>
+        <li class="good">Easy to collect</li>
+      </ul>
+      <div class="strip" data-strip="actprm"></div>
+      <div class="note">Infer latent thoughts from logged actions; use action likelihood as dense reward.</div>
+    </div>
+  </div>
+  <p class="smallnote">
+    Hollow blue nodes are latent <span class="chip chip-z">thoughts z</span>; filled green nodes are
+    explicit <span class="chip chip-x">actions x</span>; gray nodes are
+    <span class="chip chip-s">states s</span>.
+  </p>
+</section>
 
 <!-- ================= INTRO ================= -->
 <section id="intro">
@@ -160,13 +208,13 @@
   <p>However, doing so raises its own challenges:</p>
   <ol>
     <li>
-      Remaining faithful to the <em>full</em> trajectory — recording not just actions but a human's
+      <strong>Scaling Effectively</strong>: Remaining faithful to the <em>full</em> trajectory — recording not just actions but a human's
       chain of thought — introduces annotation effort separate from task completion. This is hard to
       scale, which especially hurts when (1) BC relies on large amounts of training data, and (2) our
       dataset size is directly capped by the number of collected demonstrations.
     </li>
     <li>
-      Limiting the data to <em>action-only</em> demonstrations removes the annotation burden, but may
+      <strong>Providing Enough Context</strong>: Limiting the data to <em>action-only</em> demonstrations removes the annotation burden, but may
       not provide informative-enough learning signal. Consider a task that involves navigating a series
       of web pages. We can record the sequence of actions automatically as events in a process log
       (URLs visited, coordinates clicked). But without the surrounding context motivating this sequence,
@@ -175,10 +223,11 @@
   </ol>
 
   <p>
-    Where does that leave us? Below, the four kinds of learning signal, side by side:
+    This leaves us with the <strong>3 common approaches</strong>, along with a sign-post of the
+    <strong>Act-PRM</strong> setup we'll introduce:
   </p>
 
-  <div class="signal-grid" id="signal-grid">
+  <div class="signal-grid">
     <div class="signal-card">
       <h5>RL rollouts</h5>
       <ul>
@@ -1142,9 +1191,9 @@ howpublished={\url{https://michaelzhang.xyz/act-prm-blog/}}
 
 <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
 <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
-<script defer src="assets/js/hero.js?v=3"></script>
-<script defer src="assets/js/charts.js?v=3"></script>
-<script defer src="assets/js/demo.js?v=3"></script>
-<script defer src="assets/js/main.js?v=3"></script>
+<script defer src="assets/js/hero.js?v=4"></script>
+<script defer src="assets/js/charts.js?v=4"></script>
+<script defer src="assets/js/demo.js?v=4"></script>
+<script defer src="assets/js/main.js?v=4"></script>
 </body>
 </html>

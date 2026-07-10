@@ -196,7 +196,7 @@
     }
   }
 
-  document.querySelectorAll('#signal-grid [data-strip]').forEach((elx) => {
+  document.querySelectorAll('.signal-grid [data-strip]').forEach((elx) => {
     strip(elx.getAttribute('data-strip'), elx);
   });
 })();
