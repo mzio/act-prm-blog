@@ -1,0 +1,1089 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>On Learning to Think with Action Process Reward Models</title>
+<meta name="description" content="Act-PRMs: training LLMs to infer the latent thoughts behind action-only demonstrations, using the likelihood of observed actions as a dense process reward.">
+
+<link rel="preconnect" href="https://cdn.jsdelivr.net">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<link rel="stylesheet" href="assets/css/style.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>💭</text></svg>">
+</head>
+<body>
+
+<!-- ================= HERO ================= -->
+<header class="hero">
+  <canvas id="hero-canvas" aria-hidden="true"></canvas>
+  <div class="hero-inner">
+    <div class="hero-kicker">Action Process Reward Models</div>
+    <h1 class="title">On Learning to <span class="accent-z">Think</span><br>with Action Process Reward Models</h1>
+    <div class="hero-authors">
+      <a href="https://michaelzhang.xyz">Michael Zhang</a> &nbsp;·&nbsp; Madison Ho
+    </div>
+    <div class="hero-venue">Stanford University &nbsp;·&nbsp; ICML 2026 Workshop on RL from World Feedback</div>
+    <div class="hero-links">
+      <a href="https://openreview.net/forum?id=2zsteCP2wy">Paper</a>
+      <a href="#playground">Interactive demo</a>
+      <a href="#notebooks">Notebooks</a>
+      <a href="#bibtex">BibTeX</a>
+    </div>
+  </div>
+</header>
+
+<main>
+<div class="container">
+
+<!-- ================= TLDR ================= -->
+<div class="tldr">
+  <div class="label">TL;DR</div>
+  <p>
+    Building and hill-climbing on RL environments is great. But what happens if our workflows are too
+    long and our rewards too sparse? In this post, we explore one alternative: using easy-to-collect,
+    <em>offline</em> demonstrations of past successful trajectories — e.g., the actions recorded in a
+    process log while a human employee does the task today — to guide our LLMs along the way.
+  </p>
+  <p>
+    Supervised finetuning on these observed <span class="chip chip-x">actions</span> alone turns out
+    not to provide enough learning signal. Our key idea is that the recorded sequence is only half the
+    picture: missing from it are the human's <em>implicit</em>
+    <span class="chip chip-z">thoughts</span> between the recorded actions, which supply the connecting
+    context needed to predict what comes next. We train LLMs to <em>infer</em> these thoughts from the
+    actions — scoring each candidate thought by the
+    <span class="chip chip-r">likelihood</span> it assigns to the action that actually followed — and
+    show this is exactly an <strong>Expectation-Maximization</strong> algorithm that can be implemented
+    as plain policy-gradient RL.
+  </p>
+</div>
+
+<!-- ================= INTRO ================= -->
+<section id="intro">
+  <h2><span class="secnum">1</span>Intro + problem</h2>
+
+  <p>
+    Towards turning LLMs into useful “agents”, we'd like scalable ways to train these models to
+    complete long and tedious tasks — ones that humans might begrudgingly do today. Mechanically, this
+    involves having an LLM think and take actions (generate tool calls, reply to users) iteratively
+    over multiple steps. The final outcome of these actions then determines whether the task was
+    completed successfully or not.
+  </p>
+  <p>
+    To do this, building environments and training with RL is one option. After all, these tasks are
+    <em>technically verifiable</em> (did the LLM complete the task or not?). However, long multi-turn
+    workflows introduce several challenges, especially for the popular policy-gradient methods of today:
+  </p>
+
+  <ul>
+    <li>
+      <strong>Sparse rewards / credit assignment.</strong> While successful task completion is one true
+      reward signal, verifying success is only possible at the end. For long multi-turn workflows, this
+      single sparse reward exacerbates a classic <em>credit assignment</em> problem: it's difficult to
+      determine which actions contributed to the final outcome, and one poor action resulting in failure
+      can noisily penalize perfectly reasonable prior actions.
+    </li>
+    <li>
+      <strong>Providing informative intermediate signal.</strong> Alternatively, we could try to
+      <em>engineer</em> or <em>shape</em> reward functions that fire more often, e.g., based on the
+      immediate observations following an action. But since these rewards are only intermediate proxies
+      for the final outcome, they can often be <em>hacked</em>. Designing “unbiased” functions where
+      local rewards align with final success remains its own
+      <a href="https://archives.argmin.net/2018/04/16/ethical-rewards/">tedious challenge</a>.
+    </li>
+    <li>
+      <strong>Maintaining scalable training.</strong> Finally, to automate a large variety of useful yet
+      undesirable tasks, we'd like training to be easy to deploy for arbitrary workflows — reducing the
+      human effort needed to provide training signal. Existing reward systems, even automated ones
+      (rubric-based LLM-as-judges, process reward models), require additional manual design or data
+      curation. Can we instead have methods where collecting the training signal coincides with humans
+      <em>already having to do the task</em>?
+    </li>
+  </ul>
+
+  <div class="meme-row">
+    <figure class="card">
+      <img src="assets/img/cartpole.gif" alt="Cartpole balancing animation" loading="lazy">
+      <figcaption>We're not doing cartpole anymore. Real workflows run for dozens of turns before any
+      reward shows up.</figcaption>
+    </figure>
+    <figure class="card">
+      <img src="assets/img/reward-hacking-boat.gif" alt="A game boat spinning in circles to collect points instead of finishing the race" loading="lazy">
+      <figcaption>The classic failure mode of shaped rewards: the boat learns to spin in circles
+      collecting points instead of finishing the race
+      (<a href="https://aisafety.info/questions/8SIU/What-is-reward-hacking">reward hacking</a>).</figcaption>
+    </figure>
+  </div>
+</section>
+
+<!-- ================= SFT / BC ================= -->
+<section id="sft-bc">
+  <h2><span class="secnum">2</span>SFT on demonstrations as an alternative?</h2>
+
+  <p>
+    Meanwhile, because we are aiming to <em>distill</em> a human's ability to complete a workflow into
+    an LLM, we could consider supervised finetuning (SFT) over sequences of expert demonstrations,
+    i.e., <em>behavioral cloning</em> (BC). By collecting successful demonstrations of a human
+    completing a task and training an LLM on text representations of these trajectories, we get dense
+    next-token prediction signal from work a human was doing anyway.
+  </p>
+
+  <figure class="card">
+    <img src="assets/img/process-log-sap.gif" alt="Screen recording of a form-filling workflow being logged step by step" loading="lazy">
+    <figcaption><span class="figlabel">Action-only logs are nearly free to collect.</span>
+    Many workflows already run through software that records every explicit step — URLs visited,
+    fields filled, tool calls issued — as a process log. Nobody writes down <em>why</em>.</figcaption>
+  </figure>
+
+  <p>However, doing so raises its own challenges:</p>
+  <ol>
+    <li>
+      Remaining faithful to the <em>full</em> trajectory — recording not just actions but a human's
+      chain of thought — introduces annotation effort separate from task completion. This is hard to
+      scale, which especially hurts when (1) BC relies on large amounts of training data, and (2) our
+      dataset size is directly capped by the number of collected demonstrations.
+    </li>
+    <li>
+      Limiting the data to <em>action-only</em> demonstrations removes the annotation burden, but may
+      not provide informative-enough learning signal. Consider a task that involves navigating a series
+      of web pages. We can record the sequence of actions automatically as events in a process log
+      (URLs visited, coordinates clicked). But without the surrounding context motivating this sequence,
+      predicting the next action can be challenging.
+    </li>
+  </ol>
+
+  <p>
+    Where does that leave us? Below, the four kinds of learning signal, side by side:
+  </p>
+
+  <div class="signal-grid" id="signal-grid">
+    <div class="signal-card">
+      <h5>RL rollouts</h5>
+      <ul>
+        <li class="bad">Sparse rewards</li>
+        <li class="good">Easy to collect</li>
+      </ul>
+      <div class="strip" data-strip="rl"></div>
+      <div class="note">Generate both thoughts and actions during RL; get one reward at the very end.</div>
+    </div>
+    <div class="signal-card">
+      <h5>Complete-trace SFT</h5>
+      <ul>
+        <li class="good">Dense signal</li>
+        <li class="bad">Expensive to collect</li>
+      </ul>
+      <div class="strip" data-strip="full"></div>
+      <div class="note">Humans write down both thoughts and actions for every step.</div>
+    </div>
+    <div class="signal-card">
+      <h5>Action-only SFT</h5>
+      <ul>
+        <li class="bad">Insufficient context</li>
+        <li class="good">Easy to collect</li>
+      </ul>
+      <div class="strip" data-strip="actiononly"></div>
+      <div class="note">Log only explicit actions; the reasoning between them is lost.</div>
+    </div>
+    <div class="signal-card ours">
+      <h5>Act-PRM (ours)</h5>
+      <ul>
+        <li class="good">Dense rewards</li>
+        <li class="good">Sufficient context</li>
+        <li class="good">Easy to collect</li>
+      </ul>
+      <div class="strip" data-strip="actprm"></div>
+      <div class="note">Infer latent thoughts from logged actions; use action likelihood as dense reward.</div>
+    </div>
+  </div>
+  <p class="smallnote">
+    Hollow blue nodes are latent <span class="chip chip-z">thoughts z</span>; filled green nodes are
+    explicit <span class="chip chip-x">actions x</span>; gray nodes are
+    <span class="chip chip-s">states s</span>.
+  </p>
+</section>
+
+<!-- ================= MOTIVATING STUDY ================= -->
+<section id="motivating">
+  <h2><span class="secnum">3</span>A motivating study: action-only demonstrations are insufficient context</h2>
+
+  <p>
+    A natural first attempt at using action-only logs is to train an LLM to predict each explicit
+    action <span class="chip chip-x">x<sub>t</sub></span> from the preceding partial context — standard
+    SFT over action tokens. Since these actions led to success, generating the same target actions at
+    each step should result in successful task completion. Before introducing our method, we ask
+    empirically: <em>do action-only trajectories carry enough context to predict the next action in a
+    successful demonstration?</em>
+  </p>
+  <p>
+    For each task we collect a corpus of successful trajectories and construct two SFT variants of the
+    same base model (Qwen3-4B-Instruct-2507 + LoRA):
+  </p>
+  <ol>
+    <li><strong>Action-only SFT</strong> — supervise only the explicit action tokens given the
+      action-only context.</li>
+    <li><strong>Thoughts + Actions SFT</strong> — supervise both thoughts and actions from a
+      full-trajectory context that includes the (oracle / frontier-LM-written) thoughts.</li>
+  </ol>
+  <p>
+    We evaluate on held-out successful trajectories with two inference-time metrics over the
+    ground-truth explicit-action tokens: <strong>action-token perplexity</strong> and
+    <strong>action-token prediction accuracy</strong> (top-1 next-token match), across text-world games
+    (TextWorld Treasure Hunter, Coin Collector) and a real tool-calling task
+    (Snorkel Finance Reasoning).
+  </p>
+
+  <div class="chart" id="chart-motivating">
+    <div class="chart-title">Action-only SFT consistently lags Thoughts + Actions SFT</div>
+    <div class="chart-sub">Held-out action-token prediction accuracy (higher is better) · Qwen3-4B-Instruct-2507, same trajectories, same supervision except the thoughts</div>
+    <div class="chart-body"></div>
+    <div class="legend"></div>
+  </div>
+
+  <div class="table-wrap">
+    <table class="results">
+      <thead>
+        <tr>
+          <th class="rowhead">Task</th>
+          <th colspan="2">Action-token PPL ↓</th>
+          <th colspan="2" class="group-sep">Action-token Acc ↑</th>
+        </tr>
+        <tr>
+          <th class="rowhead"></th>
+          <th>Action-only</th><th>Thoughts + Actions</th>
+          <th class="group-sep">Action-only</th><th>Thoughts + Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td class="rowhead">Treasure Hunter (TextWorld)</td><td>1.03</td><td class="best">1.01</td><td class="group-sep">0.563</td><td class="best">0.661</td></tr>
+        <tr><td class="rowhead">Coin Collector (TextWorld)</td><td>1.07</td><td class="best">1.02</td><td class="group-sep">0.531</td><td class="best">0.674</td></tr>
+        <tr><td class="rowhead">Snorkel Finance Reasoning</td><td>1.25</td><td class="best">1.14</td><td class="group-sep">0.053</td><td class="best">0.144</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p>
+    Across the board, the action-only model trails the Thoughts + Actions model by a substantial
+    margin: gaps of 10–14 percentage points of action-prediction accuracy on the text-world games and
+    roughly 9 points on the tool-calling task, with correspondingly higher action-token perplexity.
+    The gap also isn't something more training closes — it's visible over the whole optimization
+    trajectory:
+  </p>
+
+  <div class="fig-row">
+    <figure class="card">
+      <img src="assets/img/curve-treasure-ppl.png" alt="Eval action-token perplexity vs training steps on TextWorld Treasure Hunter: the actions-only curve plateaus well above the thoughts+actions curve" loading="lazy">
+      <figcaption><span class="figlabel">TextWorld Treasure Hunter.</span> Held-out action-token PPL
+      during SFT. Action-only (red) plateaus above Thoughts + Actions (magenta) no matter how long we
+      train.</figcaption>
+    </figure>
+    <figure class="card">
+      <img src="assets/img/curve-snorkel-ppl.png" alt="Eval action-token perplexity vs training steps on Snorkel Finance Reasoning, same qualitative gap" loading="lazy">
+      <figcaption><span class="figlabel">Snorkel Finance Reasoning.</span> Same story on a real
+      tool-calling task: the context gap persists through convergence.</figcaption>
+    </figure>
+  </div>
+
+  <p>
+    The implication: the explicit-action sequence alone is missing information that the model could
+    exploit if it had access to the interleaved thoughts. This motivates recovering those thoughts from
+    the model itself — the subject of the rest of this post.
+  </p>
+</section>
+
+<!-- ================= SETUP ================= -->
+<section id="setup">
+  <h2><span class="secnum">4</span>Setup: multi-turn RL</h2>
+
+  <p>
+    To ground our approach, we start with the following multi-turn RL setup. For each timestep
+    $t$, our model processes as input context a state $s_t$, generates an action $a_t$, and receives a
+    reward $r_t$. We then transition to the next state $s_{t+1}$ via a next-timestep observation
+    $o_{t+1}$. We use the simple case where new states are a concatenation of the prior state, action,
+    reward, and new observation:
+  </p>
+  <div class="eq-block">
+  $$
+  \begin{aligned}
+  s_1 &= (o_1,) \\
+  s_2 &= (o_1, a_1, r_1, o_2) \\
+  &\ldots \\
+  s_{t} &= (o_1, a_1, r_1, \ldots, a_{t-1}, r_{t-1}, o_t)
+  \end{aligned}
+  $$
+  </div>
+  <p>
+    and let trajectory $\tau$ be a complete sequence of observations, actions, and rewards associated
+    with a task completion (or failure), i.e.,
+  </p>
+  <div class="eq-block">
+  $$
+  \tau = (o_1, a_1, r_1, o_2, a_2, r_2, \ldots, o_T, a_T, r_T, o_{T+1})
+  $$
+  </div>
+  <p>
+    for last timestep $T$. By default, we tie rewards to task completion (success or failure at the
+    final timestep), so
+  </p>
+  <div class="eq-block">
+  $$
+  r_t = \begin{cases}
+  1 & \text{if } t = T \text{ and } \tau \text{ succeeds} \\
+  0 & \text{otherwise}
+  \end{cases}
+  $$
+  </div>
+  <p>Concretely, we can think of:</p>
+  <ul>
+    <li>$s_1 = o_1$ as the system prompt, initial task instruction, and any additional environment context,</li>
+    <li>$a_1$ as the text generated by the model in response — i.e., thoughts and explicit actions $(z_1, x_1)$,</li>
+    <li>$o_2$ as some feedback or response from the environment (tool-call response or user message),</li>
+    <li>$s_2$ as just the concatenation of these prior components (e.g., the processed list of dicts
+      following a Hugging Face Transformers chat template),</li>
+  </ul>
+  <p>with similar instantiations for subsequent $t \in [T]$.</p>
+
+  <h3>Tying objectives to task success</h3>
+  <p>
+    Like most RL setups, for any timestep $t$ we want our model to generate actions that maximize the
+    expected <em>return</em> $J_t$, or (discounted) sum of future rewards. With our sparse rewards and
+    no discounting, letting $R_t$ and $\tau_t$ be the return and trajectory starting at $t$:
+  </p>
+  <div class="eq-block">
+  $$
+  \begin{aligned}
+  R_t &= r_t + r_{t+1} + \ldots + r_T \\
+  J_t &= \mathbb{E}_{\tau_t \sim p_\theta(\tau_t)} \Big[ \sum_{t'=t}^T r_{t'} \Big]
+  = \mathbb{E}_{\tau_t \sim p_\theta(\tau_t)} \Big[ \mathbb{1}(\tau_{t} \text{ succeeds}) \Big]
+  = P(\tau_t \text{ succeeds})
+  \end{aligned}
+  $$
+  </div>
+  <p>
+    In other words, at each timestep $t$, given everything the model's seen before, we want to generate
+    actions that maximize the probability of a successful task completion.
+  </p>
+</section>
+
+<!-- ================= APPROACH ================= -->
+<section id="approach">
+  <h2><span class="secnum">5</span>Training to infer thoughts, given successful demonstrations</h2>
+
+  <p>
+    Now we begin the steps to back out an RL algorithm for our setting. To recap, we're given access
+    to a sequence of <em>explicit actions</em> $x_t$ and outcomes $o_{t+1}$ from successful human task
+    completions, i.e.,
+  </p>
+  <div class="eq-block">
+  $$
+  \tau \;\text{ where }\; p(\tau_\text{succeeds} \mid o_1, a_1, \ldots, o_T, a_T) = 1
+  $$
+  </div>
+  <p>
+    However, for each action, rather than the full $a_t = (z_t, x_t)$, we only observe
+    $a_t = (x_t,)$, resulting in “partial” trajectories:
+  </p>
+  <div class="eq-block">
+  $$
+  \dot{\tau} = (o_1, \cdot\;, x_1, \ldots, o_T, \cdot\;, x_T)
+  $$
+  </div>
+  <p>
+    We could SFT LLMs over $\dot{\tau}$, since generating the explicit actions $x_t$ is enough to reach
+    a success state. However — as Section 3 just showed — $x_1, \ldots, x_t$ alone may not provide
+    enough context to predict $x_{t+1}$. So we're interested in learning to generate the best
+    interweaving <em>inferred thoughts</em> $\hat{z}_1, \hat{z}_2, \ldots, \hat{z}_T$ to fill in the
+    complete trajectory:
+  </p>
+  <div class="eq-block">
+  $$
+  \hat{\tau} = (o_1, \hat{z}_1, x_1, \ldots, o_T, \hat{z}_T, x_T)
+  $$
+  </div>
+  <p>
+    where “best” is determined by the $\hat z$ that make the observed sequence of observations and
+    explicit actions most likely.
+  </p>
+
+  <figure class="gm-figure card">
+    <div class="figbody" style="border-radius:8px; padding:1.4rem 1rem 0.8rem;">
+      <svg id="gm-svg" viewBox="0 0 560 190" role="img" aria-label="Latent-variable graphical model: latent thoughts z form a chain, each emitting an observed action x">
+        <defs>
+          <marker id="gm-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M 0 0 L 10 5 L 0 10 z" fill="#898781"/>
+          </marker>
+        </defs>
+        <!-- chain arrows z -> z -->
+        <line x1="45"  y1="55" x2="115" y2="55" stroke="#898781" stroke-width="1.5" marker-end="url(#gm-arrow)"/>
+        <line x1="185" y1="55" x2="255" y2="55" stroke="#898781" stroke-width="1.5" marker-end="url(#gm-arrow)"/>
+        <line x1="325" y1="55" x2="395" y2="55" stroke="#898781" stroke-width="1.5" marker-end="url(#gm-arrow)"/>
+        <line x1="465" y1="55" x2="535" y2="55" stroke="#898781" stroke-width="1.5" marker-end="url(#gm-arrow)"/>
+        <!-- emission arrows z -> x -->
+        <line x1="150" y1="90" x2="150" y2="128" stroke="#898781" stroke-width="1.5" marker-end="url(#gm-arrow)"/>
+        <line x1="290" y1="90" x2="290" y2="128" stroke="#898781" stroke-width="1.5" marker-end="url(#gm-arrow)"/>
+        <line x1="430" y1="90" x2="430" y2="128" stroke="#898781" stroke-width="1.5" marker-end="url(#gm-arrow)"/>
+        <!-- latent thought nodes -->
+        <g class="gm-z">
+          <circle cx="150" cy="55" r="30" fill="#fcfcfb" stroke="#2a78d6" stroke-width="1.8" stroke-dasharray="5 4"/>
+          <text x="150" y="61" text-anchor="middle" font-size="17" fill="#2a78d6" font-style="italic">z<tspan baseline-shift="sub" font-size="11">t−1</tspan></text>
+        </g>
+        <g class="gm-z">
+          <circle cx="290" cy="55" r="30" fill="#fcfcfb" stroke="#2a78d6" stroke-width="1.8" stroke-dasharray="5 4"/>
+          <text x="290" y="61" text-anchor="middle" font-size="17" fill="#2a78d6" font-style="italic">z<tspan baseline-shift="sub" font-size="11">t</tspan></text>
+        </g>
+        <g class="gm-z">
+          <circle cx="430" cy="55" r="30" fill="#fcfcfb" stroke="#2a78d6" stroke-width="1.8" stroke-dasharray="5 4"/>
+          <text x="430" y="61" text-anchor="middle" font-size="17" fill="#2a78d6" font-style="italic">z<tspan baseline-shift="sub" font-size="11">t+1</tspan></text>
+        </g>
+        <!-- observed action nodes -->
+        <g class="gm-x">
+          <circle cx="150" cy="152" r="24" fill="rgba(27,175,122,0.14)" stroke="#1baf7a" stroke-width="1.8"/>
+          <text x="150" y="158" text-anchor="middle" font-size="16" fill="#0e7a54" font-style="italic">x<tspan baseline-shift="sub" font-size="10">t−1</tspan></text>
+        </g>
+        <g class="gm-x">
+          <circle cx="290" cy="152" r="24" fill="rgba(27,175,122,0.14)" stroke="#1baf7a" stroke-width="1.8"/>
+          <text x="290" y="158" text-anchor="middle" font-size="16" fill="#0e7a54" font-style="italic">x<tspan baseline-shift="sub" font-size="10">t</tspan></text>
+        </g>
+        <g class="gm-x">
+          <circle cx="430" cy="152" r="24" fill="rgba(27,175,122,0.14)" stroke="#1baf7a" stroke-width="1.8"/>
+          <text x="430" y="158" text-anchor="middle" font-size="16" fill="#0e7a54" font-style="italic">x<tspan baseline-shift="sub" font-size="10">t+1</tspan></text>
+        </g>
+        <text x="20" y="60" font-size="20" fill="#898781">…</text>
+        <text x="20" y="158" font-size="20" fill="#898781">…</text>
+        <text x="543" y="158" font-size="20" fill="#898781">…</text>
+      </svg>
+    </div>
+    <figcaption><span class="figlabel">The latent-variable view.</span> Dashed
+    <span class="chip chip-z">thoughts z</span> are never observed; solid
+    <span class="chip chip-x">actions x</span> are what the process log records. We want the latents
+    that make the observed emissions most likely — a textbook setting for
+    Expectation-Maximization.</figcaption>
+  </figure>
+</section>
+
+<!-- ================= EM DERIVATION ================= -->
+<section id="derivation">
+  <h2><span class="secnum">6</span>Finding rewards by maximizing our expectations</h2>
+
+  <p>
+    To find $z$, we'll first connect this objective to Expectation-Maximization (EM) — finding the
+    latent thoughts that make the observed sequence of explicit actions $x$ most likely. We'll then
+    describe how we can implement this as policy-gradient RL, using a likelihood-based reward function
+    over these actions.
+  </p>
+
+  <p class="smallnote">
+    <strong>Hover any colored term</strong> below (or tap a legend chip) to see what it is and where it
+    appears across the derivation. Fix a step $t$ with state $s$ and observed action $x$; superscript
+    $(n)$ marks the frozen parameters of the current EM iteration.
+  </p>
+
+  <div class="eq-legend" id="eq-legend">
+    <button data-term="term-post"><span class="dot" style="background:#4a3aa7"></span>posterior over thoughts</button>
+    <button data-term="term-z"><span class="dot" style="background:#2a78d6"></span>thought policy (sampleable)</button>
+    <button data-term="term-x"><span class="dot" style="background:#1baf7a"></span>action likelihood → reward</button>
+    <button data-term="term-marg"><span class="dot" style="background:#eda100"></span>intractable marginal</button>
+    <button data-term="term-joint"><span class="dot" style="background:#52514e"></span>joint we maximize</button>
+  </div>
+  <div class="eq-explain" id="eq-explain">Hover a term to inspect the derivation piece by piece.</div>
+
+  <h3>EM setup</h3>
+  <p>Recall that EM iterates over two eponymous steps:</p>
+  <ol>
+    <li>
+      <strong>Expectation (E)</strong>: define
+      $\htmlClass{eq-term term-post}{p_{\theta^{(n)}}(z \mid x, s)}$ as a posterior over the latent
+      thought $z$ given the explicit action $x$, current state $s$, and latest model weights
+      $\theta^{(n)}$; and use it to write an expectation over the <em>complete action</em>
+      log-likelihood:
+      <div class="eq-block">
+      $$
+      \mathbb{E}_{z \sim \htmlClass{eq-term term-post}{p_{\theta^{(n)}}(z \mid x, s)}} \left[ \htmlClass{eq-term term-joint}{\log p_\theta(x, z \mid s)} \right]
+      $$
+      </div>
+    </li>
+    <li>
+      <strong>Maximization (M)</strong>: update $\theta$ to maximize our expectation:
+      <div class="eq-block">
+      $$
+      \theta^{(n + 1)} = \arg \max_\theta\; \mathbb{E}_{z \sim \htmlClass{eq-term term-post}{p_{\theta^{(n)}}(z \mid x, s)}} \left[ \htmlClass{eq-term term-joint}{\log p_\theta(x, z \mid s)} \right]
+      $$
+      </div>
+    </li>
+  </ol>
+  <p>
+    We iterate between <strong>E</strong> and <strong>M</strong> until convergence — finding LLM
+    parameters $\theta^*$ and thoughts $z$ that maximize the likelihood of observed successful human
+    actions $x$. Following this framing in practice:
+  </p>
+  <ul>
+    <li>In <strong>E</strong>, we sample many potential thoughts $z$ from the current state and LLM
+      (<em>generating rollouts</em>), use these samples to compute rewards, and construct a training
+      objective (<em>the policy gradient</em>).</li>
+    <li>In <strong>M</strong>, we update the LLM weights according to this objective.</li>
+  </ul>
+  <p>To make this concrete, we next show how to get the rewards and training objective from our EM framing.</p>
+
+  <h3>From expectation-maximization to policy gradient</h3>
+  <p>
+    First, we show an equivalence between the maximization above and policy gradient with certain
+    rewards. This motivates specific rewards for training our thought-generation LLMs. Recall that our
+    expectation is defined as
+  </p>
+  <div class="eq-block">
+  $$
+  \mathbb{E}_{z \sim \htmlClass{eq-term term-post}{p_{\theta^{(n)}}(z \mid x, s)}} \left[ \htmlClass{eq-term term-joint}{\log p_\theta(x, z \mid s)} \right]
+  = \int \htmlClass{eq-term term-post}{p_{\theta^{(n)}}(z \mid x, s)} \, \htmlClass{eq-term term-joint}{\log  p_\theta(x, z \mid s)} \;dz
+  $$
+  </div>
+  <p>From Bayes' rule, we have</p>
+  <div class="eq-block">
+  $$
+  \htmlClass{eq-term term-post}{p_{\theta^{(n)}}(z \mid x, s)} = \frac{\htmlClass{eq-term term-x}{p_{\theta^{(n)}}(x \mid z, s)} \cdot \htmlClass{eq-term term-z}{p_{\theta^{(n)}}(z \mid s)}}{\htmlClass{eq-term term-marg}{p_{\theta^{(n)}}(x \mid s)}}
+  $$
+  </div>
+  <p>So plugging this in gives us</p>
+  <div class="eq-block">
+  $$
+  \begin{aligned}
+  \mathbb{E}_{z \sim \htmlClass{eq-term term-post}{p_{\theta^{(n)}}(z \mid x, s)}} \left[ \htmlClass{eq-term term-joint}{\log p_\theta(x, z \mid s)} \right]
+  &= \int \frac{\htmlClass{eq-term term-x}{p_{\theta^{(n)}}(x \mid z, s)} \cdot \htmlClass{eq-term term-z}{p_{\theta^{(n)}}(z \mid s)} }{\htmlClass{eq-term term-marg}{p_{\theta^{(n)}}(x \mid s)}} \htmlClass{eq-term term-joint}{\log  p_\theta(x, z \mid s)} \;dz \\[0.4em]
+  &= \int \htmlClass{eq-term term-z}{p_{\theta^{(n)}}(z \mid s)} \cdot \Big( \frac{\htmlClass{eq-term term-x}{p_{\theta^{(n)}}(x \mid z, s)}}{\htmlClass{eq-term term-marg}{p_{\theta^{(n)}}(x \mid s)}} \htmlClass{eq-term term-joint}{\log  p_\theta(x, z \mid s)} \Big) \;dz \\[0.4em]
+  &= \mathbb{E}_{z \sim \htmlClass{eq-term term-z}{p_{\theta^{(n)}}(z \mid s)}} \left[ \frac{\htmlClass{eq-term term-x}{p_{\theta^{(n)}}(x \mid z, s)}}{\htmlClass{eq-term term-marg}{p_{\theta^{(n)}}(x \mid s)}} \htmlClass{eq-term term-joint}{\log  p_\theta(x, z \mid s)} \right]
+  \end{aligned}
+  $$
+  </div>
+  <p>
+    That inner swap is the whole trick: an expectation under the <em>posterior</em> (which we can't
+    sample) became an expectation under the <em>policy</em> (which we can — it's just the LLM generating
+    thoughts), with an importance weight left behind. Since we're maximizing this expectation via
+    $\theta$, we can write our objective as
+  </p>
+  <div class="eq-block">
+  $$
+  \begin{aligned}
+  J(\theta)
+  &= \mathbb{E}_{z \sim \htmlClass{eq-term term-z}{p_{\theta^{(n)}}(z \mid s)}} \left[ \frac{\htmlClass{eq-term term-x}{p_{\theta^{(n)}}(x \mid z, s)}}{\htmlClass{eq-term term-marg}{p_{\theta^{(n)}}(x \mid s)}} \htmlClass{eq-term term-joint}{\log  p_\theta(x, z \mid s)} \right] \\[0.4em]
+  \Rightarrow\;
+  \nabla_\theta J(\theta)
+  &= \mathbb{E}_{z \sim \htmlClass{eq-term term-z}{p_{\theta^{(n)}}(z \mid s)}} \left[ \frac{\htmlClass{eq-term term-x}{p_{\theta^{(n)}}(x \mid z, s)}}{\htmlClass{eq-term term-marg}{p_{\theta^{(n)}}(x \mid s)}} \nabla_\theta \htmlClass{eq-term term-joint}{\log  p_\theta(x, z \mid s)} \right]
+  \end{aligned}
+  $$
+  </div>
+  <p>
+    This looks <em>a lot</em> like a policy-gradient objective. Define reward
+  </p>
+  <div class="eq-block">
+  $$
+  r(z) = \dfrac{\htmlClass{eq-term term-x}{p_{\theta^{(n)}}(x \mid z, s)}}{\htmlClass{eq-term term-marg}{p_{\theta^{(n)}}(x \mid s)}}
+  $$
+  </div>
+  <p>and we're there!</p>
+  <ul>
+    <li>
+      As a brief interpretation note, $r(z)$ already hints at what we're rewarding. Ignoring the
+      normalizing denominator for now, we score a given thought $z$ by <em>how likely it is that the
+      observed explicit action $x$ follows</em>.
+    </li>
+    <li>
+      However, we still need to resolve some empirical considerations to compute $r$. Note that
+      $\htmlClass{eq-term term-marg}{p_{\theta^{(n)}}(x \mid s)} = \int p_{\theta^{(n)}}(x, z \mid s)\,dz$
+      is a marginalization over <em>all</em> possible thoughts $z$ — intractable to compute. So we
+      approximate as follows!
+    </li>
+  </ul>
+
+  <h3>Practical empirics</h3>
+  <p>
+    Finally, we derive a sampling-based version of the above to back out our concrete training
+    algorithm. Let's first define the <em>unnormalized</em> reward
+    $\tilde{r}(z) = \htmlClass{eq-term term-x}{p_{\theta^{(n)}}(x \mid z, s)}$. Then, making the
+    marginalization explicit in our reward's denominator:
+  </p>
+  <div class="eq-block">
+  $$
+  \begin{aligned}
+  \htmlClass{eq-term term-marg}{p_{\theta^{(n)}} (x \mid s)}
+  &= \int \htmlClass{eq-term term-x}{p_{\theta^{(n)}} (x \mid z, s)}\; \htmlClass{eq-term term-z}{p_{\theta^{(n)}}(z \mid s)} \; dz
+  = \mathbb{E}_{z \sim \htmlClass{eq-term term-z}{p_{\theta^{(n)}}(z \mid s)}} [ \tilde{r}(z)]
+  \end{aligned}
+  $$
+  </div>
+  <p>
+    Now in both the reward denominator and our maximization objective, we're computing expectations
+    over $\htmlClass{eq-term term-z}{p_{\theta^{(n)}}(z \mid s)}$ — the latent thought distribution
+    parameterized by our LLM in a given state. We can then estimate both quantities by sampling $G$
+    thoughts per state, and using this <em>same batch of generations</em> to compute empirical means:
+  </p>
+  <div class="eq-block">
+  $$
+  \begin{aligned}
+  \htmlClass{eq-term term-marg}{p_{\theta^{(n)}} (x \mid s)}
+  &\approx \frac{1}{G} \sum_{g=1}^G \tilde{r}(z^{(g)}) \\[0.4em]
+  \nabla_\theta J(\theta)
+  &\approx \frac{1}{G} \sum_{g=1}^G \frac{\htmlClass{eq-term term-x}{\tilde{r}(z^{(g)})}}{\htmlClass{eq-term term-marg}{\frac{1}{G} \sum_{g'=1}^G \tilde{r}(z^{(g')})}} \nabla_\theta \htmlClass{eq-term term-joint}{\log  p_\theta(x, z^{(g)} \mid s)}
+  \end{aligned}
+  $$
+  </div>
+  <p>So with empirical, group-normalized reward</p>
+  <div class="eq-block">
+  $$
+  \bar{r}(z^{(g)})
+  = \frac{\tilde{r}(z^{(g)})}{\sum_{g'=1}^G \tilde{r}(z^{(g')})}
+  = \dfrac{\htmlClass{eq-term term-x}{p_{\theta^{(n)}}(x \mid z^{(g)}, s)}}{ \sum_{g'=1}^G \htmlClass{eq-term term-x}{p_{\theta^{(n)}} (x \mid z^{(g')}, s)}}
+  $$
+  </div>
+  <p>we recover the policy gradient</p>
+  <div class="eq-block">
+  $$
+  \nabla_\theta J(\theta) \approx \sum_{g=1}^G \bar{r}(z^{(g)}) \, \nabla_\theta \htmlClass{eq-term term-joint}{\log p_\theta(x, z^{(g)} \mid s)}
+  $$
+  </div>
+  <p>
+    A thought is rewarded exactly to the extent that conditioning on it makes the human's observed next
+    action more probable — relative to the other thoughts in its batch. No annotators, no reward model
+    to train, no rubric to write: the model being trained <em>is</em> the reward model. This is what we
+    call an <strong>Action Process Reward Model</strong> (Act-PRM).
+  </p>
+</section>
+
+<!-- ================= IMPLEMENTATION ================= -->
+<section id="implementation">
+  <h2><span class="secnum">7</span>Practical implementation (it's just policy gradient)</h2>
+
+  <p>In practice, we can implement this as a standard RL algorithm.</p>
+
+  <div class="algo">
+    <div class="algo-title">Act-PRM training — single trajectory, one EM iteration</div>
+    <ol>
+      <li><strong>Generation (Expectation step).</strong>
+        Starting with the first prompt state, sample $G$ thoughts
+        $z^{(g)}_t \sim p_{\theta^{(n)}}(z \mid s_t)$ from the LLM.
+      </li>
+      <li>Compute a per-timestep reward for each based on the LLM's likelihood over the given explicit
+        action: $\tilde r(z_t^{(g)}) = p_{\theta^{(n)}}(x_t \mid z_t^{(g)}, s_t)$, then group-normalize
+        to $\bar r(z_t^{(g)})$. <span class="algo-comment">← the action-likelihood reward</span></li>
+      <li>Pick the highest-reward thought $\hat z_t$, and transition to the next state
+        $s_{t+1} = (s_t, \hat z_t, x_t, r_t, o_{t+1})$.
+        <span class="algo-comment">← commit the best thought to context</span></li>
+      <li>Repeat until the final timestep $T$, saving each trajectory step for training.</li>
+      <li><strong>Policy update (Maximization step).</strong> Train the LLM with standard policy
+        gradient:
+        $\nabla_\theta J(\theta) = \mathbb{E} \left[ \bar r(z_t^{(g)}) \, \nabla_\theta \log p_\theta(x_t, z_t^{(g)} \mid s_t) \right]$
+      </li>
+    </ol>
+  </div>
+
+  <figure class="card">
+    <img src="assets/img/act-prm-training-terminal.gif" alt="Terminal recording of Act-PRM training: the model generates a thought before a logged tool call and receives an action-likelihood reward" loading="lazy">
+    <figcaption><span class="figlabel">What this actually looks like.</span> A live Act-PRM training
+    run on Snorkel Finance traces: for each logged tool call, the model generates a candidate
+    <span class="chip chip-z">&lt;thought&gt;</span> and is scored by the likelihood of the
+    <span class="chip chip-x">logged action</span> that follows.</figcaption>
+  </figure>
+
+  <h3>Choices for the return</h3>
+  <p>
+    While the EM math above tells us one option — each step's update weighted by that same step's
+    group-normalized reward $R_t = \bar{r}(z_t^{(g)})$, a <em>contextual bandit</em> form with no
+    trajectory-level aggregation — we can consider a couple of different choices for the return $R_t$:
+  </p>
+  <ol>
+    <li>
+      <strong>Contextual bandit (what the EM derivation gives).</strong> At each step, generate thoughts
+      that primarily maximize the likelihood of that step's observed action:
+      $R_t = \bar{r}(z_t^{(g)})$, or the unnormalized $R_t = \tilde{r}(z_t^{(g)})$ may work too.
+    </li>
+    <li>
+      <strong>Trajectory-sum returns.</strong> $R_t = \sum_{t'=t}^T \bar{r}(z_{t'}^{(g)})$ — motivated
+      since earlier thoughts do add to the context and impact the generation of later ones.
+    </li>
+    <li>
+      <strong>Group-mean-centered scores (GRPO-style).</strong> Orthogonally, subtract the group mean
+      from each likelihood:
+      $\tilde{r}_\text{grpo}(z_t^{(g)}) = \tilde{r}(z_t^{(g)}) - \frac{1}{G}\sum_{g'=1}^{G} \tilde{r}(z_t^{(g')})$.
+      In practice this may help by giving us <em>negative</em> returns, allowing us to actively
+      downweight the worse half of thoughts in a batch.
+    </li>
+  </ol>
+  <p class="smallnote">
+    The paper trains with option 1 — the form that falls directly out of the EM derivation.
+  </p>
+
+  <h3>Distilling Act-PRM traces back into the model</h3>
+  <p>
+    After Act-PRM training, we use the trained model to relabel each action-only trajectory with its
+    highest-reward thoughts, producing a synthetic full-trajectory dataset
+    $\{\hat\tau^{(i)}\}_i$. Standard SFT on this dataset then yields a final agent policy — and as
+    we'll see below, this recipe matches or beats SFT on thought-and-action traces written by frontier
+    LLMs, at a fraction of the data-collection cost.
+  </p>
+</section>
+
+<!-- ================= PLAYGROUND ================= -->
+<section id="playground">
+  <h2><span class="secnum">8</span>Playground: watch the E-step think</h2>
+
+  <p>
+    The demo below walks the actual mechanics on a (lightly abridged) trajectory from the Snorkel
+    Finance Reasoning task. Given the current <span class="chip chip-s">state</span> and a logged
+    <span class="chip chip-x">action</span> the model has <em>not</em> yet seen, we sample $G = 4$
+    candidate <span class="chip chip-z">thoughts</span>, score each by the
+    <span class="chip chip-r">likelihood</span> it induces on the logged action, and commit the winner
+    to context before moving to the next step.
+  </p>
+
+  <div class="demo" id="thought-demo">
+    <div class="demo-head">
+      <h4>Inferring the thought behind the next logged action</h4>
+      <div class="demo-controls">
+        <button id="demo-run">▶ Sample thoughts</button>
+        <button id="demo-reset" class="secondary">Reset</button>
+      </div>
+    </div>
+    <div id="demo-transcript"></div>
+    <div id="demo-cands" class="cands"></div>
+    <div id="demo-note" class="stage-note"></div>
+    <div class="demo-eq">
+      Reward per candidate: $\;\bar{r}(z^{(g)}) = \dfrac{p_\theta(x \mid z^{(g)}, s)}{\sum_{g'} p_\theta(x \mid z^{(g')}, s)}$ — likelihoods here are from a Qwen3-4B-scale model, renormalized within the group.
+    </div>
+  </div>
+</section>
+
+<!-- ================= RESULTS ================= -->
+<section id="results">
+  <h2><span class="secnum">9</span>Results</h2>
+
+  <p>
+    We validate Act-PRMs on multi-turn agent tasks spanning real-world tool calling —
+    <strong>τ²-bench Airline</strong>, <strong>τ²-bench Retail</strong>,
+    <strong>Snorkel Finance Reasoning</strong> — and embodied text games —
+    <strong>TextWorld Coin Collector</strong> and <strong>Treasure Hunter</strong>. Base model:
+    Qwen3-4B-Instruct-2507 with LoRA, trained with
+    <a href="https://thinkingmachines.ai/blog/announcing-tinker/">Tinker</a> as the rollout and update
+    driver, $G = 8$ thoughts per state, and the self-normalized EM reward. The central question:
+    do Act-PRM-trained models actually generate thoughts that close the action-only context gap from
+    Section 3?
+  </p>
+
+  <h3>Result 1 — Back to the land of climbable hills</h3>
+  <p>
+    First, sanity: is the action-likelihood reward a hill we can climb at all? Yes — over Act-PRM
+    training, the reward (the model's likelihood over held-out logged actions, conditioned on its own
+    sampled thoughts) rises smoothly, on both training and evaluation trajectories. We can train models
+    to get <em>better at thinking</em>, where “better” is measured by an un-gameable quantity: did your
+    thought make the human's actual next action more likely?
+  </p>
+  <div class="fig-row">
+    <figure class="card">
+      <img src="assets/img/reward-train-finance.png" alt="Act-PRM training reward rising from about 0.55 to 0.9 over training steps" loading="lazy">
+      <figcaption><span class="figlabel">Training reward.</span> Mean action-likelihood reward per
+      sampled thought, Snorkel Finance traces.</figcaption>
+    </figure>
+    <figure class="card">
+      <img src="assets/img/reward-eval-finance.png" alt="Act-PRM held-out evaluation reward rising from about 0.67 to 0.91" loading="lazy">
+      <figcaption><span class="figlabel">Held-out reward.</span> The same quantity on evaluation
+      trajectories — the model's thoughts generalize to unseen logs.</figcaption>
+    </figure>
+  </div>
+
+  <h3>Result 2 — Thinking models, from action-only logs</h3>
+  <p>
+    From easy-to-collect traces of raw action-only logs, we can now generate full thinking + action
+    traces. Below, a trained model relabels a finance workflow: every gray reasoning block was
+    <em>inferred</em> by the model; only the blue question and the tool calls existed in the original
+    log.
+  </p>
+  <figure class="card">
+    <img src="assets/img/finance-trace-example.png" alt="A multi-turn finance workflow where model-generated reasoning precedes each logged tool call" loading="lazy">
+    <figcaption><span class="figlabel">An Act-PRM-relabelled trajectory</span> on Snorkel Finance
+    Reasoning: inferred thoughts (gray) now connect the logged tool calls, turning an action-only log
+    into a complete reasoning trace.</figcaption>
+  </figure>
+
+  <h3>Result 3 — Act-PRM traces close the context gap</h3>
+  <p>
+    The payoff. We compare three downstream agents trained from <em>the same</em> corpus of successful
+    action-only trajectories, differing only in supervision:
+  </p>
+  <ul>
+    <li><strong>Action-only BC</strong> — SFT on the raw logs; the “half the picture” lower bound.</li>
+    <li><strong>Frontier-trace SFT</strong> — SFT on traces whose thoughts are written by frontier LLMs
+      (averaged over Claude Opus 4, Claude Sonnet 4, o3, o4-mini, Gemini 2.5 Pro) — an expensive
+      upper-bound baseline.</li>
+    <li><strong>Act-PRM SFT (ours)</strong> — SFT on traces relabelled by the Act-PRM-trained model
+      itself.</li>
+  </ul>
+
+  <div class="chart" id="chart-main">
+    <div class="chart-title">Act-PRM SFT vs. baselines across five benchmarks</div>
+    <div class="chart-sub">Held-out action-token prediction accuracy (higher is better) · same action-only corpus, different supervision</div>
+    <div class="chart-body"></div>
+    <div class="legend"></div>
+  </div>
+
+  <div class="table-wrap">
+    <table class="results">
+      <thead>
+        <tr>
+          <th class="rowhead">Method</th>
+          <th colspan="2">τ²-Airline</th>
+          <th colspan="2" class="group-sep">τ²-Retail</th>
+          <th colspan="2" class="group-sep">Snorkel Finance</th>
+          <th colspan="2" class="group-sep">TW Coin</th>
+          <th colspan="2" class="group-sep">TW Treasure</th>
+        </tr>
+        <tr>
+          <th class="rowhead"></th>
+          <th>PPL ↓</th><th>Acc ↑</th>
+          <th class="group-sep">PPL ↓</th><th>Acc ↑</th>
+          <th class="group-sep">PPL ↓</th><th>Acc ↑</th>
+          <th class="group-sep">PPL ↓</th><th>Acc ↑</th>
+          <th class="group-sep">PPL ↓</th><th>Acc ↑</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="rowhead">Action-only BC</td>
+          <td class="best">1.56</td><td>0.155</td>
+          <td class="group-sep">1.49</td><td>0.249</td>
+          <td class="group-sep">1.25</td><td>0.053</td>
+          <td class="group-sep">1.07</td><td>0.531</td>
+          <td class="group-sep">1.03</td><td>0.563</td>
+        </tr>
+        <tr>
+          <td class="rowhead">Frontier-trace SFT</td>
+          <td>1.59</td><td class="best">0.255</td>
+          <td class="group-sep best">1.28</td><td class="best">0.453</td>
+          <td class="group-sep best">1.14</td><td>0.144</td>
+          <td class="group-sep best">1.02</td><td>0.674</td>
+          <td class="group-sep best">1.01</td><td>0.661</td>
+        </tr>
+        <tr>
+          <td class="rowhead">Act-PRM SFT (ours)</td>
+          <td>1.58</td><td>0.253</td>
+          <td class="group-sep">1.36</td><td>0.376</td>
+          <td class="group-sep">1.35</td><td class="best">0.299</td>
+          <td class="group-sep">1.07</td><td class="best">0.929</td>
+          <td class="group-sep">1.14</td><td class="best">0.739</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p>Two takeaways:</p>
+  <ul>
+    <li>
+      <strong>Act-PRM substantially beats action-only BC everywhere both ran</strong>: +10.0 accuracy
+      points on τ²-Airline (0.253 vs 0.155), +12.7 on τ²-Retail (0.376 vs 0.249), and +24.6 on Snorkel
+      Finance Reasoning (0.299 vs 0.053). When the missing thought context is filled in by Act-PRMs,
+      the same explicit-action targets become substantially easier to predict.
+    </li>
+    <li>
+      <strong>Act-PRM matches or exceeds frontier-trace SFT</strong> on two of three completed
+      tool-calling tasks: a statistical tie on τ²-Airline (0.253 vs 0.255), and a +15.5-point win on
+      Snorkel Finance (0.299 vs 0.144). Thoughts whose only credential is <em>making the observed
+      action likely</em> are at least as useful for SFT as thoughts written by an external frontier
+      model that never produced the action.
+    </li>
+  </ul>
+
+  <figure class="card">
+    <img src="assets/img/curve-taubench-ppl.png" alt="Held-out perplexity during SFT on tau-squared-bench Airline: Act-PRM-relabelled traces track ground-truth thought traces closely, both well below action-only" loading="lazy">
+    <figcaption><span class="figlabel">τ²-bench Airline, held-out action-token PPL during SFT.</span>
+    Training on Act-PRM-relabelled traces (magenta) converges to nearly the same perplexity as training
+    on ground-truth thought traces (cyan) — both far below action-only (red).</figcaption>
+  </figure>
+</section>
+
+<!-- ================= DISCUSSION ================= -->
+<section id="discussion">
+  <h2><span class="secnum">10</span>Discussion + what's next</h2>
+  <p>
+    We showed how to make action-only logs a competitive supervision source, by training a model to
+    infer the latent thoughts behind them. The recipe drops out of a classical EM step against the
+    marginal action log-likelihood, implements as vanilla policy gradient, and needs no annotation
+    beyond the logs an agent (or employee) already produces.
+  </p>
+  <p>
+    Plenty remains. We demonstrate results for behavioral-cloning metrics on 4B models; scaling base
+    model size (Qwen3-8B / 32B), evaluating across model families, end-to-end task success under live
+    rollouts, and combining the Act-PRM stage with subsequent multi-turn RL (the thoughts as a warm
+    start for the “climbable hills” of Section 1) are all future work — as are richer evaluation
+    environments like Terminal-Bench and computer control.
+  </p>
+</section>
+
+<hr>
+
+<!-- ================= APPENDIX ================= -->
+<section id="appendix">
+  <h2>Appendix: what the model actually sees</h2>
+
+  <details class="appendix" id="appendix-prompts" open>
+    <summary>A. Prompt construction — reversing traces to seed thought generation</summary>
+    <div class="appendix-body" id="appendix-prompts-body">
+      <p>
+        How do we get a model to produce a <em>thought that leads to a given action</em>, before it's
+        been trained to do so? Sampling from the bare policy $p_{\theta}(z \mid s)$ at initialization
+        wastes most samples on thoughts unrelated to what the demonstrator did. The codebase bootstraps
+        with a <strong>reversal trick</strong>: since the logged action is known, we can show it to the
+        model <em>first</em>, and ask for the thought after — turning each offline step from
+        $(s, z, x)$-order into $(s, x, z)$-order.
+      </p>
+      <p>
+        Concretely, every assistant turn of a demonstration — normally
+        <code>{thought}&lt;tool_call&gt;{action}&lt;/tool_call&gt;</code> — is rewritten with the
+        action first and the thought wrapped in explicit delimiters:
+      </p>
+<pre><code>&lt;tool_call&gt;{action}&lt;/tool_call&gt;
+
+&lt;thought&gt;
+{thought}
+&lt;/thought&gt;</code></pre>
+      <p>
+        For the final turn — the one being generated — the message is truncated right after
+        <code>&lt;thought&gt;\n</code> and tokenized with <code>continue_final_message=True</code>, so
+        the model sees the action it must explain and is prompted mid-message to complete the thought:
+      </p>
+<pre><code>[
+  {"role": "system",    "content": "You are a helpful assistant that infers reasoning
+                                    thoughts behind your own observed actions."},
+  # (optional few-shot: 1 complete worked trajectory of thought+action turns)
+  {"role": "user",      "content": "Great! Now do the same for the next task:\n\n
+                                    ## Next Task:\n\n{task instruction}"},
+  {"role": "assistant", "content": "&lt;tool_call&gt;{logged action x_1}&lt;/tool_call&gt;\n\n
+                                    &lt;thought&gt;\n"}   # ← model continues from here
+]</code></pre>
+      <p>
+        Earlier turns of the same trajectory appear in the same action-then-thought format, so the
+        few-shot structure teaches the reversal by example. Two generators then form a curriculum:
+      </p>
+      <ol>
+        <li><strong>Action-prompted bootstrap</strong> (<code>action_prompt_act_prm</code>): the model
+          sees the target action as a hint and learns to write thoughts that rationalize it.</li>
+        <li><strong>State-only Act-PRM</strong> (<code>act_prm</code>): the action hint is removed —
+          the model must now generate the thought from the state alone, which is the deployment
+          condition.</li>
+      </ol>
+      <p>
+        <strong>Scoring happens in the un-reversed order.</strong> To compute the reward, the generated
+        thought is stitched back into natural order — state, then thought, then action — under the
+        task's <em>original</em> system prompt (<code>"You are a helpful assistant."</code>), with the
+        few-shot scaffolding stripped. The reward is the length-normalized likelihood of the action
+        tokens only:
+      </p>
+<pre><code># tokens = chat_template(state + thought + action)
+# score only the action suffix:
+target_logprobs = full_logprobs[-num_action_tokens:]
+reward = exp(mean(target_logprobs))     # ≈ 1 / action-token perplexity
+# then group-normalize: r_i / sum_j r_j    (reward_method="em")</code></pre>
+      <p class="smallnote">
+        Everything above maps to
+        <code>generator/tinker_act_prompt_aprm.py</code> (reversal + bootstrap rollouts),
+        <code>generator/tinker_act_prm.py</code> (state-only rollouts, reward + EM normalization), and
+        <code>environments/act_prm/env.py</code> (action-only data loading, few-shot seeds) in the
+        companion codebase. The notebooks below reimplement each piece in ~30 lines apiece.
+      </p>
+    </div>
+  </details>
+
+  <details class="appendix">
+    <summary>B. Motivating-study datasets</summary>
+    <div class="appendix-body">
+      <p>
+        Each task's training corpus is the set of successful trajectories (out of all attempted)
+        produced by GPT-5-mini at <code>reasoning_effort=med</code> on the task's training split. Both
+        the action-only and Thoughts + Actions conditions train on the same trajectory set; the only
+        difference is whether the thoughts $z_t$ are included in the supervision target.
+      </p>
+      <div class="table-wrap">
+        <table class="results">
+          <thead>
+            <tr><th class="rowhead">Task</th><th class="rowhead">Eval env config</th><th># Successful / total</th><th># Unique tasks</th></tr>
+          </thead>
+          <tbody>
+            <tr><td class="rowhead">Treasure Hunter (TextWorld, easy)</td><td class="rowhead"><code>textworld/treasure_hunter_easy</code></td><td>219 / 320</td><td>67</td></tr>
+            <tr><td class="rowhead">Coin Collector (TextWorld, easy)</td><td class="rowhead"><code>textworld/coin_collector_easy</code></td><td>278 / 320</td><td>78</td></tr>
+            <tr><td class="rowhead">Snorkel Finance Reasoning</td><td class="rowhead"><code>finqa/reasoning</code></td><td>103 / 248</td><td>34</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="smallnote">
+        Shared hyperparameters: Qwen3-4B-Instruct-2507; LoRA $r{=}8$, $\alpha{=}16$ on
+        $\{q,k,v,o\}$ projections; AdamW, LR $10^{-3}$; mini-batch 8 × grad-accum 8. Act-PRM training
+        uses group size $G = 8$ and the self-normalized reward.
+      </p>
+    </div>
+  </details>
+</section>
+
+<!-- ================= NOTEBOOKS ================= -->
+<section id="notebooks">
+  <h2>Companion notebooks</h2>
+  <p>
+    Two standalone, didactic notebooks walk through implementing the core loop — sampling thoughts,
+    scoring them with action likelihoods, and training on the result:
+  </p>
+  <ul>
+    <li>
+      <a href="notebooks/act_prm_transformers.ipynb"><strong>act_prm_transformers.ipynb</strong></a> —
+      pure Hugging Face Transformers + PyTorch. Builds the prompt reversal, computes
+      $p(x \mid s, z)$ from raw logits, and takes REINFORCE steps on a small Qwen3 model. Runs on a
+      free Colab GPU.
+    </li>
+    <li>
+      <a href="notebooks/act_prm_tinker.ipynb"><strong>act_prm_tinker.ipynb</strong></a> — the same
+      loop against the <a href="https://thinkingmachines.ai/blog/announcing-tinker/">Tinker</a>
+      training API (sampling client + <code>forward_backward</code> with importance weights), the way
+      the paper's experiments actually ran.
+    </li>
+  </ul>
+</section>
+
+<!-- ================= BIBTEX ================= -->
+<section id="bibtex">
+  <h2>Citation</h2>
+  <p>For the ICML 2026 RLxF workshop paper:</p>
+  <div class="bibtex">
+    <button class="copy-btn" data-copy="bib-paper">copy</button>
+<pre id="bib-paper"><code>@inproceedings{
+anonymous2026on,
+title={On Learning to Think with Action Process Reward Models},
+author={Michael Zhang and Madison Ho},
+booktitle={ICML 2026 Workshop on RL from World Feedback},
+year={2026},
+url={https://openreview.net/forum?id=2zsteCP2wy}
+}</code></pre>
+  </div>
+  <p>For this blog post:</p>
+  <div class="bibtex">
+    <button class="copy-btn" data-copy="bib-blog">copy</button>
+<pre id="bib-blog"><code>@misc{zhang2026actprmblog,
+title={On Learning to Think with Action Process Reward Models (Blog Post)},
+author={Michael Zhang and Madison Ho},
+year={2026},
+howpublished={\url{https://michaelzhang.xyz/act-prm-blog/}}
+}</code></pre>
+  </div>
+</section>
+
+</div>
+</main>
+
+<footer>
+  <div class="container">
+    Companion site for the ICML 2026 RLxF workshop paper ·
+    <a href="https://openreview.net/forum?id=2zsteCP2wy">OpenReview</a> ·
+    built with plain HTML/CSS/Canvas + KaTeX
+  </div>
+</footer>
+
+<div class="viz-tooltip" id="viz-tooltip"></div>
+
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script defer src="assets/js/hero.js"></script>
+<script defer src="assets/js/charts.js"></script>
+<script defer src="assets/js/demo.js"></script>
+<script defer src="assets/js/main.js"></script>
+</body>
+</html>
