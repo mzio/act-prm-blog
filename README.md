@@ -107,7 +107,15 @@ and checkpoint URL, regenerable via `scripts/plot_length_penalty_run.py` and
 
 #### Watching the same eval steps across training
 
-Best-of-G thought for the held-out probe step at each checkpoint:
+Best-of-G thought for the held-out probe step at each checkpoint — the probe question is
+*"How significant is the company's international operations footprint in terms of asset allocation
+and income generation as of 2022–2024?"* and the ground-truth tool call being explained is:
+
+```
+<tool_call>
+{"name": "get_descriptions", "arguments": {"company_name": "meta"}}
+</tool_call>
+```
 
 | iter | p(x\|s,z) | \|z\| | best-of-G thought |
 |---|---|---|---|

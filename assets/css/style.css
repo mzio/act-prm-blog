@@ -749,3 +749,20 @@ table.results.wrap th, table.results.wrap td {
 table.results.wrap th:nth-child(1), table.results.wrap td:nth-child(1) { width: 2.6rem; }
 table.results.wrap th:nth-child(2), table.results.wrap td:nth-child(2) { width: 33%; }
 table.results.wrap td code { font-size: 0.74em; word-break: break-word; white-space: pre-wrap; background: none; padding: 0; }
+table.results.wrap td pre {
+  white-space: pre-wrap; word-break: break-word; overflow: visible;
+  background: #f7f6f3; border: none; border-radius: 6px;
+  padding: 0.5rem 0.6rem; margin: 0; font-size: 0.72rem; line-height: 1.5;
+}
+
+/* result-2: stat tiles + two-column panel grid */
+.r2-stats { display: flex; gap: 0.6rem; flex-wrap: wrap; margin-top: 0.8rem; }
+.r2-stat {
+  border: 1px solid var(--hairline); border-radius: 10px; background: var(--surface);
+  padding: 0.45rem 0.9rem; min-width: 7.5rem;
+}
+.r2-stat .lbl { font-size: 0.72rem; letter-spacing: 0.04em; color: var(--ink-muted); }
+.r2-stat .val { font-size: 1.15rem; font-weight: 600; color: var(--ink); }
+.r2-grid { display: grid; grid-template-columns: 5fr 6fr; gap: 0.5rem; margin-top: 0.5rem; }
+.r2-grid .r2-col { display: grid; gap: 0.5rem; align-content: start; }
+@media (max-width: 700px) { .r2-grid { grid-template-columns: 1fr; } }

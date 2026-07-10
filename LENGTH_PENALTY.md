@@ -137,7 +137,16 @@ Other artifacts we caught along the way:
 ## Checkpoints
 
 Every periodic checkpoint saved sampler weights **and** full trainer state (resumable); URLs live in
-the run log's `checkpoints` list. Highlights:
+the run log's `checkpoints` list. Probe columns refer to the held-out meta task's first step — the
+ground-truth tool call being explained is:
+
+```
+<tool_call>
+{"name": "get_descriptions", "arguments": {"company_name": "meta"}}
+</tool_call>
+```
+
+Highlights:
 
 | iter | probe best-of-G p(x\|s,ẑ) | \|ẑ\| tok | sampler |
 |---:|---:|---:|---|
