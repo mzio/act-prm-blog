@@ -896,15 +896,82 @@
     Next, does this hill-climbing suffice to generate real reasoning traces? Also yes! From easy-to-collect 
     traces of raw action-only logs, we found we could now generate full thinking + action traces, saving annotators
     from having to write out or narrate their full inner monologues. 
-    As an example, we show this thought-generation on a Snorkel finance workflow. Here every gray reasoning block 
-    was <em>inferred</em> by the model; only the blue question and the tool calls existed in the original log.
+    As an example, we show this thought-generation on a held-out Snorkel finance workflow, step by step.
+    Every generated thought was <em>inferred</em> by the model; only the observations and tool calls
+    existed in the original log.
   </p>
-  <figure class="card">
-    <img src="assets/img/finance-trace-example.png" alt="A multi-turn finance workflow where model-generated reasoning precedes each logged tool call" loading="lazy">
-    <figcaption><span class="figlabel">An Act-PRM-relabelled trajectory</span> on Snorkel Finance
-    Reasoning: inferred thoughts (gray) now connect the logged tool calls, turning an action-only log
-    into a complete reasoning trace.</figcaption>
+  <figure>
+    <div class="table-wrap">
+      <table class="results wrap">
+        <thead>
+          <tr><th>Step</th><th>Observation</th><th>Ground-truth action</th><th>Generated thought (iteration 59)</th></tr>
+        </thead>
+        <tbody>
+        <tr>
+          <td>1</td>
+          <td>Here is the question : How significant is the company&#x27;s international operations footprint in terms of asset allocation and income generation as of 2022-2024?, Here are the companies name in the database to query for : meta</td>
+          <td><code>&lt;tool_call&gt;
+{&quot;name&quot;: &quot;get_descriptions&quot;, &quot;arguments&quot;: {&quot;company_name&quot;: &quot;meta&quot;}}
+&lt;/tool_call&gt;</code></td>
+          <td>Since I need detailed selections about asset and income allocations for meta across multiple years, I should first understand available tables to accurately select relevant columns for comprehensive queries addressing this question.</td>
+        </tr>
+        <tr>
+          <td>2</td>
+          <td>[&quot;us_gaap_ScheduleOfComponentsOfIncomeTaxExpenseBenefitTableTextBlock&quot;, &quot;us_gaap_ScheduleOfOtherNonoperatingIncomeExpenseTableTextBlock&quot;, &quot;us_gaap_ScheduleOfEarningsPerShareBasicAndDilutedTableTextBlock&quot;, &quot;us_gaap_ScheduleOfMaturitiesOfLongTermDebtTableTextBlock&quot;, &quot;meta_LeaseBalanceSheetInformationTableTextBlock&quot;, &quot;us_gaap_LeaseCostTableTextBlock&quot;, &quot;us_gaap_DisaggregationOfRe … (…)</td>
+          <td><code>&lt;tool_call&gt;
+{&quot;name&quot;: &quot;get_table_info&quot;, &quot;arguments&quot;: {&quot;company_name&quot;: &quot;meta&quot;, &quot;table_name&quot;: &quot;us_gaap_DisaggregationOfRevenueTableTextBlock&quot;}}
+&lt;/tool_call&gt;</code></td>
+          <td>For detailed analysis on revenue allocation across regions, I should examine table structures to understand revenue breakdowns by geographic area for meaningful data selection and query structuring.</td>
+        </tr>
+        <tr>
+          <td>3</td>
+          <td>{&quot;description&quot;: &quot;revenue_disaggregated_by_revenue_source_and_by_segment_consists_of_the_following_(in_millions)&quot;,&quot;column_names&quot;: [&quot;revenue_source_or_segment&quot;,&quot;2024&quot;,&quot;2023&quot;,&quot;2022&quot;],&quot;unique_vals_per_col&quot;: {&quot;revenue_source_or_segment&quot;: [&quot;advertising&quot;,&quot;other_revenue&quot;,&quot;family_of_apps&quot;,&quot;reality_labs&quot;,&quot;total_revenue&quot;]},&quot;company&quot;: &quot;meta&quot;,&quot;column_dtypes&quot;: {&quot;revenue_source_or_segment&quot;: … (…)</td>
+          <td><code>&lt;tool_call&gt;
+{&quot;name&quot;: &quot;get_table_info&quot;, &quot;arguments&quot;: {&quot;company_name&quot;: &quot;meta&quot;, &quot;table_name&quot;: &quot;us_gaap_LongLivedAssetsByGeographicAreasTableTextBlock&quot;}}
+&lt;/tool_call&gt;</code></td>
+          <td>To fully understand the regional asset distributions, I need asset table structures table details for geographic areas to ensure precise selections analyzing regional exposure accurately by asset types across years.</td>
+        </tr>
+        <tr>
+          <td>4</td>
+          <td>{&quot;description&quot;: &quot;the_following_table_sets_forth_our_long-lived_assets_by_geographic_area,_which_consist_of_property_and_equipment,_net_and_operating_lease_right-of-use_assets_(in_millions):&quot;,&quot;column_names&quot;: [&quot;geographic_area&quot;,&quot;december_31_2024&quot;,&quot;december_31_2023&quot;],&quot;unique_vals_per_col&quot;: {&quot;geographic_area&quot;: [&quot;united_states&quot;,&quot;rest_of_the_world_(1)&quot;,&quot;total_long-lived_assets&quot;]},&quot; … (…)</td>
+          <td><code>&lt;tool_call&gt;
+{&quot;name&quot;: &quot;get_table_info&quot;, &quot;arguments&quot;: {&quot;company_name&quot;: &quot;meta&quot;, &quot;table_name&quot;: &quot;us_gaap_ScheduleOfIncomeBeforeIncomeTaxDomesticAndForeignTableTextBlock&quot;}}
+&lt;/tool_call&gt;</code></td>
+          <td>Understanding long-lived assets requires income table structures for domestic and foreign categorizations to ensure balance sheets accurately reflect income classifications corresponding to asset locations for analytical integrity.</td>
+        </tr>
+        <tr>
+          <td>5</td>
+          <td>{&quot;description&quot;: &quot;the_components_of_income_before_provision_for_income_taxes_are_as_follows_(in_millions)&quot;,&quot;column_names&quot;: [&quot;component&quot;,&quot;2024&quot;,&quot;2023&quot;,&quot;2022&quot;],&quot;unique_vals_per_col&quot;: {&quot;component&quot;: [&quot;domestic&quot;,&quot;foreign&quot;,&quot;income_before_provision_for_income_taxes&quot;]},&quot;company&quot;: &quot;meta&quot;,&quot;column_dtypes&quot;: {&quot;component&quot;: &quot;object&quot;,&quot;2024&quot;: &quot;object&quot;,&quot;2023&quot;: &quot;object&quot;,&quot;2022&quot;: &quot;object&quot;}} (…)</td>
+          <td><code>&lt;tool_call&gt;
+{&quot;name&quot;: &quot;sql_query&quot;, &quot;arguments&quot;: {&quot;company_name&quot;: &quot;meta&quot;, &quot;table_name&quot;: &quot;us_gaap_LongLivedAssetsByGeographicAreasTableTextBlock&quot;, &quot;query&quot;: &quot;SELECT * FROM us_gaap_LongLivedAssetsByGeographicAreasTableTextBlock&quot;}}
+&lt;/tool_call&gt;</code></td>
+          <td>Specific tables provide asset details categorized by geographic area annually, and selecting all rows initially ensures I can structure computations accurately based on asset allocation knowledge patterns for the comprehensive answer required about these asset classifications driving calculations.</td>
+        </tr>
+        <tr>
+          <td>6</td>
+          <td>Error : select * is not allowed, highly inefficient!</td>
+          <td><code>&lt;tool_call&gt;
+{&quot;name&quot;: &quot;sql_query&quot;, &quot;arguments&quot;: {&quot;company_name&quot;: &quot;meta&quot;, &quot;table_name&quot;: &quot;us_gaap_LongLivedAssetsByGeographicAreasTableTextBlock&quot;, &quot;query&quot;: &quot;SELECT geographic_area, december_31_2024, december_31_2023 FROM us_gaap_LongLivedAssetsByGeographicAreasTableTextBlock WHERE geographic_area IN (&#x27;united_states&#x27;, &#x27;rest_of_the_world_(1)&#x27;, &#x27;total_long-lived_assets&#x27;)&quot;}}
+&lt;/tool_call&gt;</code></td>
+          <td>Selecting relevant years for asset analysis ensures efficient use of table columns by choosing essential geographic areas and including relevant jurisdictions like rest of the world, united states, and total allocations for insightful calculations that directly impact performance metrics reporting.</td>
+        </tr>
+        </tbody>
+      </table>
+    </div>
+    <figcaption><span class="figlabel">A relabelled held-out trajectory.</span> The meta
+    lease-financing task from the eval set: only the observations and tool calls existed in the
+    action-only log — every thought was <em>inferred</em> by the final Act-PRM checkpoint
+    (iteration 59, λ=0.15 run).</figcaption>
   </figure>
+
+  <p>
+    And because we checkpointed throughout training, we can watch a single thought slot
+    <em>learn</em>. The reward curve below is the held-out likelihood of the selected thought for
+    one task + step; hover (or drag) along it to read what the model was actually thinking at
+    that point in training:
+  </p>
+
+  <div class="chart" id="result2-viz"></div>
 
   <h3>Result 3 — Act-PRM traces close the context gap</h3>
   <p>
@@ -1207,6 +1274,8 @@ howpublished={\url{https://michaelzhang.xyz/act-prm-blog/}}
 <script defer src="assets/js/charts.js?v=4"></script>
 <script defer src="assets/js/miniloop.js?v=4"></script>
 <script defer src="assets/js/demo.js?v=4"></script>
+<script defer src="assets/js/lenpen-curve-data.js?v=1"></script>
+<script defer src="assets/js/result2.js?v=1"></script>
 <script defer src="assets/js/main.js?v=4"></script>
 </body>
 </html>

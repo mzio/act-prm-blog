@@ -716,3 +716,36 @@ footer {
   html { scroll-behavior: auto; }
   * { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
 }
+
+/* ---------- result-2 interactive (thought evolution) ---------- */
+.r2-toggles { display: flex; align-items: center; gap: 0.35rem; flex-wrap: wrap; margin: 0.3rem 0 0.7rem; }
+.r2-toggle-label { text-transform: uppercase; letter-spacing: 0.08em; font-size: 0.68rem; color: var(--ink-muted); }
+.r2-pill {
+  font-family: inherit; font-size: 0.78rem;
+  border: 1px solid var(--hairline); background: var(--surface);
+  border-radius: 999px; padding: 0.16rem 0.62rem;
+  color: var(--ink-secondary); cursor: pointer;
+  transition: all 0.15s ease;
+}
+.r2-pill:hover { border-color: var(--baseline); color: var(--ink); }
+.r2-pill.active { border-color: var(--c-thought); color: var(--c-thought); background: rgba(42,120,214,0.07); font-weight: 500; }
+.r2-chart svg { display: block; width: 100%; height: auto; }
+.r2-panel { display: grid; gap: 0.5rem; margin-top: 0.75rem; }
+.r2-msg { border-radius: 10px; padding: 0.65rem 0.95rem; font-size: 0.84rem; line-height: 1.5; }
+.r2-msg .who { font-size: 0.67rem; letter-spacing: 0.09em; text-transform: uppercase; margin-bottom: 0.25rem; font-weight: 500; color: var(--ink-muted); }
+.r2-obs { background: #f4f3f0; color: var(--ink-secondary); }
+.r2-action { background: rgba(27,175,122,0.08); border: 1px solid rgba(27,175,122,0.35); }
+.r2-action .who { color: #0e7a54; }
+.r2-action .body { font-family: var(--mono); font-size: 0.75rem; white-space: pre-wrap; word-break: break-word; margin: 0; background: none; border: none; padding: 0; }
+.r2-thought { background: rgba(42,120,214,0.06); border: 1px solid rgba(42,120,214,0.35); color: var(--ink-secondary); }
+.r2-thought .who { color: #1c5cab; }
+
+/* wrapping variant for thinking-trace tables */
+table.results.wrap { table-layout: fixed; width: 100%; }
+table.results.wrap th, table.results.wrap td {
+  white-space: normal; text-align: left; font-variant-numeric: normal;
+  vertical-align: top; padding: 0.6rem 0.7rem; word-break: break-word;
+}
+table.results.wrap th:nth-child(1), table.results.wrap td:nth-child(1) { width: 2.6rem; }
+table.results.wrap th:nth-child(2), table.results.wrap td:nth-child(2) { width: 33%; }
+table.results.wrap td code { font-size: 0.74em; word-break: break-word; white-space: pre-wrap; background: none; padding: 0; }
