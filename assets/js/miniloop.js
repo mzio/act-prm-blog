@@ -1,8 +1,9 @@
-/* Mini looping Act-PRM animation ("at a glance"): for each step, the prompt/state
-   and the LOGGED action are shown first (spaced apart), then 3 candidate thoughts
-   are sampled between them, scored by p(x | s, z), and the best is kept — then the
-   chain advances to the next logged action. Companion to the hero background, but
-   inline, compact, and with the ground-truth action visible before sampling. */
+/* Mini Act-PRM animation ("at a glance"): a FIXED stage that replays the loop —
+   the prompt/observation and the LOGGED action are always visible (spaced apart);
+   each cycle samples 3 candidate thoughts between them, scores them with
+   p(x | s, z), keeps the best, resolves the action, holds, then fades and replays
+   with fresh candidates (a carousel of iterations, no scrolling). Scales itself
+   down to fit narrow/mobile viewports. */
 (function () {
   const canvas = document.getElementById('miniloop-canvas');
   if (!canvas) return;
@@ -17,22 +18,27 @@
   };
   const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-  let W = 0, H = 0, dpr = 1;
+  const DESIGN_W = 340;           // fixed design width of the stage (one step)
+  const DESIGN_H = 250;           // design height (matches the canvas CSS height)
+  const CYCLE = 9500;             // ms per full replay (incl. holds + fade)
+  const G = 3;
+  const CAND_W = 96, CAND_H = 34;
+
+  let W = 0, H = 0, dpr = 1, scale = 1, offX = 0;
   function resize() {
     dpr = Math.min(window.devicePixelRatio || 1, 2);
     W = canvas.clientWidth;
+    scale = Math.min(1, W / DESIGN_W);
+    // shrink the canvas itself on narrow screens so nothing is clipped
+    canvas.style.height = Math.round(DESIGN_H * scale) + 'px';
     H = canvas.clientHeight;
+    offX = (W / scale - DESIGN_W) / 2;
     canvas.width = W * dpr;
     canvas.height = H * dpr;
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    if (reduceMotion) draw(0.9, 0);
   }
-  window.addEventListener('resize', () => { resize(); if (reduceMotion) drawStatic(); });
+  window.addEventListener('resize', resize);
   resize();
-
-  const G = 3;                    // candidate thoughts per step
-  const STEP_W = 360;             // horizontal span per timestep
-  const PERIOD = 7200;            // ms per timestep (incl. ~1.7s hold after the pick)
-  const CAND_W = 96, CAND_H = 34;
 
   function prand(i, j) {
     const x = Math.sin(i * 127.1 + j * 311.7) * 43758.5453;
@@ -58,20 +64,32 @@
     ctx.fillText(text, x, y);
   }
 
-  /* one timestep anchored at x0; p ∈ [0,1] is its phase; labeled = draw captions */
-  function drawStep(stepIdx, x0, p, labeled) {
-    const cy = H / 2;
-    const sx = x0, candX = x0 + 96, ax = x0 + 262;
-    const winner = Math.floor(prand(stepIdx, 9) * G);
+  /* one full frame of the replay: p ∈ [0,1] is the cycle phase; iter varies the
+     sampled candidates. Everything is drawn in DESIGN_W × DESIGN_H coordinates,
+     scaled + centered to the actual canvas. */
+  function draw(p, iter) {
+    ctx.setTransform(dpr * scale, 0, 0, dpr * scale, 0, 0);
+    ctx.clearRect(0, 0, W / scale, H / scale);
+    ctx.translate(offX, 0);
 
-    const pFan = easeOut(p / 0.12);
-    const pType = clamp01((p - 0.08) / 0.22);
-    const pScore = clamp01((p - 0.32) / 0.14);
-    const pPick = clamp01((p - 0.48) / 0.09);
-    // hold: winner stays highlighted from ~0.57 to 0.80 before the action resolves
-    const pAct = clamp01((p - 0.80) / 0.12);
+    // fade in/out at the cycle boundaries (the carousel transition)
+    let alpha = 1;
+    if (p < 0.03) alpha = easeOut(p / 0.03);
+    else if (p > 0.96) alpha = 1 - easeOut((p - 0.96) / 0.04);
+    ctx.globalAlpha = alpha;
 
-    // --- state node (visible immediately) ---
+    // sub-phases: fan → type → score → pick → (hold) → resolve → (hold) → fade
+    const pFan = easeOut(p / 0.10);
+    const pType = clamp01((p - 0.07) / 0.20);
+    const pScore = clamp01((p - 0.29) / 0.13);
+    const pPick = clamp01((p - 0.46) / 0.08);     // winner chosen by ~0.54
+    const pAct = clamp01((p - 0.70) / 0.10);      // ~1.5s hold, then action resolves
+
+    const cy = DESIGN_H / 2;
+    const sx = 30, candX = 118, ax = 292;
+    const winner = Math.floor(prand(iter, 9) * G);
+
+    // --- observation node ---
     ctx.lineWidth = 1.5;
     ctx.fillStyle = COL.stateFill;
     ctx.strokeStyle = COL.state;
@@ -80,9 +98,9 @@
     ctx.font = 'italic 12px Georgia, serif';
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     ctx.fillText('o', sx, cy + 1);
-    if (labeled) label(stepIdx === 0 ? 'prompt' : 'observation', sx, cy + 32);
+    label('prompt', sx, cy + 32);
 
-    // --- LOGGED action node: dashed outline from the start (it's given!) ---
+    // --- logged action node (always visible; dashed until resolved) ---
     const solid = pAct > 0.5;
     ctx.save();
     ctx.lineWidth = 1.6;
@@ -95,10 +113,10 @@
     ctx.font = 'italic 12px Georgia, serif';
     ctx.fillText('x', ax, cy + 1);
     ctx.restore();
-    if (labeled) label('logged action', ax, cy + 32);
+    label('logged action', ax, cy + 32);
 
-    // --- candidate thoughts fan out between s and x ---
-    const band = Math.min(H - 58, 150);
+    // --- candidate thoughts ---
+    const band = Math.min(DESIGN_H - 58, 152);
     const spread = band / (G - 1);
     const bandTop = cy - band / 2 - CAND_H / 2 + 6;
     for (let g = 0; g < G; g++) {
@@ -109,7 +127,7 @@
       const t = clamp01(pFan * (1 - 0.08 * g));
       if (t > 0.01) {
         ctx.save();
-        ctx.globalAlpha = fade * 0.9;
+        ctx.globalAlpha = alpha * fade * 0.9;
         ctx.strokeStyle = isWin && pPick > 0 ? COL.thought : COL.ghost;
         ctx.lineWidth = isWin && pPick > 0 ? 1.6 : 1;
         ctx.beginPath();
@@ -127,7 +145,7 @@
       if (pType <= 0) continue;
 
       ctx.save();
-      ctx.globalAlpha = fade;
+      ctx.globalAlpha = alpha * fade;
       ctx.fillStyle = '#ffffff';
       ctx.strokeStyle = isWin && pPick > 0 ? COL.thought : COL.thoughtSoft;
       ctx.lineWidth = isWin && pPick > 0 ? 1.6 : 1.1;
@@ -138,7 +156,7 @@
 
       if (isWin && pPick > 0) {
         ctx.save();
-        ctx.globalAlpha = 0.3 * pPick * fade;
+        ctx.globalAlpha = alpha * 0.3 * pPick * fade;
         ctx.strokeStyle = COL.thought;
         ctx.lineWidth = 4;
         roundRect(candX - 2, ty - 2, CAND_W + 4, CAND_H + 4, 10);
@@ -146,9 +164,9 @@
         ctx.restore();
       }
 
-      // typing text lines
+      // typing text lines (vary with the carousel iteration)
       for (let l = 0; l < 2; l++) {
-        const full = CAND_W - 34 - prand(stepIdx, g * 7 + l) * 22;
+        const full = CAND_W - 34 - prand(iter, g * 7 + l) * 22;
         const lineP = clamp01(pType * 2.6 - l);
         if (lineP <= 0) continue;
         ctx.strokeStyle = isWin && pPick > 0 ? 'rgba(42,120,214,0.55)' : 'rgba(137,135,129,0.45)';
@@ -164,9 +182,9 @@
       ctx.textAlign = 'left';
       ctx.fillText('z', candX + 8, ty + 17);
 
-      // reward bar: p(x | s, z)
+      // reward bar
       if (pScore > 0) {
-        const rw = 0.22 + 0.75 * prand(stepIdx, g * 3 + 1);
+        const rw = 0.22 + 0.75 * prand(iter, g * 3 + 1);
         const rewardW = (CAND_W - 16) * (isWin ? Math.max(rw, 0.85) : Math.min(rw, 0.55));
         ctx.strokeStyle = 'rgba(0,0,0,0.07)';
         ctx.lineWidth = 2.6;
@@ -182,9 +200,11 @@
       }
       ctx.restore();
     }
-    if (labeled && pScore > 0.4) {
+
+    // scoring annotation
+    if (pScore > 0.4) {
       ctx.save();
-      ctx.globalAlpha = clamp01((pScore - 0.4) / 0.4);
+      ctx.globalAlpha = alpha * clamp01((pScore - 0.4) / 0.4);
       ctx.fillStyle = '#9a6900';
       ctx.font = '10.5px "Helvetica Neue", Arial, sans-serif';
       ctx.textAlign = 'center';
@@ -192,7 +212,7 @@
       ctx.restore();
     }
 
-    // --- winner connects to the logged action ---
+    // winner connects to the logged action
     if (pAct > 0) {
       const wy = bandTop + spread * winner + CAND_H / 2;
       ctx.strokeStyle = COL.thought;
@@ -207,59 +227,23 @@
         if (i === 0) ctx.moveTo(bx, by); else ctx.lineTo(bx, by);
       }
       ctx.stroke();
-      // connector to the next state
-      if (pAct > 0.8) {
-        ctx.strokeStyle = COL.ghost;
-        ctx.lineWidth = 1;
-        ctx.beginPath();
-        ctx.moveTo(ax + 15, cy);
-        ctx.lineTo(ax + 15 + (STEP_W - 292) * easeOut((pAct - 0.8) / 0.2), cy);
-        ctx.stroke();
-      }
     }
+    ctx.globalAlpha = 1;
   }
 
   let running = false, rafId = null;
   function frame(now) {
     if (!running) return;
-    ctx.clearRect(0, 0, W, H);
-    const tGlobal = now / PERIOD;
-    const camX = Math.max(0, (tGlobal - 1)) * STEP_W;   // hold still for step 0
-    const first = Math.floor(camX / STEP_W) - 1;
-    const count = Math.ceil(W / STEP_W) + 2;
-    for (let k = 0; k < count; k++) {
-      const stepIdx = Math.max(0, first + k);
-      const x0 = stepIdx * STEP_W - camX + 28;
-      const p = clamp01(tGlobal - stepIdx + 0.16);
-      if (x0 > -STEP_W && x0 < W + 40) {
-        drawStep(stepIdx % 1000, x0, p, stepIdx === 0 && camX < STEP_W * 0.4);
-      }
-    }
-    // edge fades
-    const fadeW = 46;
-    let grd = ctx.createLinearGradient(0, 0, fadeW, 0);
-    grd.addColorStop(0, 'rgba(255,255,255,1)');
-    grd.addColorStop(1, 'rgba(255,255,255,0)');
-    ctx.fillStyle = grd; ctx.fillRect(0, 0, fadeW, H);
-    grd = ctx.createLinearGradient(W - fadeW, 0, W, 0);
-    grd.addColorStop(0, 'rgba(255,255,255,0)');
-    grd.addColorStop(1, 'rgba(255,255,255,1)');
-    ctx.fillStyle = grd; ctx.fillRect(W - fadeW, 0, fadeW, H);
-
+    const iter = Math.floor(now / CYCLE);
+    const p = (now % CYCLE) / CYCLE;
+    draw(p, iter % 1000);
     rafId = requestAnimationFrame(frame);
   }
 
-  function drawStatic() {
-    ctx.clearRect(0, 0, W, H);
-    drawStep(0, 28, 1, true);
-    if (W > 640) drawStep(1, 28 + STEP_W, 1, false);
-  }
-
   if (reduceMotion) {
-    drawStatic();
+    draw(0.9, 0);   // fully-resolved static frame with annotations
     return;
   }
-  // animate only while visible
   const io = new IntersectionObserver((entries) => {
     entries.forEach((e) => {
       if (e.isIntersecting && !running) {

@@ -1,72 +1,24 @@
-# On Learning to Think with Action Process Reward Models (Act-PRMs)
+# Experiment: length-penalized Act-PRMs — do thoughts get *shorter*, and does the English survive?
 
-Companion site + notebooks + experiments for the ICML 2026 RLxF workshop paper
-**[On Learning to Think with Action Process Reward Models](https://openreview.net/forum?id=2zsteCP2wy)**
-(Michael Zhang & Madison Ho).
-
-**tldr:** given easy-to-collect, *action-only* demonstration logs, treat the missing
-thoughts as latent variables — sample candidate thoughts $z$ from the LLM itself, reward each by the
-likelihood it induces on the *observed next action*, $\tilde r(z) = p(x \mid s, z)$, and train with
-policy gradient. The EM derivation, interactive demos, and results live in the blog post
-(`index.html`, deployed via GitHub Pages).
-
-## Repo layout
-
-```
-index.html                     the blog post (single page, interactive)
-assets/css/style.css           typography + layout + components
-assets/js/hero.js              animated hero banner (canvas: s → sampled z's → x chain)
-assets/js/charts.js            SVG bar charts (paper Tables 1 & 2) + signal-strip diagrams
-assets/js/demo.js              interactive thought-sampling playground (E-step walkthrough)
-assets/js/main.js              KaTeX + hoverable equation terms + quick-nav + bibtex copy
-assets/img/                    plots, reward curves, memes/GIFs extracted from the slides
-notebooks/act_prm_transformers.ipynb   didactic HF Transformers walkthrough (Colab-friendly)
-notebooks/act_prm_tinker.ipynb         same loop via the Tinker training API
-scripts/act_prm_length_penalty.py      train + demo script: length-penalized thought reward
-runs/                          JSON logs + checkpoint URLs from script runs
-.nojekyll                      serve as-is on GitHub Pages
-```
-
-## Quickstart: the site
-
-```bash
-# preview locally
-python3 -m http.server 8000    # → http://localhost:8000
-
-# deploy: push to GitHub, then Settings → Pages → "Deploy from a branch" → main / (root)
-```
-
-Math renders via the KaTeX CDN; everything else is self-contained static files. Asset links carry
-`?v=N` cache-busters — bump them when editing CSS/JS.
-
-## Setup: notebooks + training scripts
-
-Everything runs through [`uv`](https://docs.astral.sh/uv/) with ephemeral environments — no venv to
-manage. You need one secret: a [Tinker](https://thinkingmachines.ai/blog/announcing-tinker/) API key
-in a `.env` file at the repo root (gitignored):
-
-```
-TINKER_API_KEY=sk-...
-```
-
-- **`notebooks/act_prm_transformers.ipynb`** — the whole algorithm in plain HF Transformers + PyTorch
-  on Qwen3-0.6B: prompt reversal, sampling $G$ thoughts, computing $p(x \mid s, z)$ from raw logits,
-  a REINFORCE M-step. Runs on a free Colab T4.
-- **`notebooks/act_prm_tinker.ipynb`** — the same loop against the Tinker API, the way the paper's
-  experiments ran: `sample_async` (E-step), `compute_logprobs_async` (reward),
-  `forward_backward_async(loss_fn="importance_sampling")` (M-step).
-
-## Experiment: what happens if thoughts must be *short* as well as *predictive*?
-
-`scripts/act_prm_length_penalty.py` trains an Act-PRM whose reward subtracts a length penalty:
+An Act-PRM rewards a sampled thought $z$ by how likely it makes the logged next action:
+$\tilde r(z) = p(x \mid s, z)$. Here we add a **length penalty** and train for real on
+[Tinker](https://thinkingmachines.ai/blog/announcing-tinker/):
 
 $$r_\text{pen}(z) = \underbrace{p(x \mid s, z)}_{\text{action likelihood}} - \lambda \cdot \underbrace{|z| / L_\text{max}}_{\text{fraction of thought budget used}}$$
 
 Both terms are $O(1)$-scale, so with $\lambda = 0.15$ a thought that maxes out the token budget must
-buy ~0.15 of extra action-likelihood over a concise alternative to win its group. The *committed*
-thought is the penalized-reward argmax — the shortest thought that still explains the logged action
-carries the trajectory forward. Standalone writeup with full details:
-**[LENGTH_PENALTY.md](LENGTH_PENALTY.md)**.
+buy ~0.15 of extra action-likelihood over a concise alternative to win its group. Group weights are
+the normalized clamped rewards (falling back to likelihood-normalization when the penalty pushes a
+whole group negative), and the *committed* thought is the penalized-reward argmax — the shortest
+thought that still explains the logged action carries the trajectory forward.
+
+**Setup.** `Qwen/Qwen3-8B`, LoRA r=8, G=8 thoughts/state, λ=0.15, L_max=200. Data:
+[`mzio/aprm-snorkelai_agent_finance_reasoning`](https://huggingface.co/datasets/mzio/aprm-snorkelai_agent_finance_reasoning)
+(successful multi-turn financial tool-calling rollouts, narration stripped from logged actions so
+assistant turns are bare `<tool_call>`s) — 8 train + 2 held-out trajectories × 6 steps. Up to 100 EM
+iterations with early stopping (patience 12 on held-out likelihood).
+**Early-stopped at iteration 59** (best held-out p=0.888 @ iteration 43). One external kill at
+iteration 48 was recovered losslessly via `--resume-state` from the checkpoint's saved trainer state.
 
 ```bash
 # reproduce (needs TINKER_API_KEY in .env)
@@ -80,17 +32,11 @@ uv run --with tinker --with datasets --with python-dotenv \
     --log-path runs/length_penalty_qwen3_8b_100.json
 ```
 
-### Results
+Run log: [`runs/length_penalty_qwen3_8b_100.json`](runs/length_penalty_qwen3_8b_100.json) — every
+candidate thought, likelihood, penalty, and weight for every step of every iteration, plus
+`tinker://` sampler + trainer-state URLs for all checkpoints.
 
-Run: `Qwen/Qwen3-8B`, LoRA r=8, G=8 thoughts/state, λ=0.15, L_max=200 — 8 train + 2 held-out
-trajectories × 6 steps, up to 100 EM iterations with early stopping (patience 12 on held-out
-likelihood). **Early-stopped at iteration 59** (best held-out p=0.888 @ iteration 43). One external
-kill at iteration 48 was recovered losslessly via `--resume-state` from the checkpoint's saved
-trainer state. Full log: `runs/length_penalty_qwen3_8b_100.json` (every candidate thought, reward,
-and checkpoint URL, regenerable via `scripts/plot_length_penalty_run.py` and
-`scripts/make_eval_tables.py`).
-
-#### The two-phase dynamic
+## The two-phase dynamic
 
 ![Action likelihood during training](assets/img/lenpen-likelihood.png)
 
@@ -105,32 +51,11 @@ and checkpoint URL, regenerable via `scripts/plot_length_penalty_run.py` and
    ~37), at no cost to training likelihood (holds ~0.95). Held-out likelihood plateaus at ~0.87–0.89,
    which triggers early stopping.
 
-#### Watching the same eval steps across training
+## The same eval tasks across training
 
-Best-of-G thought for the held-out probe step at each checkpoint:
-
-| iter | p(x\|s,z) | \|z\| | best-of-G thought |
-|---|---|---|---|
-| 0 | 0.0018 | 28 | "I need information about meta's international operations. First, I should identify the relevant tables that describe their operations and financial data." |
-| 8 | 0.113 | 31 | "I need to examine the international operations of Meta. First, I should determine which tables and data points exist in the database for this company." |
-| 16 | 0.275 | 44 | "I need to understand how to get the data I need for acme. I'll first list the available table descriptions for the company meta…" *(the few-shot's "acme" leaking in)* |
-| 24 | 0.478 | 46 | "First, I need an understanding of the tables available for Meta to answer questions about their international footprint in terms of assets and income…" |
-| 32 | 0.763 | 51 | "To understand the context of Meta's operations, I'll start by retrieving the descriptions of available tables to determine the relevant data sources…" |
-| 40 | 0.956 | 56 | "I need details about international operations for Meta. first step is to fetch the available tables and their descriptions, which will guide me to the correct data sources…" |
-| 48 | 0.994 | 48 | "I must analyze meta's operations globally for this report. First I'll check its available tables to understand where the data might be stored…" |
-| 56 | 0.997 | 31 | "To get insights into international operations for meta, I must first examine available tables and structures by retrieving descriptions to understand location and income relationships effectively." |
-| 59 (stop) | 0.996 | 38 | "To understand asset allocation and income generation across regions, I should first list out all tables related to meta to make sure I have all relevant data structures ready for the analysis query." |
-
-By the end, **every one of the 8 sampled thoughts scores p≈0.997** on a step whose initial best was
-p=0.0018 (~550×) — the length penalty becomes the sole differentiator, and the group is ranked
-purely by brevity.
-
-The same effect across **different held-out tasks** (step-1 thought for each eval question, at
-every 10th iteration — watch the English erode into telegraphic noun-stacks by iteration 59). This
-run held out 2 tasks; the λ-sweep runs below hold out 5:
-
-<details>
-<summary><b>Per-task thought-evolution tables (click to expand)</b></summary>
+_“Step” in earlier drafts meant sequential actions of one trajectory; the tables below
+instead show the **first step of each held-out task** (different questions), so the effect is
+visible across tasks. This run held out 2 tasks; the λ-sweep runs hold out 5._
 
 _Held-out tasks, every 10 EM iterations; "selected ẑ" is the penalized-reward argmax of G=8 sampled thoughts (the one committed to context)._
 
@@ -179,28 +104,97 @@ _Held-out tasks, every 10 EM iterations; "selected ẑ" is the penalized-reward 
 | 50 | 0.9967 | 40 | I need to analyze how Microsoft is positioned for short-term needs based on its investment portfolio. I'll check table structures to identify relevant categories like investments or financial status to model this analysis. |
 | 59 | 0.9965 | 34 | Getting table descriptions for microsoft helps simplify structuring queries for accessing investment data about liquidity requirements and portfolio assessments. Comprehensive table structure existence understanding ensures appropriate metrics retrieval. |
 
-</details>
+## So… does the English degrade?
 
-#### λ sweep: push harder, collapse sooner
+Yes — but not into caveman. It erodes into **telegraphic corporate jargon**: articles drop, noun
+phrases stack, and sentence tails drift into semantically hollow buzzword chains that presumably
+still "prime" the right action. Same step, early vs late:
 
-Rerunning with **λ = 0.4** and **λ = 1.0** for the full 100 iterations (early stopping disabled)
-adds a third act to the story:
+> **iteration 20 (49 tok):** "I need to check which tables and columns are available for the company
+> 'meta'. I will execute a query to get the descriptions of all tables and columns related to this
+> company so that I can understand what data I can work with."
+
+> **iteration 59 (35 tok):** "To fully understand the regional asset distributions, I need asset
+> **table structures table details** for geographic areas to ensure precise **selections analyzing
+> regional exposure accurately by asset types across years**."
+
+> **iteration 59 (43 tok):** "…selecting all rows initially ensures I can structure computations
+> accurately based on **asset allocation knowledge patterns for the comprehensive answer required
+> about these asset classifications driving calculations**."
+
+Other artifacts we caught along the way:
+
+- **Token-saving typos.** One selected thought opens *"I'am examining Meta's operations…"* — the
+  invented contraction is a token cheaper than "I am".
+- **Confident confabulation.** Late thoughts casually cite plausible-but-invented table names
+  (`fact_revenue`, `dimension_region`, `meta_position_breakdown_this_year`) — the action likelihood
+  is indifferent to whether the reasoning's *props* are real, only whether the right action follows.
+- **Few-shot bleed-through.** A mid-training checkpoint briefly addresses "acme", the company from
+  the built-in few-shot example.
+- **Saturation makes length the whole game.** By the end, *all 8* sampled thoughts on the probe step
+  score p≈0.997 (vs 0.0018 at initialization — ~550×), so the group is ranked purely by brevity.
+
+## Checkpoints
+
+Every periodic checkpoint saved sampler weights **and** full trainer state (resumable); URLs live in
+the run log's `checkpoints` list. Highlights:
+
+| iter | probe best-of-G p(x\|s,ẑ) | \|ẑ\| tok | sampler |
+|---:|---:|---:|---|
+| 0 | 0.0018 | 28 | `tinker://fa604ca3-…/sampler_weights/lenpen-iter-0` |
+| 8 | 0.113 | 31 | `…/lenpen-iter-8` |
+| 16 | 0.275 | 44 | `…/lenpen-iter-16` |
+| 24 | 0.478 | 46 | `…/lenpen-iter-24` |
+| 32 | 0.763 | 51 | `…/lenpen-iter-32` |
+| 40 | 0.956 | 56 | `…/lenpen-iter-40` |
+| 48 | 0.994 | 48 | `tinker://c637f323-…/sampler_weights/lenpen-iter-48` (post-resume) |
+| 56 | 0.997 | 31 | `…/lenpen-iter-56` |
+| 59 (stop) | 0.996 | 38 | `…/lenpen-iter-100` (final label) |
+
+## λ sweep: push harder, collapse sooner
+
+We reran the same recipe with more aggressive penalties — **λ = 0.4** and **λ = 1.0** (where a
+budget-maxing thought loses to an empty one no matter its likelihood) — for the **full 100
+iterations with early stopping disabled**, on the same 8 train + 5 held-out trajectories
+(logs: `runs/length_penalty_qwen3_8b_lam04.json`, `runs/length_penalty_qwen3_8b_lam10.json`).
 
 ![Held-out likelihood across length penalties](assets/img/lenpen-sweep-likelihood.png)
 
 ![Held-out thought length across length penalties](assets/img/lenpen-sweep-length.png)
 
-Likelihood climbs identically for every λ — but at matched likelihood, thoughts are shorter with
-higher λ (at iteration 20: ~62 → 50 → 33 selected tokens for λ = 0.15 / 0.4 / 1.0). Both aggressive
-runs converge to terse ~33-token thoughts at p≈0.99 by iteration ~70… and then **collapse**: past
-iteration ~78 (λ=1.0) / ~84 (λ=0.4) the policy falls into a degenerate attractor — thoughts blow up
-to the 200-token cap as literal *"percentage percentage percentage…"* repetition, which still
-reward-hacks p≈0.85 on the logged action while held-out likelihood craters 0.91 → 0.70. Stronger
-penalty, earlier collapse — and the λ=0.15 run's early stopping (iteration 59) exited safely at the
-plateau. Full analysis in [LENGTH_PENALTY.md](LENGTH_PENALTY.md).
+Three regimes, visible in the curves:
 
-<details>
-<summary><b>Cross-λ thought-evolution tables (same tasks, same checkpoints — click to expand)</b></summary>
+1. **λ barely affects the likelihood climb.** All three runs track nearly identical held-out
+   likelihood up to saturation (~0.9 by iteration 40) — but at matched likelihood, thoughts are
+   consistently shorter with higher λ (e.g. at iteration 20, selected thoughts averaged ~62 tokens at
+   λ=0.15, 50 at λ=0.4, 33 at λ=1.0). The penalty buys brevity at essentially no likelihood cost.
+2. **Convergent compression.** By iterations 60–75 both aggressive runs settle at ~33–35 token
+   thoughts with p≈0.99 — terse but coherent ("To understand international operations, I need table
+   structures for meta…").
+3. **Then the babble collapse.** Past iteration ~78 (λ=1.0) / ~84 (λ=0.4), the policy falls into a
+   degenerate attractor: thoughts explode to the 200-token cap as literal
+   *"percentage percentage percentage percentage…"* repetition, and held-out likelihood craters
+   0.91 → 0.70. The babble is a genuine **reward hack** — a wall of "percentage" still primes the
+   right tool call at p≈0.84–0.89, so once the policy's entropy is squeezed low enough, the
+   repetition mode takes over the group and the policy gradient locks it in. **The stronger the
+   penalty, the earlier the collapse** — and the λ=0.15 run's early stopping (iteration 59) exited
+   at the plateau, well before the cliff. By the final checkpoint, *all eight* sampled thoughts in
+   the demo are percentage-babble.
+
+Notably, there was **no collapse to short thoughts** — the failure mode runs the other way. Very
+short thoughts are strictly bad early (low likelihood, small penalty savings), and by the time length
+pressure dominates, ~33 coherent tokens beat 5 tokens on likelihood by more than the penalty
+difference. The babble attractor also exploits a design seam: at λ=1.0 a cap-length thought has
+$r_\text{pen} = p - 1 < 0$, and when a *whole group* goes negative our weights fall back to
+likelihood-normalization — removing length pressure from the gradient exactly when the babble
+appears, so nothing restrains it.
+
+The morals: (i) a length penalty works beautifully *while likelihood still has headroom*; (ii) once
+both objectives saturate, continued policy-gradient pressure with no KL anchor finds the degenerate
+mode; (iii) early stopping on held-out likelihood is exactly the right guardrail — the λ=0.15 run
+never met the monster.
+
+### Thoughts across λ, same tasks, same checkpoints
 
 _Selected thought ẑ (penalized-reward argmax of G=8) for the **first step** of shared held-out tasks, under different length penalties λ. “—” = run already finished (λ=0.15 early-stopped at iter 59)._
 
@@ -259,100 +253,28 @@ _Selected thought ẑ (penalized-reward argmax of G=8) for the **first step** of
 | 90 | — | p=1.00, 41 tok — “This table description retrieval for microsoft investments helps structure category percentage percentage growth percentage category percentage percentage percentage growth percentage percentage category percentage perc…” | p=0.70, 200 tok — “For revenue percentage growth percentage percentage percentage percentage percentage percentage percentage percentage percentage percentage percentage percentage percentage percentage percentage percentage percentage pe…” |
 | 99 | — | p=0.98, 73 tok — “I need percentage category percentage information percentage percentage percentage percentage percentage percentage percentage percentage percentage percentage percentage percentage percentage percentage percentage perc…” | p=0.90, 83 tok — “Percentage percentage percentage percentage percentage percentage percentage percentage percentage percentage percentage percentage percentage percentage percentage percentage percentage percentage percentage percentage…” |
 
-</details>
+## Regenerating these artifacts
 
-#### Amusing failure modes
+```bash
+# curves (assets/img/lenpen-*.png) + checkpoint-generation markdown
+uv run --with matplotlib python scripts/plot_length_penalty_run.py runs/length_penalty_qwen3_8b_100.json
 
-- **Token-saving typos.** Under length pressure the model started inventing contractions —
-  one selected thought opens *"I'am examining Meta's operations…"* (a token cheaper than "I am").
-- **Telegraphic jargon, not caveman.** Late thoughts stay fluent-ish but stack nouns and drop
-  articles: *"I need asset table structures table details for geographic areas to ensure precise
-  selections analyzing regional exposure accurately by asset types across years."*
-- **Confident confabulation.** Late thoughts casually cite plausible-but-invented table names
-  (`fact_revenue`, `dimension_region`, `meta_position_breakdown_this_year`) — the action likelihood
-  is indifferent to whether the reasoning's *props* are real, only whether the right action follows.
+# λ-sweep overlay plots (assets/img/lenpen-sweep-*.png)
+uv run --with matplotlib python scripts/plot_lambda_sweep.py
 
-#### Checkpoints (Tinker sampler weights)
+# cross-λ comparison tables
+uv run --with datasets --with numpy --with "transformers>=4.51" --with python-dotenv \
+       --with tinker --with jinja2 \
+  python scripts/make_lambda_comparison.py \
+    --run 0.15=runs/length_penalty_qwen3_8b_100.json \
+    --run 0.4=runs/length_penalty_qwen3_8b_lam04.json \
+    --run 1.0=runs/length_penalty_qwen3_8b_lam10.json
 
-All resumable — each periodic checkpoint also saved full trainer state (`state_path` in the run log).
+# the eval-step tables in this document
+uv run --with datasets --with numpy --with "transformers>=4.51" --with python-dotenv \
+       --with tinker --with jinja2 \
+  python scripts/make_eval_tables.py runs/length_penalty_qwen3_8b_100.json
 
-| iter | sampler path |
-|---|---|
-| 0–48 | `tinker://fa604ca3-…:train:0/sampler_weights/lenpen-iter-{0,8,16,24,32,40,48}` |
-| 48 (resumed), 56, final | `tinker://c637f323-…:train:0/sampler_weights/lenpen-iter-{48,56,100}` |
-| best eval (iter 43) | `…/lenpen-best-43` (recorded in run log) |
-
----
-
-<details>
-<summary>Original project planning notes (pre-build)</summary>
-
-## Todo:
-
-### Static-site Blog
-
-We want to make a clean, minimal, yet interactive blog post / demo site that I can upload to
-github pages. This might roughly be a motivating aesthetic:
-- https://michaelzhang.xyz/distillation-is-not-a-heist/
-- https://yoonholee.com/meta-harness/
-
-Using the notes at `docs/1.0-notes-act_prm.ipynb`, write up a blog post that combines the prose there
-(basically word-for-word, if not with edits + revisions by first reading over an thinking about as a
-Technical Editor for content that is scientific yet didacts and meant for the masses; Nathan Lambert
-or Michael Levine ah), with our results at the following sources:
-
-- docs/slides.pptx
-- docs/paper_act_prm-10.pdf
-
-We want the results + experiment descriptions to be standard, i.e., Tables, Plots, Reward Curves. We
-may want to back-up the initial claims in the notes about just trying to predict future actions from
-past ones as not having enough context via the motivating results that we have in the slides.
-
-Additional sources for references may be found at:
-
-- Paper repository: /Users/michael/Documents/projects/papers/paper-act-prm
-- Codebase: /Users/michael/Documents/projects/act-prm-tinker (training with Tinker)
-- Codebase 2: /Users/michael/Documents/projects/act-prm
-
-#### Requirements
-
-We want to have nice interactive visualizations of the idea and our method. This should all be
-present in a static-site that can be served and deployed to GitHub pages, but can make use of
-technologies like HTML5, CSS, Canvas, or Three.js (if the latter can be served)
-
-Some inspiration seeds:
-1. Given an initial prompt (s), and a logged action (x), spaced apart, we can sample various thoughts
-   (z), and compute rewards via p(x | s, z), and bold or select the thought with the highest reward.
-   * Each prompt, action, thought should be text, where the thoughts get generated
-     character-by-character as an animation
-   * The thought that gets selected can also be an animation
-2. We can have figures showing the latent variable modeling at play
-3. We can have the equation derivation in MathTex or LaTex, with different parts being hoverable and
-   glowing in different colors.
-
-The overall site should be a white background (or off-white). We want to use clean simple fonts
-(Roboto, Calibri, Arial, Helvetica Neue; thin-styling or regular styling)
-
-We want to have a hero banner or image that is animated and visualizes the method's core conepts at
-large.
-
-We want to have the memes and gifs present in the slides when they make sense.
-
-Include a bibtex for the site itself as a blog post and for the ICML RLxF paper.
-
-In the appendix (or as part of illustrating the method), and also in the notebooks, we want to setup
-what the prompts and context are like for our thought-generation — how we reverse the prompts first
-as (state, action, thought) for offline traces of (state, thought, ___), seeding this with a few
-few-shot examples, and then scoring the generated samples via the same model as
-p(action | state, thought).
-
-We want the derivation to be didactic and make the EM connections very easy to follow and natural.
-
-### Code / Jupyter notebook
-
-It'd also be good to include a standalone jupyter-notebook using HuggingFace Transformers and Tinker
-for walking through how one would sample and train the models via RL. This should be quite didactic
-and make it very easy for someone to follow implementations of the core concepts. I have Tinker keys
-in a .env file, though you may need to test on Google Colab for the HuggingFace transformers route.
-
-</details>
+# sample thoughts from any checkpoint
+uv run ... python scripts/act_prm_length_penalty.py demo --sampler-path "tinker://..."
+```
