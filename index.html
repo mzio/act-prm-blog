@@ -13,9 +13,9 @@
 </head>
 <body>
 
-<!-- ================= HERO ================= -->
-<header class="hero">
-  <canvas id="hero-canvas" aria-hidden="true"></canvas>
+<!-- ================= HERO (canvas is a fixed, always-on background) ================= -->
+<canvas id="hero-canvas" aria-hidden="true"></canvas>
+<header class="hero" id="top">
   <div class="hero-inner">
     <div class="hero-kicker">Action Process Reward Models</div>
     <h1 class="title">On Learning to <span class="accent-z">Think</span><br>with Action Process Reward Models</h1>
@@ -31,6 +31,23 @@
     </div>
   </div>
 </header>
+
+<div class="page-panel">
+<nav class="topnav" aria-label="Sections">
+  <a href="#intro">1 Problem</a>
+  <a href="#sft-bc">2 SFT?</a>
+  <a href="#motivating">3 Study</a>
+  <a href="#setup">4 Setup</a>
+  <a href="#approach">5 Latent thoughts</a>
+  <a href="#derivation">6 EM → rewards</a>
+  <a href="#implementation">7 Algorithm</a>
+  <a href="#playground">8 Playground</a>
+  <a href="#results">9 Results</a>
+  <a href="#discussion">10 What's next</a>
+  <a href="#appendix">Appendix</a>
+  <a href="#bibtex">Cite</a>
+  <a href="#top" class="nav-top">↑ top</a>
+</nav>
 
 <main>
 <div class="container">
@@ -77,10 +94,10 @@
   <ul>
     <li>
       <strong>Sparse rewards / credit assignment.</strong> While successful task completion is one true
-      reward signal, verifying success is only possible at the end. For long multi-turn workflows, this
-      single sparse reward exacerbates a classic <em>credit assignment</em> problem: it's difficult to
-      determine which actions contributed to the final outcome, and one poor action resulting in failure
-      can noisily penalize perfectly reasonable prior actions.
+      reward signal, <strong>verifying success is only possible at the end</strong>. For long
+      multi-turn workflows, this single sparse reward exacerbates a classic <em>credit assignment</em>
+      problem: it's difficult to determine which actions contributed to the final outcome, and one poor
+      action resulting in failure can noisily penalize <em>perfectly reasonable</em> prior actions.
     </li>
     <li>
       <strong>Providing informative intermediate signal.</strong> Alternatively, we could try to
@@ -124,7 +141,7 @@
     an LLM, we could consider supervised finetuning (SFT) over sequences of expert demonstrations,
     i.e., <em>behavioral cloning</em> (BC). By collecting successful demonstrations of a human
     completing a task and training an LLM on text representations of these trajectories, we get dense
-    next-token prediction signal from work a human was doing anyway.
+    next-token prediction signal <strong>from work a human was doing anyway</strong>.
   </p>
 
   <figure class="card">
@@ -262,10 +279,10 @@
 
   <p>
     Across the board, the action-only model trails the Thoughts + Actions model by a substantial
-    margin: gaps of 10–14 percentage points of action-prediction accuracy on the text-world games and
-    roughly 9 points on the tool-calling task, with correspondingly higher action-token perplexity.
-    The gap also isn't something more training closes — it's visible over the whole optimization
-    trajectory:
+    margin: <strong>gaps of 10–14 percentage points</strong> of action-prediction accuracy on the
+    text-world games and roughly 9 points on the tool-calling task, with correspondingly higher
+    action-token perplexity. The gap also isn't something more training closes — <em>it's visible over
+    the whole optimization trajectory</em>:
   </p>
 
   <div class="fig-row">
@@ -283,15 +300,19 @@
   </div>
 
   <p>
-    The implication: the explicit-action sequence alone is missing information that the model could
-    exploit if it had access to the interleaved thoughts. This motivates recovering those thoughts from
-    the model itself — the subject of the rest of this post.
+    The implication: <strong>the explicit-action sequence alone is missing information</strong> that
+    the model could exploit if it had access to the interleaved thoughts. This motivates recovering
+    those thoughts <em>from the model itself</em> — the subject of the rest of this post.
   </p>
 </section>
 
 <!-- ================= SETUP ================= -->
 <section id="setup">
   <h2><span class="secnum">4</span>Setup: multi-turn RL</h2>
+
+  <details class="collapse" id="collapse-setup">
+  <summary><span class="collapse-title">The formal setup — states, trajectories, and returns</span><span class="collapse-hint"></span></summary>
+  <div class="collapse-body">
 
   <p>
     To ground our approach, we start with the following multi-turn RL setup. For each timestep
@@ -358,9 +379,12 @@
   $$
   </div>
   <p>
-    In other words, at each timestep $t$, given everything the model's seen before, we want to generate
-    actions that maximize the probability of a successful task completion.
+    In other words, at each timestep $t$, given everything the model's seen before, <strong>we want to
+    generate actions that maximize the probability of a successful task completion</strong>.
   </p>
+
+  </div>
+  </details>
 </section>
 
 <!-- ================= APPROACH ================= -->
@@ -471,8 +495,8 @@
   </p>
 
   <p class="smallnote">
-    <strong>Hover any colored term</strong> below (or tap a legend chip) to see what it is and where it
-    appears across the derivation. Fix a step $t$ with state $s$ and observed action $x$; superscript
+    <strong>Hover any colored term</strong> below to see what it is and where it appears across the
+    derivation — <strong>click a term</strong> (or a legend chip) to pin its highlight. Fix a step $t$ with state $s$ and observed action $x$; superscript
     $(n)$ marks the frozen parameters of the current EM iteration.
   </p>
 
@@ -522,7 +546,9 @@
   </ul>
   <p>To make this concrete, we next show how to get the rewards and training objective from our EM framing.</p>
 
-  <h3>From expectation-maximization to policy gradient</h3>
+  <details class="collapse" id="collapse-em-pg">
+  <summary><span class="collapse-title">From expectation-maximization to policy gradient</span><span class="collapse-hint"></span></summary>
+  <div class="collapse-body">
   <p>
     First, we show an equivalence between the maximization above and policy gradient with certain
     rewards. This motivates specific rewards for training our thought-generation LLMs. Recall that our
@@ -552,9 +578,9 @@
   $$
   </div>
   <p>
-    That inner swap is the whole trick: an expectation under the <em>posterior</em> (which we can't
-    sample) became an expectation under the <em>policy</em> (which we can — it's just the LLM generating
-    thoughts), with an importance weight left behind. Since we're maximizing this expectation via
+    That inner swap is <strong>the whole trick</strong>: an expectation under the <em>posterior</em>
+    (which we can't sample) became an expectation under the <em>policy</em> (which we can — it's just
+    the LLM generating thoughts), with an importance weight left behind. Since we're maximizing this expectation via
     $\theta$, we can write our objective as
   </p>
   <div class="eq-block">
@@ -590,8 +616,12 @@
       approximate as follows!
     </li>
   </ul>
+  </div>
+  </details>
 
-  <h3>Practical empirics</h3>
+  <details class="collapse" id="collapse-empirics">
+  <summary><span class="collapse-title">Practical empirics — from integrals to a batch of G samples</span><span class="collapse-hint"></span></summary>
+  <div class="collapse-body">
   <p>
     Finally, we derive a sampling-based version of the above to back out our concrete training
     algorithm. Let's first define the <em>unnormalized</em> reward
@@ -637,11 +667,15 @@
   \nabla_\theta J(\theta) \approx \sum_{g=1}^G \bar{r}(z^{(g)}) \, \nabla_\theta \htmlClass{eq-term term-joint}{\log p_\theta(x, z^{(g)} \mid s)}
   $$
   </div>
+  </div>
+  </details>
+
   <p>
-    A thought is rewarded exactly to the extent that conditioning on it makes the human's observed next
-    action more probable — relative to the other thoughts in its batch. No annotators, no reward model
-    to train, no rubric to write: the model being trained <em>is</em> the reward model. This is what we
-    call an <strong>Action Process Reward Model</strong> (Act-PRM).
+    <strong>A thought is rewarded exactly to the extent that conditioning on it makes the human's
+    observed next action more probable</strong> — relative to the other thoughts in its batch.
+    <em>No annotators, no reward model to train, no rubric to write</em>: the model being trained
+    <em>is</em> the reward model. This is what we call an
+    <strong>Action Process Reward Model</strong> (Act-PRM).
   </p>
 </section>
 
@@ -680,7 +714,9 @@
     <span class="chip chip-x">logged action</span> that follows.</figcaption>
   </figure>
 
-  <h3>Choices for the return</h3>
+  <details class="collapse" id="collapse-returns">
+  <summary><span class="collapse-title">Choices for the return</span><span class="collapse-hint"></span></summary>
+  <div class="collapse-body">
   <p>
     While the EM math above tells us one option — each step's update weighted by that same step's
     group-normalized reward $R_t = \bar{r}(z_t^{(g)})$, a <em>contextual bandit</em> form with no
@@ -707,14 +743,17 @@
   <p class="smallnote">
     The paper trains with option 1 — the form that falls directly out of the EM derivation.
   </p>
+  </div>
+  </details>
 
   <h3>Distilling Act-PRM traces back into the model</h3>
   <p>
     After Act-PRM training, we use the trained model to relabel each action-only trajectory with its
     highest-reward thoughts, producing a synthetic full-trajectory dataset
     $\{\hat\tau^{(i)}\}_i$. Standard SFT on this dataset then yields a final agent policy — and as
-    we'll see below, this recipe matches or beats SFT on thought-and-action traces written by frontier
-    LLMs, at a fraction of the data-collection cost.
+    we'll see below, this recipe <strong>matches or beats SFT on thought-and-action traces written by
+    frontier LLMs on behavioral cloning experiments</strong>, at a fraction of the data-collection
+    cost.
   </p>
 </section>
 
@@ -769,8 +808,8 @@
     First, sanity: is the action-likelihood reward a hill we can climb at all? Yes — over Act-PRM
     training, the reward (the model's likelihood over held-out logged actions, conditioned on its own
     sampled thoughts) rises smoothly, on both training and evaluation trajectories. We can train models
-    to get <em>better at thinking</em>, where “better” is measured by an un-gameable quantity: did your
-    thought make the human's actual next action more likely?
+    to get <em>better at thinking</em>, where “better” is measured by an <strong>un-gameable
+    quantity</strong>: <em>did your thought make the human's actual next action more likely?</em>
   </p>
   <div class="fig-row">
     <figure class="card">
@@ -904,11 +943,15 @@
     beyond the logs an agent (or employee) already produces.
   </p>
   <p>
-    Plenty remains. We demonstrate results for behavioral-cloning metrics on 4B models; scaling base
-    model size (Qwen3-8B / 32B), evaluating across model families, end-to-end task success under live
-    rollouts, and combining the Act-PRM stage with subsequent multi-turn RL (the thoughts as a warm
-    start for the “climbable hills” of Section 1) are all future work — as are richer evaluation
-    environments like Terminal-Bench and computer control.
+    There's still lots to do! Here we demo'd Act-PRMs as a fun way to quickly spin out SFT traces with
+    <em>thoughts and actions</em> from easier-to-collect <em>action-only</em> trajectories. We're
+    excited about seeing how policies RL'd from these thinking + acting checkpoints perform
+    <strong>beyond behavioral cloning metrics</strong>. We also demo'd these ideas on multi-turn
+    agentic tool-calling benchmarks, but we're excited to see if similar ideas could be applied to more
+    advanced real-world use-cases like <strong>computer control</strong> and
+    <strong>EHR documentation</strong> — where anyone can operate these interfaces, but it might become
+    a chore to have to dictate your inner monologue as well. Above all, <em>if we can make it less
+    painful to collect high-quality data, then that will be a win</em>.
   </p>
 </section>
 
@@ -1025,16 +1068,24 @@ reward = exp(mean(target_logprobs))     # ≈ 1 / action-token perplexity
   </p>
   <ul>
     <li>
-      <a href="notebooks/act_prm_transformers.ipynb"><strong>act_prm_transformers.ipynb</strong></a> —
+      <a href="https://github.com/mzio/act-prm-blog/blob/main/notebooks/act_prm_transformers.ipynb"><strong>act_prm_transformers.ipynb</strong></a> —
       pure Hugging Face Transformers + PyTorch. Builds the prompt reversal, computes
       $p(x \mid s, z)$ from raw logits, and takes REINFORCE steps on a small Qwen3 model. Runs on a
       free Colab GPU.
     </li>
     <li>
-      <a href="notebooks/act_prm_tinker.ipynb"><strong>act_prm_tinker.ipynb</strong></a> — the same
+      <a href="https://github.com/mzio/act-prm-blog/blob/main/notebooks/act_prm_tinker.ipynb"><strong>act_prm_tinker.ipynb</strong></a> — the same
       loop against the <a href="https://thinkingmachines.ai/blog/announcing-tinker/">Tinker</a>
       training API (sampling client + <code>forward_backward</code> with importance weights), the way
       the paper's experiments actually ran.
+    </li>
+    <li>
+      <a href="https://github.com/mzio/act-prm-blog/blob/main/scripts/act_prm_length_penalty.py"><strong>scripts/act_prm_length_penalty.py</strong></a> —
+      a standalone training + demo-sampling script that adds a <em>length penalty</em> to the thought
+      reward, $r_\text{pen}(z) = p(x \mid s, z) - \lambda \cdot |z| / L_\text{max}$, and runs the full
+      EM loop on Tinker against the real
+      <a href="https://huggingface.co/datasets/mzio/aprm-snorkelai_agent_finance_reasoning">Snorkel
+      Agent Finance action-only dataset</a> (narration stripped from logged actions).
     </li>
   </ul>
 </section>
@@ -1073,9 +1124,11 @@ howpublished={\url{https://michaelzhang.xyz/act-prm-blog/}}
   <div class="container">
     Companion site for the ICML 2026 RLxF workshop paper ·
     <a href="https://openreview.net/forum?id=2zsteCP2wy">OpenReview</a> ·
+    <a href="#top">back to top ↑</a> ·
     built with plain HTML/CSS/Canvas + KaTeX
   </div>
 </footer>
+</div><!-- /page-panel -->
 
 <div class="viz-tooltip" id="viz-tooltip"></div>
 

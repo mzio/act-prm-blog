@@ -18,7 +18,7 @@
       context: [
         { kind: 'state', who: 'state s₁ — user', text: 'Here is the question: What is the company’s lease financing strategy and how heavily does it rely on operating leases versus finance leases? The company to query in the database: meta' },
       ],
-      action: '<tool_call>{"name": "get_descriptions", "arguments": {"company_name": "meta"}}</tool_call>',
+      action: '<tool_call>\n{"name": "get_descriptions", "arguments": {"company_name": "meta"}}\n</tool_call>',
       cands: [
         { text: 'I need to retrieve information about Meta’s lease financing strategy to determine its reliance on operating versus finance leases. The provided tool lets me get descriptions of the tables available for the company “meta” — I should start there.', rTilde: 0.34 },
         { text: 'The question is about operating vs. finance leases, so I’ll write a SQL query against the lease balance-sheet table right away.', rTilde: 0.07 },
@@ -30,7 +30,7 @@
       context: [
         { kind: 'obs', who: 'observation o₂ — tool', text: 'Result: 62 tables for “meta”, including “meta_LeaseBalanceSheetInformationTableTextBlock”: lease assets and liabilities reported on the balance sheet…' },
       ],
-      action: '<tool_call>{"name": "get_table_info", "arguments": {"company_name": "meta", "table_name": "meta_LeaseBalanceSheetInformationTableTextBlock"}}</tool_call>',
+      action: '<tool_call>\n{"name": "get_table_info", "arguments": {"company_name": "meta", "table_name": "meta_LeaseBalanceSheetInformationTableTextBlock"}}\n</tool_call>',
       cands: [
         { text: 'The query result includes a table named “meta_LeaseBalanceSheetInformationTableTextBlock”, which likely contains lease assets and liabilities split by operating and finance leases. I’ll retrieve details from this specific table next.', rTilde: 0.41 },
         { text: 'I have the table list. I’ll answer the question now based on Meta’s well-known preference for operating leases.', rTilde: 0.015 },
@@ -126,27 +126,33 @@
       later(tick, 120 * i);
     });
 
-    // 2) score
+    // 2) score: first show the computation happening, then reveal the numbers
     function scorePhase() {
-      noteEl.textContent = 'Scoring: computing p(x | s, z⁽ᵍ⁾) over the logged action’s tokens, then normalizing within the group…';
+      noteEl.textContent = 'Scoring: teacher-forcing the logged action’s tokens after each thought to compute p(x | s, z⁽ᵍ⁾), then normalizing within the group…';
+      step.cands.forEach((c, i) => {
+        const wrap = cards[i].querySelector('.rbar-wrap');
+        wrap.style.visibility = 'visible';
+        const val = cards[i].querySelector('.rval');
+        val.classList.add('computing');
+        val.textContent = `computing p(x | s, z⁽${i + 1}⁾)…`;
+      });
       later(() => {
         step.cands.forEach((c, i) => {
-          const wrap = cards[i].querySelector('.rbar-wrap');
-          wrap.style.visibility = 'visible';
           const bar = cards[i].querySelector('.rbar');
           const val = cards[i].querySelector('.rval');
+          val.classList.remove('computing');
           later(() => { bar.style.width = (rewards[i] * 100).toFixed(1) + '%'; }, 60);
-          val.textContent = `r̄ = ${rewards[i].toFixed(2)}`;
+          val.textContent = `p(x|s,z)=${c.rTilde.toFixed(2)} → r̄=${rewards[i].toFixed(2)}`;
         });
         later(pickPhase, 1100);
-      }, 350);
+      }, 1400);
     }
 
     // 3) pick winner
     function pickPhase() {
       cards.forEach((card, i) => card.classList.add(i === winner ? 'winner' : 'loser'));
-      noteEl.textContent = 'The highest-reward thought ẑ is committed to context; every sampled thought and its reward go into the policy-gradient batch.';
-      later(commitPhase, 1400);
+      noteEl.textContent = 'ẑ = argmax p(x | s, z⁽ᵍ⁾): the thought that made the logged action most likely is committed to context; every sampled thought and its reward go into the policy-gradient batch.';
+      later(commitPhase, 1600);
     }
 
     // 4) commit thought + reveal action

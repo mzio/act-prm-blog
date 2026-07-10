@@ -88,10 +88,12 @@
     ctx.textBaseline = 'middle';
     ctx.fillText('s', sx, cy + 1);
 
-    // --- candidate thoughts ---
-    const spread = (H - 90) / (G - 1);
+    // --- candidate thoughts (kept in a band around the center line) ---
+    const band = Math.min(Math.max(H - 140, 220), 430);
+    const spread = band / (G - 1);
+    const bandTop = cy - band / 2 - CAND_H / 2;
     for (let g = 0; g < G; g++) {
-      const ty = 45 + spread * g;
+      const ty = bandTop + spread * g;
       const isWin = g === winner;
       const fade = pPick > 0 && !isWin ? 1 - 0.72 * pPick : 1;
 
@@ -184,7 +186,7 @@
 
     // --- edge winner → action + action node ---
     if (pAct > 0) {
-      const wy = 45 + spread * winner + CAND_H / 2;
+      const wy = bandTop + spread * winner + CAND_H / 2;
       ctx.strokeStyle = COL.thought;
       ctx.lineWidth = 1.8;
       ctx.beginPath();
