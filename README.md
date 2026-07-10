@@ -95,7 +95,74 @@ periodic, and final checkpoints, so everything below can be regenerated post-hoc
 
 ### Results
 
-_(training in progress — this section is filled in from `runs/length_penalty_qwen3_8b_full.json`)_
+Run: `Qwen/Qwen3-8B`, LoRA r=8, G=8 thoughts/state, λ=0.15, L_max=200 — 8 train + 2 held-out
+trajectories × 6 steps, up to 100 EM iterations with early stopping (patience 12 on held-out
+likelihood). **Early-stopped at iteration 59** (best held-out p=0.888 @ iteration 43). One external
+kill at iteration 48 was recovered losslessly via `--resume-state` from the checkpoint's saved
+trainer state. Full logs: `runs/length_penalty_qwen3_8b_100.json` (main),
+`runs/length_penalty_qwen3_8b_full.json` (earlier 16-iter run),
+`runs/length_penalty_qwen3_8b_100_killed_at_25.json` (25-iter partial that motivated resumability).
+
+#### The two-phase dynamic
+
+Optimizing *likelihood minus length* produced a clean two-phase trajectory, visible in the curves:
+
+![Action likelihood during training](assets/img/lenpen-likelihood.png)
+
+![Thought length during training](assets/img/lenpen-thought-length.png)
+
+1. **Phase 1 (iterations ~0–35): likelihood buys length.** Mean action likelihood climbs
+   0.47 → 0.89 (held-out), and thoughts *grow* — from ~63 to a peak of ~85 tokens — because early
+   on, extra explanatory detail buys more likelihood than the λ·|z|/L_max tax costs. The penalty only
+   shapes *selection* at this stage.
+2. **Phase 2 (iterations ~38–59): the length tax takes over.** Once likelihood saturates
+   (marginal gains < marginal length cost), thoughts compress hard: ~85 → ~45 mean tokens, with
+   selected thoughts down to ~37, at **no cost to training likelihood** (holds ~0.95). Held-out
+   likelihood plateaus at ~0.87–0.89, which is what triggers early stopping.
+
+#### Checkpoint generations: the same probe step over training
+
+Held-out probe: *"How significant is the company's international operations footprint in terms of
+asset allocation and income generation as of 2022–2024?"* → logged action
+`get_descriptions(company_name="meta")`. Best-of-G thought at each checkpoint:
+
+| iter | p(x\|s,z) | \|z\| | best-of-G thought |
+|---|---|---|---|
+| 0 | 0.0018 | 28 | "I need information about meta's international operations. First, I should identify the relevant tables that describe their operations and financial data." |
+| 8 | 0.113 | 31 | "I need to examine the international operations of Meta. First, I should determine which tables and data points exist in the database for this company." |
+| 16 | 0.275 | 44 | "I need to understand how to get the data I need for acme. I'll first list the available table descriptions for the company meta…" *(note the few-shot's "acme" leaking in)* |
+| 24 | 0.478 | 46 | "First, I need an understanding of the tables available for Meta to answer questions about their international footprint in terms of assets and income…" |
+| 32 | 0.763 | 51 | "To understand the context of Meta's operations, I'll start by retrieving the descriptions of available tables to determine the relevant data sources…" |
+| 40 | 0.956 | 56 | "I need details about international operations for Meta. first step is to fetch the available tables and their descriptions, which will guide me to the correct data sources…" |
+| 48 | 0.994 | 48 | "I must analyze meta's operations globally for this report. First I'll check its available tables to understand where the data might be stored…" |
+| 56 | 0.997 | 31 | "To get insights into international operations for meta, I must first examine available tables and structures by retrieving descriptions to understand location and income relationships effectively." |
+| final (stop @ 59) | 0.996 | 38 | — |
+
+By the end, **every one of the 8 sampled thoughts scores p≈0.997** on a step whose initial best was
+p=0.0018 (a ~550× improvement) — so the length penalty becomes the sole differentiator, and the
+group is ranked purely by brevity.
+
+#### Amusing failure modes
+
+- **Token-saving typos.** Under length pressure the model started inventing contractions —
+  one selected thought opens *"I'am examining Meta's operations…"* (a token cheaper than "I am").
+- **Confident confabulation.** Late-training thoughts casually cite plausible-but-invented table
+  names (`fact_revenue`, `dimension_region`, `meta_position_breakdown_this_year`) — the action
+  likelihood is indifferent to whether the *reasoning's props* are real, only whether the right
+  action follows.
+- **Few-shot bleed-through.** The mid-training checkpoint at iteration 16 briefly addresses "acme",
+  the company from the built-in few-shot example.
+
+#### Checkpoints (Tinker sampler weights)
+
+All resumable: each periodic checkpoint also saved full trainer state (`state_path` in the run log).
+
+| iter | sampler path |
+|---|---|
+| 0 | `tinker://fa604ca3-…:train:0/sampler_weights/lenpen-iter-0` |
+| 8–48 | `…/lenpen-iter-{8,16,24,32,40,48}` (see run log for full URLs + state paths) |
+| 56, final | `tinker://c637f323-…:train:0/sampler_weights/lenpen-iter-{56,100}` |
+| best eval (iter 43) | `…/lenpen-best-43` (recorded in run log) |
 
 ---
 

@@ -260,8 +260,12 @@ async def rollout_trajectory(sampling_client, templater, traj, cfg, verbose=True
         )
         thoughts, thought_lens = [], []
         for seq in res.sequences:
-            text = templater.decode(seq.tokens).split(THOUGHT_EOS)[0].strip()
-            thoughts.append(text)
+            text = templater.decode(seq.tokens).split(THOUGHT_EOS)[0]
+            # Qwen3's template treats <think> tags specially (it splits the message),
+            # which breaks continue_final_message when they appear inside a thought —
+            # scrub them, and never let a thought be empty.
+            text = text.replace("<think>", "").replace("</think>", "").strip()
+            thoughts.append(text if text else "(no thought)")
             thought_lens.append(len(seq.tokens))
 
         # --- score: likelihood minus length penalty ---
@@ -321,73 +325,181 @@ def make_datum(full_tokens, full_logprobs, prefix_len, weight):
 # ---------------------------------------------------------------------------
 # modes
 # ---------------------------------------------------------------------------
+def summarize(all_metrics):
+    """Aggregate a list of per-trajectory metric lists into iteration-level means."""
+    flat = [m for tm in all_metrics for m in tm]
+    if not flat:
+        return {}
+    return dict(
+        mean_likelihood=float(np.mean([lk for m in flat for lk in m["likelihoods"]])),
+        mean_best_likelihood=float(np.mean([m["likelihoods"][m["best"]] for m in flat])),
+        mean_penalized=float(np.mean([p for m in flat for p in m["penalized"]])),
+        mean_thought_tokens=float(np.mean([tl for m in flat for tl in m["thought_tokens"]])),
+        mean_selected_thought_tokens=float(np.mean([m["thought_tokens"][m["best"]] for m in flat])),
+        n_steps=len(flat),
+    )
+
+
+async def safe_rollout(sampling_client, templater, traj, cfg):
+    """A rollout that degrades gracefully: one bad trajectory (transient API
+    error, context overflow) shouldn't kill a long training run."""
+    try:
+        return await rollout_trajectory(sampling_client, templater, traj, cfg, verbose=False)
+    except Exception as e:  # noqa: BLE001 — log and drop this trajectory this iteration
+        print(f"  [warn] trajectory rollout failed: {type(e).__name__}: {str(e)[:200]}", flush=True)
+        return None
+
+
+async def probe_generations(sampling_client, templater, traj, cfg):
+    """Checkpoint snapshot: sample + score one group for the probe trajectory's
+    first step, without training on it."""
+    cfg1 = argparse.Namespace(**{**vars(cfg), "max_steps_per_traj": 1})
+    _, metrics = await rollout_trajectory(
+        sampling_client, templater,
+        {"messages": traj["messages"], "system_prompt": traj["system_prompt"]},
+        cfg1, verbose=False,
+    )
+    return metrics[0]
+
+
 async def train(cfg):
-    print(f"loading {cfg.num_trajectories} trajectories from {DATASET} ...")
-    trajs = load_trajectories(cfg.num_trajectories, cfg.max_traj_timestep)
-    for i, tr in enumerate(trajs):
-        n_act = sum(m["role"] == "assistant" for m in tr["messages"])
-        print(f"  traj {i}: {len(tr['messages'])} messages, {n_act} actions "
-              f"(training on first {min(n_act, cfg.max_steps_per_traj)})")
+    total = cfg.num_trajectories + cfg.eval_trajectories
+    print(f"loading {total} trajectories from {DATASET} "
+          f"({cfg.num_trajectories} train / {cfg.eval_trajectories} held-out eval) ...", flush=True)
+    trajs = load_trajectories(total, cfg.max_traj_timestep)
+    train_trajs = trajs[: cfg.num_trajectories]
+    eval_trajs = trajs[cfg.num_trajectories:]
+    for name, group in [("train", train_trajs), ("eval", eval_trajs)]:
+        for i, tr in enumerate(group):
+            n_act = sum(m["role"] == "assistant" for m in tr["messages"])
+            print(f"  {name} traj {i}: {len(tr['messages'])} messages, {n_act} actions "
+                  f"(using first {min(n_act, cfg.max_steps_per_traj)})", flush=True)
 
     templater = Templater(cfg.model)
     service_client = tinker.ServiceClient()
-    training_client = await service_client.create_lora_training_client_async(
-        cfg.model, rank=cfg.lora_rank
-    )
-    print(f"training client: {cfg.model} (LoRA r={cfg.lora_rank}), "
-          f"lambda_len={cfg.length_penalty}, G={cfg.group_size}")
-
-    log = dict(config=vars(cfg), iterations=[])
-    sampler_path = None
-    for n in range(cfg.em_iterations):
-        print(f"\n=== EM iteration {n} ===")
-        t0 = time.time()
-        sampling_client = await training_client.save_weights_and_get_sampling_client_async()
-
-        data, iter_metrics = [], []
-        for i, traj in enumerate(trajs):
-            print(f"  trajectory {i}:")
-            step_data, metrics = await rollout_trajectory(
-                sampling_client, templater, traj, cfg
-            )
-            data += [make_datum(**sd) for sd in step_data]
-            iter_metrics.append(metrics)
-
-        fb = await training_client.forward_backward_async(data, loss_fn="importance_sampling")
-        opt = await training_client.optim_step_async(
-            types.AdamParams(learning_rate=cfg.learning_rate, beta1=0.9, beta2=0.95, eps=1e-8)
+    if cfg.resume_state:
+        training_client = await service_client.create_training_client_from_state_async(cfg.resume_state)
+        print(f"resumed training client from {cfg.resume_state}", flush=True)
+    else:
+        training_client = await service_client.create_lora_training_client_async(
+            cfg.model, rank=cfg.lora_rank
         )
-        await fb.result_async()
-        await opt.result_async()
-
-        flat = [m for tm in iter_metrics for m in tm]
-        mean_best_lik = float(np.mean([m["likelihoods"][m["best"]] for m in flat]))
-        mean_lik = float(np.mean([lk for m in flat for lk in m["likelihoods"]]))
-        mean_len = float(np.mean([tl for m in flat for tl in m["thought_tokens"]]))
-        mean_best_len = float(np.mean([m["thought_tokens"][m["best"]] for m in flat]))
-        print(f"  iter {n}: mean p(x|s,z)={mean_lik:.4f} (best-of-G {mean_best_lik:.4f}), "
-              f"mean |z|={mean_len:.0f} tokens (selected {mean_best_len:.0f}) "
-              f"[{time.time() - t0:.0f}s]")
-        log["iterations"].append(dict(
-            iteration=n, mean_likelihood=mean_lik, mean_best_likelihood=mean_best_lik,
-            mean_thought_tokens=mean_len, mean_selected_thought_tokens=mean_best_len,
-            trajectories=iter_metrics,
-        ))
-
-    # save final weights for the demo sampler
-    resp = await (await training_client.save_weights_for_sampler_async(name="lenpen-final")).result_async()
-    sampler_path = resp.path
-    log["sampler_path"] = sampler_path
-    print(f"\nfinal sampler weights: {sampler_path}")
+    print(f"training client: {cfg.model} (LoRA r={cfg.lora_rank}), "
+          f"lambda_len={cfg.length_penalty}, G={cfg.group_size}, "
+          f"iterations {cfg.start_iteration}..{cfg.em_iterations}", flush=True)
 
     out = Path(cfg.log_path)
     out.parent.mkdir(parents=True, exist_ok=True)
-    out.write_text(json.dumps(log, indent=1))
+    # resuming appends to an existing log so curves stay continuous across restarts
+    if cfg.resume_state and out.exists():
+        log = json.loads(out.read_text())
+        log["config"] = vars(cfg)
+    else:
+        log = dict(config=vars(cfg), iterations=[], checkpoints=[])
+
+    def flush_log():
+        out.write_text(json.dumps(log, indent=1))
+
+    async def snapshot(n, sampling_client):
+        """Persist sampler weights + full trainer state + probe generations."""
+        resp = await (await training_client.save_weights_for_sampler_async(
+            name=f"lenpen-iter-{n}")).result_async()
+        state = await (await training_client.save_state_async(
+            name=f"lenpen-state-{n}", overwrite=True)).result_async()
+        probe = await probe_generations(sampling_client, templater, eval_trajs[0], cfg)
+        log["checkpoints"].append(dict(iteration=n, sampler_path=resp.path,
+                                       state_path=state.path, probe=probe))
+        flush_log()
+        b = probe["best"]
+        print(f"[ckpt @ iter {n}] sampler: {resp.path}", flush=True)
+        print(f"[ckpt @ iter {n}] probe best-of-G: p(x|s,z)={probe['likelihoods'][b]:.4f}, "
+              f"|z|={probe['thought_tokens'][b]} tok\n"
+              f"    {probe['thoughts'][b][:220]}", flush=True)
+        return resp.path
+
+    sampler_path = None
+    best_eval, best_iter, patience_left = float("-inf"), -1, cfg.patience
+    if cfg.resume_state and log.get("best"):
+        best_eval, best_iter = log["best"]["eval_likelihood"], log["best"]["iteration"]
+    for n in range(cfg.start_iteration, cfg.em_iterations):
+        t0 = time.time()
+        sampling_client = await training_client.save_weights_and_get_sampling_client_async()
+
+        # periodic checkpoint BEFORE this iteration's update (n=0 == initial policy)
+        if n % cfg.checkpoint_every == 0:
+            sampler_path = await snapshot(n, sampling_client)
+
+        # E-step: all train trajectories in parallel, then held-out eval
+        results = [r for r in await asyncio.gather(*[
+            safe_rollout(sampling_client, templater, tr, cfg) for tr in train_trajs
+        ]) if r is not None]
+        if not results:
+            raise RuntimeError("every trajectory rollout failed this iteration")
+        eval_results = [r for r in await asyncio.gather(*[
+            safe_rollout(sampling_client, templater, tr, cfg) for tr in eval_trajs
+        ]) if r is not None]
+
+        data = [make_datum(**sd) for step_data, _ in results for sd in step_data]
+        train_metrics = [m for _, m in results]
+        eval_metrics = [m for _, m in eval_results]
+
+        # M-step: chunked forward/backward (gradients accumulate), one optim step
+        fb_futures = []
+        for i in range(0, len(data), cfg.fwd_bwd_chunk):
+            fb_futures.append(await training_client.forward_backward_async(
+                data[i: i + cfg.fwd_bwd_chunk], loss_fn="importance_sampling"))
+        opt = await training_client.optim_step_async(
+            types.AdamParams(learning_rate=cfg.learning_rate, beta1=0.9, beta2=0.95, eps=1e-8)
+        )
+        for f in fb_futures:
+            await f.result_async()
+        await opt.result_async()
+
+        tr_s, ev_s = summarize(train_metrics), summarize(eval_metrics)
+        secs = time.time() - t0
+        print(f"iter {n:>2}/{cfg.em_iterations}: "
+              f"train p={tr_s['mean_likelihood']:.4f} (best {tr_s['mean_best_likelihood']:.4f}) "
+              f"|z|={tr_s['mean_thought_tokens']:.0f}/{tr_s['mean_selected_thought_tokens']:.0f}sel"
+              f" || eval p={ev_s.get('mean_likelihood', float('nan')):.4f} "
+              f"(best {ev_s.get('mean_best_likelihood', float('nan')):.4f}) "
+              f"|z|={ev_s.get('mean_thought_tokens', float('nan')):.0f}"
+              f" [{secs:.0f}s, {len(data)} datums]", flush=True)
+        log["iterations"].append(dict(
+            iteration=n, train=tr_s, eval=ev_s, seconds=secs,
+            train_metrics=train_metrics, eval_metrics=eval_metrics,
+        ))
+        flush_log()
+
+        # --- early stopping on held-out likelihood ---
+        ev_lik = ev_s.get("mean_likelihood")
+        if ev_lik is not None:
+            if ev_lik > best_eval + 1e-4:
+                best_eval, best_iter = ev_lik, n
+                patience_left = cfg.patience
+                resp = await (await training_client.save_weights_for_sampler_async(
+                    name=f"lenpen-best-{n}")).result_async()
+                log["best"] = dict(iteration=n, eval_likelihood=ev_lik, sampler_path=resp.path)
+                flush_log()
+                print(f"    new best eval p={ev_lik:.4f} -> {resp.path}", flush=True)
+            else:
+                patience_left -= 1
+                degraded = n > cfg.patience and ev_lik < cfg.degrade_factor * best_eval
+                if patience_left <= 0 or degraded:
+                    why = "hard degradation" if degraded else f"no eval improvement for {cfg.patience} iters"
+                    print(f"[early stop @ iter {n}] {why} (best p={best_eval:.4f} @ iter {best_iter})", flush=True)
+                    break
+
+    # final checkpoint + probe with the fully-trained weights
+    sampling_client = await training_client.save_weights_and_get_sampling_client_async()
+    sampler_path = await snapshot(cfg.em_iterations, sampling_client)
+    log["sampler_path"] = sampler_path
+    flush_log()
+    print(f"\nfinal sampler weights: {sampler_path}")
     print(f"run log -> {out}")
 
     # small demo with the trained sampler
-    print("\n=== demo with trained sampler ===")
-    await demo(cfg, sampler_path=sampler_path, trajs=trajs, templater=templater,
+    print("\n=== demo with trained sampler ===", flush=True)
+    await demo(cfg, sampler_path=sampler_path, trajs=eval_trajs, templater=templater,
                service_client=service_client)
 
 
@@ -438,14 +550,28 @@ def main():
                    help="lambda: reward = p(x|s,z) - lambda * |z|/max_thought_tokens")
     p.add_argument("--max-thought-tokens", type=int, default=200)
     p.add_argument("--num-trajectories", type=int, default=2)
+    p.add_argument("--eval-trajectories", type=int, default=1,
+                   help="held-out trajectories for eval metrics + checkpoint probes")
     p.add_argument("--max-steps-per-traj", type=int, default=3)
     p.add_argument("--max-traj-timestep", type=int, default=12,
                    help="only use demonstrations that finished within this many steps")
     p.add_argument("--em-iterations", type=int, default=2)
+    p.add_argument("--checkpoint-every", type=int, default=4,
+                   help="save sampler weights + probe generations every N iterations")
+    p.add_argument("--patience", type=int, default=12,
+                   help="early-stop after this many iterations without eval improvement")
+    p.add_argument("--degrade-factor", type=float, default=0.75,
+                   help="early-stop immediately if eval likelihood falls below this fraction of best")
+    p.add_argument("--fwd-bwd-chunk", type=int, default=128,
+                   help="datums per forward_backward call (gradients accumulate)")
     p.add_argument("--learning-rate", type=float, default=4e-5)
     p.add_argument("--obs-max-chars", type=int, default=1500)
     p.add_argument("--log-path", default="runs/length_penalty_run.json")
     p.add_argument("--sampler-path", default=None, help="tinker:// path for demo mode")
+    p.add_argument("--resume-state", default=None,
+                   help="tinker:// state path (from a checkpoint's state_path) to resume training")
+    p.add_argument("--start-iteration", type=int, default=0,
+                   help="iteration number to resume counting from")
     cfg = p.parse_args()
 
     if cfg.mode == "train":
