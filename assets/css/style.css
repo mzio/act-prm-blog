@@ -65,7 +65,7 @@ section { margin: 3.2rem 0; }
 header.hero {
   position: relative;
   z-index: 1;
-  min-height: 76vh;   /* sets where the article panel starts — smaller = higher */
+  min-height: 69vh;   /* sets where the article panel starts — smaller = higher */
   display: flex;
   align-items: center;
   justify-content: center;
@@ -77,7 +77,7 @@ header.hero {
      (center of the hero's min-height): positive = down, negative = up.
      If you change the hero's min-height by Δvh, add Δ/2 here to keep the card put.
      The fixed canvas never moves; the animation band is cy = H * 0.34 in hero.js. */
-  transform: translateY(1vh);
+  transform: translateY(4.5vh);
   max-width: 640px;
   text-align: center;
   background: rgba(252, 252, 251, 0.78);
