@@ -85,11 +85,12 @@ header.hero {
 }
 @media (max-width: 640px) { .hero-inner { padding: 1.8rem 1.4rem 2rem; } }
 
-/* the article panel that scrolls over the animation */
+/* the article panel that scrolls over the animation — always leave side
+   gutters so the animated background stays visible while reading */
 .page-panel {
   position: relative;
   z-index: 1;
-  max-width: 880px;
+  max-width: min(880px, calc(100% - 72px));
   margin: 0 auto;
   background: rgba(252, 252, 251, 0.97);
   border: 1px solid var(--hairline);
@@ -97,42 +98,88 @@ header.hero {
   border-radius: 18px 18px 0 0;
   box-shadow: 0 -6px 40px rgba(0, 0, 0, 0.06);
 }
+@media (max-width: 640px) { .page-panel { max-width: calc(100% - 20px); } }
 
-/* ---------- top navigation (sticky within the panel) ---------- */
-.topnav {
+/* ---------- quick navigation (sticky dropdown) ---------- */
+.quicknav-bar {
   position: sticky;
   top: 0;
   z-index: 6;
   display: flex;
   align-items: center;
-  gap: 0.15rem;
-  overflow-x: auto;
-  scrollbar-width: none;
+  justify-content: space-between;
+  gap: 1rem;
   background: rgba(252, 252, 251, 0.92);
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
   border-bottom: 1px solid var(--hairline);
   border-radius: 18px 18px 0 0;
-  padding: 0.45rem 0.9rem;
+  padding: 0.5rem 1.1rem;
 }
-.topnav::-webkit-scrollbar { display: none; }
-.topnav a {
-  flex: 0 0 auto;
-  font-size: 0.78rem;
+.quicknav { position: relative; }
+.quicknav > summary {
+  cursor: pointer;
+  list-style: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.86rem;
+  font-weight: 500;
+  color: var(--ink-secondary);
+  border-radius: 8px;
+  padding: 0.25rem 0.55rem;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.quicknav > summary::-webkit-details-marker { display: none; }
+.quicknav > summary::before {
+  content: "▾";
+  color: var(--c-thought);
+  transition: transform 0.15s ease;
+  display: inline-block;
+}
+.quicknav[open] > summary::before { transform: rotate(180deg); }
+.quicknav > summary:hover { background: rgba(42, 120, 214, 0.09); color: var(--c-thought); }
+.quicknav ol {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  min-width: 330px;
+  max-width: min(430px, 86vw);
+  max-height: 70vh;
+  overflow-y: auto;
+  margin: 0;
+  padding: 0.65rem 0.65rem 0.65rem 2.4rem;
+  background: var(--surface);
+  border: 1px solid var(--hairline);
+  border-radius: 12px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.12);
+}
+.quicknav ol li {
+  margin: 0;
+  padding: 0;
+  font-size: 0.87rem;
+  color: var(--ink-muted);
+}
+.quicknav ol li.quicknav-extra { list-style: none; }
+.quicknav ol li.quicknav-extra:first-of-type { border-top: 1px solid var(--hairline); margin-top: 0.45rem; padding-top: 0.45rem; }
+.quicknav ol a {
+  display: block;
   color: var(--ink-secondary);
   text-decoration: none;
   border: none;
-  border-radius: 999px;
-  padding: 0.22rem 0.62rem;
-  white-space: nowrap;
-  transition: background 0.15s ease, color 0.15s ease;
+  border-radius: 6px;
+  padding: 0.3rem 0.55rem;
 }
-.topnav a:hover { background: rgba(42, 120, 214, 0.09); color: var(--c-thought); }
-.topnav a.nav-top {
-  margin-left: auto;
+.quicknav ol a:hover { background: rgba(42, 120, 214, 0.09); color: var(--c-thought); }
+.nav-top {
+  font-size: 0.82rem;
   font-weight: 500;
   color: var(--c-thought);
+  text-decoration: none;
+  border: none;
+  white-space: nowrap;
 }
+.nav-top:hover { border-bottom: 1px solid currentColor; }
 .hero-kicker {
   font-size: 0.82rem;
   letter-spacing: 0.14em;
@@ -583,7 +630,7 @@ details.collapse {
   border: 1px solid var(--hairline);
   border-radius: 10px;
   background: var(--surface);
-  margin: 1.2rem 0 1.8rem;
+  margin: 1.4rem 0 2.6rem;   /* generous gap below so blocks never crowd what follows */
 }
 details.collapse > summary {
   cursor: pointer;
@@ -606,13 +653,14 @@ details.collapse > summary .collapse-title { font-weight: 500; font-size: 1.02re
 details.collapse > summary .collapse-hint {
   margin-left: auto;
   font-size: 0.74rem;
-  color: var(--ink-muted);
+  color: var(--c-thought);
   letter-spacing: 0.06em;
   text-transform: uppercase;
   white-space: nowrap;
+  border: 1px solid rgba(42, 120, 214, 0.35);
+  border-radius: 999px;
+  padding: 0.14rem 0.6rem;
 }
-details.collapse[open] > summary .collapse-hint::after { content: "collapse"; }
-details.collapse:not([open]) > summary .collapse-hint::after { content: "click to expand"; }
 details.collapse > .collapse-body {
   padding: 0.3rem 1.4rem 1.2rem;
   border-top: 1px solid var(--hairline);

@@ -151,6 +151,25 @@
   window.addEventListener('hashchange', openCollapseForHash);
   openCollapseForHash();
 
+  // hint text flips with the block's state
+  document.querySelectorAll('details.collapse').forEach((d) => {
+    const hint = d.querySelector('.collapse-hint');
+    if (!hint) return;
+    const update = () => { hint.textContent = d.open ? 'click to collapse' : 'click to expand'; };
+    d.addEventListener('toggle', update);
+    update();
+  });
+
+  /* ---------- quick navigation: close the dropdown after choosing a section ---------- */
+  const quicknav = document.getElementById('quicknav');
+  if (quicknav) {
+    quicknav.querySelectorAll('a').forEach((a) =>
+      a.addEventListener('click', () => { quicknav.open = false; }));
+    document.addEventListener('click', (e) => {
+      if (quicknav.open && !quicknav.contains(e.target)) quicknav.open = false;
+    });
+  }
+
   /* ---------- bibtex copy ---------- */
   document.querySelectorAll('.copy-btn').forEach((btn) => {
     btn.addEventListener('click', () => {

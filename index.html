@@ -8,7 +8,7 @@
 
 <link rel="preconnect" href="https://cdn.jsdelivr.net">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
-<link rel="stylesheet" href="assets/css/style.css">
+<link rel="stylesheet" href="assets/css/style.css?v=2">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>💭</text></svg>">
 </head>
 <body>
@@ -33,21 +33,27 @@
 </header>
 
 <div class="page-panel">
-<nav class="topnav" aria-label="Sections">
-  <a href="#intro">1 Problem</a>
-  <a href="#sft-bc">2 SFT?</a>
-  <a href="#motivating">3 Study</a>
-  <a href="#setup">4 Setup</a>
-  <a href="#approach">5 Latent thoughts</a>
-  <a href="#derivation">6 EM → rewards</a>
-  <a href="#implementation">7 Algorithm</a>
-  <a href="#playground">8 Playground</a>
-  <a href="#results">9 Results</a>
-  <a href="#discussion">10 What's next</a>
-  <a href="#appendix">Appendix</a>
-  <a href="#bibtex">Cite</a>
-  <a href="#top" class="nav-top">↑ top</a>
-</nav>
+<div class="quicknav-bar">
+  <details class="quicknav" id="quicknav">
+    <summary>Quick Navigation</summary>
+    <ol>
+      <li><a href="#intro">Intro + problem</a></li>
+      <li><a href="#sft-bc">SFT on demonstrations as an alternative?</a></li>
+      <li><a href="#motivating">A motivating study: the context gap</a></li>
+      <li><a href="#setup">Setup: multi-turn RL</a></li>
+      <li><a href="#approach">Training to infer thoughts</a></li>
+      <li><a href="#derivation">Finding rewards by maximizing our expectations</a></li>
+      <li><a href="#implementation">Practical implementation (it's just policy gradient)</a></li>
+      <li><a href="#playground">Playground: watch the E-step think</a></li>
+      <li><a href="#results">Results</a></li>
+      <li><a href="#discussion">Discussion + what's next</a></li>
+      <li class="quicknav-extra"><a href="#appendix">Appendix: what the model actually sees</a></li>
+      <li class="quicknav-extra"><a href="#notebooks">Companion notebooks</a></li>
+      <li class="quicknav-extra"><a href="#bibtex">Citation</a></li>
+    </ol>
+  </details>
+  <a href="#top" class="nav-top">↑ back to top</a>
+</div>
 
 <main>
 <div class="container">
@@ -311,7 +317,7 @@
   <h2><span class="secnum">4</span>Setup: multi-turn RL</h2>
 
   <details class="collapse" id="collapse-setup">
-  <summary><span class="collapse-title">The formal setup — states, trajectories, and returns</span><span class="collapse-hint"></span></summary>
+  <summary><span class="collapse-title">Our setup — states, trajectories, and returns</span><span class="collapse-hint">click to expand</span></summary>
   <div class="collapse-body">
 
   <p>
@@ -547,7 +553,7 @@
   <p>To make this concrete, we next show how to get the rewards and training objective from our EM framing.</p>
 
   <details class="collapse" id="collapse-em-pg">
-  <summary><span class="collapse-title">From expectation-maximization to policy gradient</span><span class="collapse-hint"></span></summary>
+  <summary><span class="collapse-title">From expectation-maximization to policy gradient</span><span class="collapse-hint">click to expand</span></summary>
   <div class="collapse-body">
   <p>
     First, we show an equivalence between the maximization above and policy gradient with certain
@@ -620,7 +626,7 @@
   </details>
 
   <details class="collapse" id="collapse-empirics">
-  <summary><span class="collapse-title">Practical empirics — from integrals to a batch of G samples</span><span class="collapse-hint"></span></summary>
+  <summary><span class="collapse-title">Practical empirics — from integrals to a batch of G samples</span><span class="collapse-hint">click to expand</span></summary>
   <div class="collapse-body">
   <p>
     Finally, we derive a sampling-based version of the above to back out our concrete training
@@ -715,7 +721,7 @@
   </figure>
 
   <details class="collapse" id="collapse-returns">
-  <summary><span class="collapse-title">Choices for the return</span><span class="collapse-hint"></span></summary>
+  <summary><span class="collapse-title">Choices for the return</span><span class="collapse-hint">click to expand</span></summary>
   <div class="collapse-body">
   <p>
     While the EM math above tells us one option — each step's update weighted by that same step's
@@ -1134,9 +1140,9 @@ howpublished={\url{https://michaelzhang.xyz/act-prm-blog/}}
 
 <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
 <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
-<script defer src="assets/js/hero.js"></script>
-<script defer src="assets/js/charts.js"></script>
-<script defer src="assets/js/demo.js"></script>
-<script defer src="assets/js/main.js"></script>
+<script defer src="assets/js/hero.js?v=2"></script>
+<script defer src="assets/js/charts.js?v=2"></script>
+<script defer src="assets/js/demo.js?v=2"></script>
+<script defer src="assets/js/main.js?v=2"></script>
 </body>
 </html>
