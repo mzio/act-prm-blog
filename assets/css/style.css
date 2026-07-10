@@ -73,6 +73,9 @@ header.hero {
   background: transparent;
 }
 .hero-inner {
+  /* push the title card below the animation band so the chain reads as a banner;
+     transform moves only the card — the fixed canvas and page layout are untouched */
+  transform: translateY(clamp(60px, 16vh, 170px));
   max-width: 640px;
   text-align: center;
   background: rgba(252, 252, 251, 0.78);

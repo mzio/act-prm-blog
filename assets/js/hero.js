@@ -59,7 +59,7 @@
 
   // draw one timestep anchored at x0 (center-line cy), with local phase p ∈ [0, 1]
   function drawStep(stepIdx, x0, p) {
-    const cy = H / 2;
+    const cy = H * 0.34;   // chain rides high, as a banner band above the title card
     const sx = x0;               // state node x
     const candX = x0 + 128;      // candidates x
     const ax = x0 + 300;         // action node x
