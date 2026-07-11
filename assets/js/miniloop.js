@@ -115,7 +115,7 @@
   /* the sampling animation for one segment; q ∈ [0,1] local phase, iter varies
      candidates; alpha = global fade; labeled = show the score annotation */
   function drawSampling(baseX, q, iter, alpha, labeled) {
-    const cy = DESIGN_H / 2;
+    const cy = DESIGN_H / 2 - 8;
     const sx = baseX + O_X, candX = baseX + CAND_X, ax = baseX + X_X;
     const winner = Math.floor(prand(iter, 9) * G);
 
@@ -206,7 +206,7 @@
       ctx.fillStyle = '#9a6900';
       ctx.font = '10.5px "Helvetica Neue", Arial, sans-serif';
       ctx.textAlign = 'center';
-      ctx.fillText('score: p(x | s, z)', candX + CAND_W / 2, bandTop + band + CAND_H + 18);
+      ctx.fillText('score: p(x | s, z)', candX + CAND_W / 2, bandTop + band + CAND_H + 15);
       ctx.restore();
     }
 
@@ -241,7 +241,7 @@
     ctx.translate(offX - cam, 0);
     ctx.globalAlpha = alpha;
 
-    const cy = DESIGN_H / 2;
+    const cy = DESIGN_H / 2 - 8;
 
     // the chain is given from the start: o1 … x1 → o2 (and o2 … x2 → o3 after the pan)
     const seg0Solid = q0 >= 0.91;

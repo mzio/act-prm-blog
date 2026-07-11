@@ -21,8 +21,9 @@
     <div class="chart-title">Watching a thought evolve over training</div>
     <div class="chart-sub">Reward p(x | s, ẑ) of the selected first-step thought for 10
       <strong>held-out</strong> tasks, re-sampled from every saved checkpoint of the λ = 0.15 run.
-      <strong>Hover to scrub, click a point to inspect it.</strong> Gray line: mean held-out
-      reward during training.</div>
+      <strong>Hover to scrub, click a point to inspect it.</strong> Gray line: mean held-out reward
+      across <em>all</em> steps during training — it starts much higher because later steps are far
+      easier than step 1 (their context already contains prior tool calls).</div>
     <div class="r2-toggles">
       <span class="r2-toggle-label">held-out task</span><span class="r2-eval"></span>
     </div>
