@@ -26,7 +26,7 @@ for arg in (sys.argv[1:] or [
 
 OUT = Path("assets/img")
 INK, MUTED, GRID = "#52514e", "#898781", "#e1e0d9"
-COLORS = ["#2a78d6", "#1baf7a", "#eda100"]   # λ ascending: blue, aqua, yellow
+COLORS = ["#2a78d6", "#1baf7a", "#eda100", "#4a3aa7"]   # λ ascending + lift variant
 
 plt.rcParams.update({
     "font.family": "Helvetica Neue, Helvetica, Arial, sans-serif",
@@ -56,7 +56,7 @@ def series(log, key, sub):
 fig, ax = plt.subplots(figsize=(7, 4.2), dpi=160)
 for (label, log), c in zip(runs, COLORS):
     xs, ys = series(log, "mean_likelihood", "eval")
-    ax.plot(xs, ys, color=c, lw=2, label=f"λ = {label}")
+    ax.plot(xs, ys, color=c, lw=2, label=f"λ = {label}" if label[0].isdigit() else label)
 style(ax, "Held-out action likelihood p(x | s, z) across length penalties",
       "mean action-token likelihood")
 fig.tight_layout()
@@ -65,7 +65,7 @@ fig.savefig(OUT / "lenpen-sweep-likelihood.png", bbox_inches="tight")
 fig, ax = plt.subplots(figsize=(7, 4.2), dpi=160)
 for (label, log), c in zip(runs, COLORS):
     xs, ys = series(log, "mean_thought_tokens", "eval")
-    ax.plot(xs, ys, color=c, lw=2, label=f"λ = {label}")
+    ax.plot(xs, ys, color=c, lw=2, label=f"λ = {label}" if label[0].isdigit() else label)
 ax.axhline(200, color=MUTED, lw=1, ls=":")
 ax.annotate("thought-token budget (L_max = 200)", xy=(1, 200), xytext=(2, 206),
             fontsize=9, color=MUTED)

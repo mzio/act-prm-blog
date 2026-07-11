@@ -248,7 +248,17 @@ async def score_thought(sampling_client, templater, scoring_state, thought,
     full_logprobs = await sampling_client.compute_logprobs_async(
         types.ModelInput.from_ints(full_tokens)
     )
-    action_lp = np.array([lp for lp in full_logprobs[-n_action:]], dtype=np.float64)
+    base_logprobs = None
+    if base_client is not None:
+        base_logprobs = await base_client.compute_logprobs_async(
+            types.ModelInput.from_ints(full_tokens)
+        )
+    # frozen-scorer mode: the reward likelihood comes from the base model, so the
+    # policy can't inflate its own reward by co-adapting the action head to the
+    # thought pattern; datum logprobs stay the policy's (importance sampling).
+    score_logprobs = (base_logprobs if base_logprobs is not None
+                      and getattr(cfg, "score_with_base", False) else full_logprobs)
+    action_lp = np.array([lp for lp in score_logprobs[-n_action:]], dtype=np.float64)
     likelihood = float(np.exp(action_lp.mean()))            # in (0, 1]
     sum_action_lp = float(action_lp.sum())                  # total log p(x | s, z)
 
@@ -259,11 +269,8 @@ async def score_thought(sampling_client, templater, scoring_state, thought,
 
     # per-token KL of the *thought* against the frozen base model (KL anchor)
     kl_mean = 0.0
-    if base_client is not None:
+    if base_logprobs is not None:
         n_thought = max(1, len(prefix_tokens) - prefix_len)
-        base_logprobs = await base_client.compute_logprobs_async(
-            types.ModelInput.from_ints(full_tokens)
-        )
         cur = np.array([lp or 0.0 for lp in full_logprobs[prefix_len: prefix_len + n_thought]])
         base = np.array([lp or 0.0 for lp in base_logprobs[prefix_len: prefix_len + n_thought]])
         kl_mean = float((cur - base).mean())
@@ -482,10 +489,10 @@ async def train(cfg):
             cfg.model, rank=cfg.lora_rank
         )
     base_client = None
-    if cfg.reward_method == "lift" and cfg.kl_coef > 0:
+    if (cfg.reward_method == "lift" and cfg.kl_coef > 0) or cfg.score_with_base:
         base_client = service_client.create_sampling_client(base_model=cfg.model)
     print(f"training client: {cfg.model} (LoRA r={cfg.lora_rank}), "
-          f"reward={cfg.reward_method} "
+          f"reward={cfg.reward_method}{' [scored by frozen base]' if cfg.score_with_base else ''} "
           f"({'lift_c=' + str(cfg.lift_c) + ', eps=' + str(cfg.select_epsilon) + ', kl=' + str(cfg.kl_coef) if cfg.reward_method == 'lift' else 'lambda_len=' + str(cfg.length_penalty)}), "
           f"G={cfg.group_size}, iterations {cfg.start_iteration}..{cfg.em_iterations}", flush=True)
 
@@ -623,13 +630,15 @@ async def demo(cfg, sampler_path=None, trajs=None, templater=None, service_clien
         sampling_client = service_client.create_sampling_client(base_model=cfg.model)
         print(f"sampler: base {cfg.model} (no trained weights given)")
 
+    base_client = (service_client.create_sampling_client(base_model=cfg.model)
+                   if getattr(cfg, "score_with_base", False) else None)
     trajs = trajs or load_trajectories(1, cfg.max_traj_timestep)
     traj = trajs[0]
     _, metrics = await rollout_trajectory(
         sampling_client, templater,
         {"messages": traj["messages"], "system_prompt": traj["system_prompt"]},
         argparse.Namespace(**{**vars(cfg), "max_steps_per_traj": 1}),
-        verbose=False,
+        verbose=False, base_client=base_client,
     )
     m = metrics[0]
     print("\nquestion:", traj["messages"][0]["content"][:220])
@@ -665,6 +674,10 @@ def main():
                    help="lift method: commit the shortest thought within eps of best likelihood")
     p.add_argument("--kl-coef", type=float, default=0.05,
                    help="lift method: per-token KL-to-base-model penalty coefficient")
+    p.add_argument("--score-with-base", action="store_true",
+                   help="compute the reward likelihood p(x|s,z) with the FROZEN base "
+                        "model instead of the current policy (frozen scorer: kills the "
+                        "self-scored reward co-adaptation loop / babble hack)")
     p.add_argument("--max-thought-tokens", type=int, default=200)
     p.add_argument("--num-trajectories", type=int, default=2)
     p.add_argument("--eval-trajectories", type=int, default=1,

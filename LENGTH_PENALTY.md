@@ -203,6 +203,31 @@ both objectives saturate, continued policy-gradient pressure with no KL anchor f
 mode; (iii) early stopping on held-out likelihood is exactly the right guardrail — the λ=0.15 run
 never met the monster.
 
+## A better reward? Lift-per-token + lexicographic selection + KL anchor
+
+Following the collapse analysis, we designed and ran a fourth variant (violet in the sweep plots
+above, `runs/length_penalty_qwen3_8b_lift.json`, `--reward-method lift`):
+
+1. **Lift-per-token reward**: $r(z) = \big[\log p(x \mid s, z) - \log p(x \mid s, \varnothing)\big] / (|z| + 15) - 0.05\,\mathrm{KL}$
+   — the thought is rewarded for what it *adds* over having no thought, per token spent;
+2. **Lexicographic selection**: the committed ẑ is the *shortest* candidate within 2% of the
+   group's best likelihood — length breaks ties, never trades against likelihood;
+3. **Small KL anchor** (coef 0.05, reward-level, vs the frozen base model).
+
+Results: the **best of the four runs while it lasted** — fastest held-out likelihood climb
+(≈+0.05–0.1 ahead through iterations 10–45, peaking ~0.92 at iteration ~42 vs ~0.90 at ~55 for the
+additive penalties), **no phase-1 length bump** (compression is monotone from the start, reaching
+~33-token thoughts by iteration 45), and the highest peak with the shortest thoughts. But
+`kl=0.05` only *delayed* the endgame: past iteration ~77 the same babble attractor took over
+(this run's filler of choice: *"category category category insights category…"* — each collapsed
+run invents its own token), likelihood cratering to ~0.73 before the usual partial recovery.
+
+Verdict: (1)+(2) demonstrably improve the reward design; (3) at 0.05 is too weak once the policy's
+entropy is exhausted — a stronger anchor, entropy bonus, or simply early stopping (which would have
+exited at the iteration-42 peak: better and earlier than any additive run) remains necessary.
+Amusingly, the lexicographic rule stayed on duty *through* the collapse: among eight babble
+candidates it still dutifully committed the shortest one.
+
 ### Thoughts across λ, same tasks, same checkpoints
 
 _Selected thought ẑ (penalized-reward argmax of G=8) for the **first step** of shared held-out tasks, under different length penalties λ. “—” = run already finished (λ=0.15 early-stopped at iter 59)._

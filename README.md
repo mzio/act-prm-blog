@@ -207,6 +207,13 @@ reward-hacks p≈0.85 on the logged action while held-out likelihood craters 0.9
 penalty, earlier collapse — and the λ=0.15 run's early stopping (iteration 59) exited safely at the
 plateau. Full analysis in [LENGTH_PENALTY.md](LENGTH_PENALTY.md).
 
+**Fourth variant — lift-per-token + lexicographic selection + KL anchor** (violet in the plots):
+rewarding thoughts by likelihood-*lift over no-thought* per token, committing the shortest
+near-best candidate, and anchoring to the base model with a small KL (0.05) gives the **fastest
+climb, highest peak (~0.92 @ iter 42), and earliest compression with no length bump** — but the
+small KL only delays the babble collapse (~iteration 77; this run's filler: *"category category
+insights…"*). Details in [LENGTH_PENALTY.md](LENGTH_PENALTY.md).
+
 <details>
 <summary><b>Cross-λ thought-evolution tables (same tasks, same checkpoints — click to expand)</b></summary>
 
