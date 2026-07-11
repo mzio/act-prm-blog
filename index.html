@@ -1066,8 +1066,9 @@
   <p>
     And because we checkpointed throughout training, we can watch a single thought slot
     <em>learn</em>. The reward curve below is the likelihood of the selected first-step thought for
-    a chosen task (2 held-out + 8 train); hover to scrub along training, and <strong>click any
-    point</strong> to read what the model was actually thinking at that iteration:
+    one of <strong>10 held-out tasks</strong>, re-sampled from every saved checkpoint; hover to scrub
+    along training, and <strong>click any point</strong> to read what the model was actually thinking
+    at that stage:
   </p>
 
   <div class="chart" id="result2-viz"></div>
@@ -1373,8 +1374,8 @@ howpublished={\url{https://michaelzhang.xyz/act-prm-blog/}}
 <script defer src="assets/js/charts.js?v=4"></script>
 <script defer src="assets/js/miniloop.js?v=4"></script>
 <script defer src="assets/js/demo.js?v=4"></script>
-<script defer src="assets/js/lenpen-curve-data.js?v=2"></script>
-<script defer src="assets/js/result2.js?v=2"></script>
+<script defer src="assets/js/lenpen-curve-data.js?v=3"></script>
+<script defer src="assets/js/result2.js?v=3"></script>
 <script defer src="assets/js/main.js?v=4"></script>
 </body>
 </html>

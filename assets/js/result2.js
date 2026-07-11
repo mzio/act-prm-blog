@@ -19,12 +19,12 @@
 
   root.innerHTML = `
     <div class="chart-title">Watching a thought evolve over training</div>
-    <div class="chart-sub">Reward p(x | s, ẑ) of the selected first-step thought at every EM
-      iteration (λ = 0.15 run). <strong>Hover to scrub, click a point to inspect it.</strong>
-      Gray line: mean over all held-out steps.</div>
+    <div class="chart-sub">Reward p(x | s, ẑ) of the selected first-step thought for 10
+      <strong>held-out</strong> tasks, re-sampled from every saved checkpoint of the λ = 0.15 run.
+      <strong>Hover to scrub, click a point to inspect it.</strong> Gray line: mean held-out
+      reward during training.</div>
     <div class="r2-toggles">
-      <span class="r2-toggle-label">held-out</span><span class="r2-eval"></span>
-      <span class="r2-toggle-label" style="margin-left:0.9rem">train</span><span class="r2-train"></span>
+      <span class="r2-toggle-label">held-out task</span><span class="r2-eval"></span>
     </div>
     <div class="r2-chart"></div>
     <div class="r2-stats">
@@ -55,13 +55,9 @@
 
   function renderToggles() {
     const evalEl = root.querySelector('.r2-eval');
-    const trainEl = root.querySelector('.r2-train');
     evalEl.innerHTML = '';
-    trainEl.innerHTML = '';
     data.tasks.forEach((t, i) => {
-      const target = t.label === 'held-out' ? evalEl : trainEl;
-      const n = target.children.length + 1;
-      target.appendChild(pill(String(n), i === taskIdx, () => {
+      evalEl.appendChild(pill(String(i + 1), i === taskIdx, () => {
         taskIdx = i;
         const series = data.tasks[i].per_iter;
         if (!series.some((d) => d.i === curIter)) curIter = series[series.length - 1].i;
@@ -114,8 +110,8 @@
       'stroke-linejoin': 'round', 'stroke-linecap': 'round',
     }, svg);
     series.forEach((d) => {
-      el('circle', { cx: x(d.i), cy: y(d.p), r: 2.6, fill: '#2a78d6',
-                     stroke: '#fff', 'stroke-width': 1, 'data-iter': d.i }, svg);
+      el('circle', { cx: x(d.i), cy: y(d.p), r: 4, fill: '#2a78d6',
+                     stroke: '#fff', 'stroke-width': 1.5, 'data-iter': d.i }, svg);
     });
 
     // hover preview: crosshair + floating hint
@@ -180,7 +176,7 @@
     root.querySelector('.r2-s-p').textContent = pt.p.toFixed(3);
     root.querySelector('.r2-s-tok').textContent = `${pt.tok} tok`;
     root.querySelector('.r2-obs .who').textContent =
-      `prompt — ${task.label} task`;
+      `prompt — held-out task ${taskIdx + 1}`;
     root.querySelector('.r2-obs .body').textContent = task.question;
     root.querySelector('.r2-action .body').textContent = task.action;
     root.querySelector('.r2-thought .who').textContent =

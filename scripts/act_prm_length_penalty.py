@@ -132,6 +132,46 @@ def load_trajectories(n: int, max_timestep: int):
     return out
 
 
+def load_trajectories_split(split_file: str, dataset: str = DATASET):
+    """Load ALL successful trajectories, partitioned by the canonical task split
+    (runs/sftrl/split.json). Returns (train_pool, eval_pool); each trajectory dict
+    carries its task uid."""
+    from datasets import load_dataset
+
+    split = json.loads(Path(split_file).read_text())
+    train_uids, eval_uids = set(split["train_uids"]), set(split["eval_uids"])
+    want = train_uids | eval_uids
+    ds = load_dataset(split.get("dataset", dataset), split="train", streaming=True)
+    train_pool, eval_pool, seen = [], [], set()
+    for row in ds:
+        if not (row["done"] and row["return_"] > 0):
+            continue
+        uid = row["unique_data_sample_id"]
+        if uid not in want or uid in seen:
+            continue
+        seen.add(uid)
+        messages = list(row["state"]) + [row["action"]]
+        traj, ok = [], True
+        for msg in messages:
+            if msg["role"] == "assistant":
+                action = extract_action(msg["content"])
+                if action is None:
+                    ok = False
+                    break
+                traj.append({"role": "assistant", "content": action})
+            else:
+                traj.append({"role": msg["role"], "content": msg["content"]})
+        if not ok or sum(m["role"] == "assistant" for m in traj) < 2:
+            continue
+        entry = {"messages": traj,
+                 "system_prompt": row.get("system_prompt") or "You are a helpful assistant.",
+                 "uid": uid}
+        (train_pool if uid in train_uids else eval_pool).append(entry)
+    train_pool.sort(key=lambda t: t["uid"])
+    eval_pool.sort(key=lambda t: t["uid"])
+    return train_pool, eval_pool
+
+
 def compact_observations(messages, obs_max_chars: int, first_to_show: int = 2,
                          last_to_show: int = 1):
     """Cap observation lengths and hide middle observations (the codebase's
@@ -411,17 +451,26 @@ async def probe_generations(sampling_client, templater, traj, cfg, base_client=N
 
 
 async def train(cfg):
-    total = cfg.num_trajectories + cfg.eval_trajectories
-    print(f"loading {total} trajectories from {DATASET} "
-          f"({cfg.num_trajectories} train / {cfg.eval_trajectories} held-out eval) ...", flush=True)
-    trajs = load_trajectories(total, cfg.max_traj_timestep)
-    train_trajs = trajs[: cfg.num_trajectories]
-    eval_trajs = trajs[cfg.num_trajectories:]
-    for name, group in [("train", train_trajs), ("eval", eval_trajs)]:
-        for i, tr in enumerate(group):
-            n_act = sum(m["role"] == "assistant" for m in tr["messages"])
-            print(f"  {name} traj {i}: {len(tr['messages'])} messages, {n_act} actions "
-                  f"(using first {min(n_act, cfg.max_steps_per_traj)})", flush=True)
+    train_pool = None
+    if cfg.split_file:
+        print(f"loading trajectories via split {cfg.split_file} ...", flush=True)
+        train_pool, eval_pool = load_trajectories_split(cfg.split_file)
+        eval_trajs = eval_pool[: cfg.eval_trajectories]
+        train_trajs = train_pool          # rebatched per iteration below
+        print(f"  train pool: {len(train_pool)} tasks | eval pool: {len(eval_pool)} tasks "
+              f"(metrics on first {len(eval_trajs)}) | {cfg.tasks_per_iter} tasks/iter", flush=True)
+    else:
+        total = cfg.num_trajectories + cfg.eval_trajectories
+        print(f"loading {total} trajectories from {DATASET} "
+              f"({cfg.num_trajectories} train / {cfg.eval_trajectories} held-out eval) ...", flush=True)
+        trajs = load_trajectories(total, cfg.max_traj_timestep)
+        train_trajs = trajs[: cfg.num_trajectories]
+        eval_trajs = trajs[cfg.num_trajectories:]
+        for name, group in [("train", train_trajs), ("eval", eval_trajs)]:
+            for i, tr in enumerate(group):
+                n_act = sum(m["role"] == "assistant" for m in tr["messages"])
+                print(f"  {name} traj {i}: {len(tr['messages'])} messages, {n_act} actions "
+                      f"(using first {min(n_act, cfg.max_steps_per_traj)})", flush=True)
 
     templater = Templater(cfg.model)
     service_client = tinker.ServiceClient()
@@ -482,9 +531,14 @@ async def train(cfg):
         if n % cfg.checkpoint_every == 0:
             sampler_path = await snapshot(n, sampling_client)
 
-        # E-step: all train trajectories in parallel, then held-out eval
+        # E-step: this iteration's train batch in parallel, then held-out eval
+        if train_pool is not None:
+            k = cfg.tasks_per_iter
+            batch = [train_pool[(n * k + j) % len(train_pool)] for j in range(k)]
+        else:
+            batch = train_trajs
         results = [r for r in await asyncio.gather(*[
-            safe_rollout(sampling_client, templater, tr, cfg, base_client) for tr in train_trajs
+            safe_rollout(sampling_client, templater, tr, cfg, base_client) for tr in batch
         ]) if r is not None]
         if not results:
             raise RuntimeError("every trajectory rollout failed this iteration")
@@ -631,6 +685,11 @@ def main():
     p.add_argument("--obs-max-chars", type=int, default=1500)
     p.add_argument("--log-path", default="runs/length_penalty_run.json")
     p.add_argument("--sampler-path", default=None, help="tinker:// path for demo mode")
+    p.add_argument("--split-file", default=None,
+                   help="canonical task split json (runs/sftrl/split.json); enables pooled "
+                        "training with per-iteration round-robin batching")
+    p.add_argument("--tasks-per-iter", type=int, default=16,
+                   help="split mode: train tasks rolled out per iteration")
     p.add_argument("--resume-state", default=None,
                    help="tinker:// state path (from a checkpoint's state_path) to resume training")
     p.add_argument("--start-iteration", type=int, default=0,
