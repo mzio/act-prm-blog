@@ -8,7 +8,7 @@
 
 <link rel="preconnect" href="https://cdn.jsdelivr.net">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
-<link rel="stylesheet" href="assets/css/style.css?v=7">
+<link rel="stylesheet" href="assets/css/style.css?v=9">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>💭</text></svg>">
 </head>
 <body>
@@ -37,18 +37,21 @@
   <details class="quicknav" id="quicknav">
     <summary>Quick Navigation</summary>
     <ol>
-      <li><a href="#intro">Intro + problem</a></li>
-      <li><a href="#sft-bc">SFT on demonstrations as an alternative?</a></li>
-      <li><a href="#motivating">A motivating study: the context gap</a></li>
-      <li><a href="#setup">Setup: multi-turn RL</a></li>
-      <li><a href="#approach">Training to infer thoughts</a></li>
-      <li><a href="#derivation">Finding rewards by maximizing our expectations</a></li>
-      <li><a href="#implementation">Practical implementation (it's just policy gradient)</a></li>
-      <li><a href="#playground">Playground: watch the E-step think</a></li>
-      <li><a href="#results">Results</a></li>
-      <li><a href="#discussion">Discussion + what's next</a></li>
+      <li value="1"><a href="#intro">Intro + problem</a></li>
+      <li value="2"><a href="#sft-bc">What's insufficient about prior approaches?</a></li>
+      <li class="quicknav-sub"><a href="#sft-demos">Can we SFT on easy-to-collect demonstrations?</a></li>
+      <li class="quicknav-sub"><a href="#motivating">A motivating study: the context gap</a></li>
+      <li value="3"><a href="#method">Method: Action Process Reward Models</a></li>
+      <li class="quicknav-sub"><a href="#setup">Setup: multi-turn RL</a></li>
+      <li class="quicknav-sub"><a href="#approach">Part 1: thoughts as latent variables</a></li>
+      <li class="quicknav-sub"><a href="#derivation">Part 2: maximizing our expectations</a></li>
+      <li class="quicknav-sub"><a href="#implementation">Part 3: practical implementation (it's just policy gradient)</a></li>
+      <li class="quicknav-sub"><a href="#playground">Playground: watch the E-step think</a></li>
+      <li value="4"><a href="#results">Results</a></li>
+      <li value="5"><a href="#discussion">Discussion + what's next</a></li>
       <li class="quicknav-extra"><a href="#appendix">Appendix: what the model actually sees</a></li>
       <li class="quicknav-extra"><a href="#notebooks">Companion notebooks</a></li>
+      <li class="quicknav-extra"><a href="#references">References</a></li>
       <li class="quicknav-extra"><a href="#bibtex">Citation</a></li>
     </ol>
   </details>
@@ -70,13 +73,19 @@
   <p>
     Supervised finetuning on these observed <span class="chip chip-x">actions</span> alone turns out
     not to provide enough learning signal. Our key idea is that the recorded sequence is only half the
-    picture: missing from it are the human's <em>implicit</em>
-    <span class="chip chip-z">thoughts</span> between the recorded actions, which supply the connecting
-    context needed to predict what comes next. We train LLMs to <em>infer</em> these thoughts from the
+    true picture: missing from it are a human's 
+    <em>internal</em>
+    <span class="chip chip-z">thoughts</span> that happen when completing tasks.
+    These provide the connecting context needed to predict what comes next between each recorded action.
+    Rather than having to write these thoughts down explicitly (or assume everyone has an <em>internal monologue</em>),
+    <!-- between the recorded actions, which supply the connecting context needed to predict what comes next.  -->
+    we train LLMs to <em>infer</em> these thoughts from the
     actions — scoring each candidate thought by the
-    <span class="chip chip-r">likelihood</span> it assigns to the action that actually followed — and
-    show this is exactly an <strong>Expectation-Maximization</strong> algorithm that can be implemented
-    as plain policy-gradient RL.
+    <span class="chip chip-r">likelihood</span> it assigns to the action that actually followed.
+    We support this idea of treating chain-of-thoughts as latent variables by deriving an exact
+    connection to <strong>Expectation-Maximization</strong> that can be implemented
+    as plain policy-gradient RL, and show across various tool-calling agentic tasks that Act-PRMs
+    can close the context gap while leading to best performance after full SFT + RL post-training steps.
   </p>
 </div>
 
@@ -148,11 +157,11 @@
     Towards turning LLMs into useful “agents”, we'd like scalable ways to train these models to
     complete long and tedious tasks — ones that humans might begrudgingly do today. Mechanically, this
     involves having an LLM think and take actions (generate tool calls, reply to users) iteratively
-    over multiple steps. The final outcome of these actions then determines whether the task was
+    over multiple steps<sup><a href="#ref-1">[1]</a><a href="#ref-2">[2]</a><a href="#ref-3">[3]</a></sup>. The final outcome of these actions then determines whether the task was
     completed successfully or not.
   </p>
   <p>
-    To do this, building environments and training with RL is one option. After all, these tasks are
+    To do this, building environments and training with RL is one option<sup><a href="#ref-4">[4]</a></sup>. After all, these tasks are
     <em>technically verifiable</em> (did the LLM complete the task or not?). However, long multi-turn
     workflows introduce several challenges, especially for the popular policy-gradient methods of today:
   </p>
@@ -171,13 +180,13 @@
       immediate observations following an action. But since these rewards are only intermediate proxies
       for the final outcome, they can often be <em>hacked</em>. Designing “unbiased” functions where
       local rewards align with final success remains its own
-      <a href="https://archives.argmin.net/2018/04/16/ethical-rewards/">tedious challenge</a>.
+      <a href="https://archives.argmin.net/2018/04/16/ethical-rewards/">tedious challenge</a><sup><a href="#ref-5">[5]</a><a href="#ref-6">[6]</a></sup>.
     </li>
     <li>
       <strong>Maintaining scalable training.</strong> Finally, to automate a large variety of useful yet
       undesirable tasks, we'd like training to be easy to deploy for arbitrary workflows — reducing the
       human effort needed to provide training signal. Existing reward systems, even automated ones
-      (rubric-based LLM-as-judges, process reward models), require additional manual design or data
+      (rubric-based LLM-as-judges, process reward models)<sup><a href="#ref-7">[7]</a><a href="#ref-8">[8]</a><a href="#ref-9">[9]</a></sup>, require additional manual design or data
       curation. Can we instead have methods where collecting the training signal coincides with humans
       <em>already having to do the task</em>?
     </li>
@@ -187,25 +196,31 @@
     <figure class="card">
       <img src="assets/img/cartpole.gif" alt="Cartpole balancing animation" loading="lazy">
       <figcaption>We're not doing cartpole anymore. Real workflows run for dozens of turns before any
-      reward shows up.</figcaption>
+      reward shows up.
+      Image source: <a href="https://makeagif.com/gif/cart-pole-balancing-gH6UKd">https://makeagif.com/gif/cart-pole-balancing-gH6UKd</a>.
+    </figcaption>
     </figure>
     <figure class="card">
       <img src="assets/img/reward-hacking-boat.gif" alt="A game boat spinning in circles to collect points instead of finishing the race" loading="lazy">
       <figcaption>The classic failure mode of shaped rewards: the boat learns to spin in circles
       collecting points instead of finishing the race
-      (<a href="https://aisafety.info/questions/8SIU/What-is-reward-hacking">reward hacking</a>).</figcaption>
+      (<a href="https://openai.com/index/faulty-reward-functions/">reward hacking</a>).
+      Image source: <a href="https://openai.com/index/faulty-reward-functions/">https://openai.com/index/faulty-reward-functions/</a>.
+      </figcaption>
     </figure>
   </div>
 </section>
 
 <!-- ================= SFT / BC ================= -->
 <section id="sft-bc">
-  <h2><span class="secnum">2</span>SFT on demonstrations as an alternative?</h2>
+  <h2><span class="secnum">2</span>What's insufficient about prior approaches?</h2>
+
+  <h3 id="sft-demos"><span class="secnum">2.1</span>Can we SFT on easy-to-collect demonstrations?</h3>
 
   <p>
-    Meanwhile, because we are aiming to <em>distill</em> a human's ability to complete a workflow into
+    Because we are aiming to <em>distill</em> a human's ability to complete a workflow into
     an LLM, we could consider supervised finetuning (SFT) over sequences of expert demonstrations,
-    i.e., <em>behavioral cloning</em> (BC). By collecting successful demonstrations of a human
+    i.e., <em>behavioral cloning</em> (BC)<sup><a href="#ref-4">[4]</a><a href="#ref-10">[10]</a><a href="#ref-11">[11]</a></sup>. By collecting successful demonstrations of a human
     completing a task and training an LLM on text representations of these trajectories, we get dense
     next-token prediction signal <strong>from work a human was doing anyway</strong>.
   </p>
@@ -230,7 +245,7 @@
       not provide informative-enough learning signal. Consider a task that involves navigating a series
       of web pages. We can record the sequence of actions automatically as events in a process log
       (URLs visited, coordinates clicked). But without the surrounding context motivating this sequence,
-      predicting the next action can be challenging.
+      predicting the next action can be challenging (as we'll see next!).
     </li>
   </ol>
 
@@ -287,19 +302,21 @@
 
 <!-- ================= MOTIVATING STUDY ================= -->
 <section id="motivating">
-  <h2><span class="secnum">3</span>A motivating study: action-only demonstrations are insufficient context</h2>
+  <h3><span class="secnum">2.2</span>Quick motivating study: action-only demos provide insufficient context</h3>
 
   <p>
-    A natural first attempt at using action-only logs is to train an LLM to predict each explicit
+    To ground our last point above, we see what happens when training with action-only logs of expert demonstrations. 
+    We train LLMs to predict each explicit
     action <span class="chip chip-x">x<sub>t</sub></span> from the preceding partial context — standard
     SFT over action tokens. Since these actions led to success, generating the same target actions at
-    each step should result in successful task completion. Before introducing our method, we ask
+    each step <em>should</em> result in successful task completion. However, it's worth asking
     empirically: <em>do action-only trajectories carry enough context to predict the next action in a
     successful demonstration?</em>
   </p>
   <p>
-    For each task we collect a corpus of successful trajectories and construct two SFT variants of the
-    same base model (Qwen3-4B-Instruct-2507 + LoRA):
+    <strong>Experimental Setup</strong>.
+    For each task, we collect a corpus of successful trajectories and construct two SFT variants of the
+    same base model (Qwen3-4B-Instruct-2507<sup><a href="#ref-12">[12]</a></sup> + LoRA):
   </p>
   <ol>
     <li><strong>Action-only SFT</strong> — supervise only the explicit action tokens given the
@@ -311,8 +328,8 @@
     We evaluate on held-out successful trajectories with two inference-time metrics over the
     ground-truth explicit-action tokens: <strong>action-token perplexity</strong> and
     <strong>action-token prediction accuracy</strong> (top-1 next-token match), across text-world games
-    (TextWorld Treasure Hunter, Coin Collector) and a real tool-calling task
-    (Snorkel Finance Reasoning).
+    (TextWorld Treasure Hunter, Coin Collector)<sup><a href="#ref-13">[13]</a></sup> and a real tool-calling task
+    (Snorkel Finance Reasoning)<sup><a href="#ref-14">[14]</a></sup>.
   </p>
 
   <div class="chart" id="chart-motivating">
@@ -345,11 +362,10 @@
   </div>
 
   <p>
-    Across the board, the action-only model trails the Thoughts + Actions model by a substantial
+    <strong>Experimental Results</strong>. Across the board, the action-only model trails the Thoughts + Actions model by a substantial
     margin: <strong>gaps of 10–14 percentage points</strong> of action-prediction accuracy on the
     text-world games and roughly 9 points on the tool-calling task, with correspondingly higher
-    action-token perplexity. The gap also isn't something more training closes — <em>it's visible over
-    the whole optimization trajectory</em>:
+    action-token perplexity. Unfortunately, training doesn't close the gap:
   </p>
 
   <div class="fig-row">
@@ -367,15 +383,42 @@
   </div>
 
   <p>
-    The implication: <strong>the explicit-action sequence alone is missing information</strong> that
+    <!-- <strong>Takeaways<strong>the explicit-action sequence alone is missing information</strong> that
     the model could exploit if it had access to the interleaved thoughts. This motivates recovering
-    those thoughts <em>from the model itself</em> — the subject of the rest of this post.
+    those thoughts <em>from the model itself</em> — the subject of the rest of this post. -->
+
+    <strong>Takeaways</strong>. All results suggest that while action-only data might be easier to collect,
+    prior actions alone may not provide enough context to predict future actions in successful "ground-truth" trajectories.
+    (<em>c.f.</em> the gaps when models <em>do</em> have access to thoughts and actions). This motivates recovering
+    thoughts <em>from the model itself</em> — what we'll discuss next with Act-PRMs.
   </p>
 </section>
 
+<!-- ================= METHOD ================= -->
+
+<section id="method">
+  <h2><span class="secnum">3</span>Method: Action Process Reward Models (Act-PRMs)</h2>
+
+  <p>
+  We now introduce Act-PRM, which trains LLMs to generate thoughts and actions from easy-to-collect,
+  action-only demonstrations. Here we aim to learn high-quality thoughts in multi-turn trajectories
+  via RL, where the likelihood of the next action is a dense <em>process reward</em> for each thought-generation
+  (hence <em>Action</em> Process Reward Models).
+  Act-PRMs can then be used to cheaply bootstrap better SFT datasets with chain-of-thoughts and actions,
+  leading to our best post-trained models when used to SFT checkpoints before RL.
+  </p>
+
+  <p>
+  We first go over <a href="#setup">our setup for multi-turn RL</a>, before introducing the method
+  through a derivation of trying to <a href="#derivation">infer latent thoughts from observed actions
+  in an Expectation-Maximization (EM) framework</a><sup><a href="#ref-15">[15]</a><a href="#ref-16">[16]</a></sup>. We finally discuss
+  <a href="#implementation">how to implement Act-PRMs</a> (where the math also points us
+  to a nice plain policy-gradient connection).
+  </p>
+
 <!-- ================= SETUP ================= -->
-<section id="setup">
-  <h2><span class="secnum">4</span>Setup: multi-turn RL</h2>
+
+  <h3 id="setup"><span class="secnum">3.1</span>Setup: multi-turn RL</h3>
 
   <details class="collapse" id="collapse-setup">
   <summary><span class="collapse-title">Our setup — states, trajectories, and returns</span><span class="collapse-hint">click to expand</span></summary>
@@ -429,7 +472,7 @@
   </ul>
   <p>with similar instantiations for subsequent $t \in [T]$.</p>
 
-  <h3>Tying objectives to task success</h3>
+  <h4><strong>Tying objectives to task success</strong></h4>
   <p>
     Like most RL setups, for any timestep $t$ we want our model to generate actions that maximize the
     expected <em>return</em> $J_t$, or (discounted) sum of future rewards. With our sparse rewards and
@@ -456,10 +499,14 @@
 
 <!-- ================= APPROACH ================= -->
 <section id="approach">
-  <h2><span class="secnum">5</span>Training to infer thoughts, given successful demonstrations</h2>
+  <!-- <h2><span class="secnum">5</span>Training to infer thoughts, given successful demonstrations</h2> -->
+  <!-- <h3><span class="secnum">3.2</span>Act-PRM Part 1: Thinking about thoughts as latent variables</h3> -->
+  <h3><span class="secnum">3.2</span>Act-PRM Part 1: Thinking about thoughts as latent variables</h3>
 
   <p>
-    Now we begin the steps to back out an RL algorithm for our setting. To recap, we're given access
+    <!-- Now we begin the steps to back out an RL algorithm for our setting. -->
+    Now we begin the steps to back out Act-PRMs for our setting. 
+    To recap, we're given access
     to a sequence of <em>explicit actions</em> $x_t$ and outcomes $o_{t+1}$ from successful human task
     completions, i.e.,
   </p>
@@ -469,7 +516,7 @@
   $$
   </div>
   <p>
-    However, for each action, rather than the full $a_t = (z_t, x_t)$, we only observe
+    However, for each action, rather than the full ReAct-style<sup><a href="#ref-1">[1]</a></sup> $a_t = (z_t, x_t)$, we only observe
     $a_t = (x_t,)$, resulting in “partial” trajectories:
   </p>
   <div class="eq-block">
@@ -479,7 +526,7 @@
   </div>
   <p>
     We could SFT LLMs over $\dot{\tau}$, since generating the explicit actions $x_t$ is enough to reach
-    a success state. However — as Section 3 just showed — $x_1, \ldots, x_t$ alone may not provide
+    a success state. However — as <a href="#motivating">Section 2.2</a> showed — $x_1, \ldots, x_t$ alone may not provide
     enough context to predict $x_{t+1}$. So we're interested in learning to generate the best
     interweaving <em>inferred thoughts</em> $\hat{z}_1, \hat{z}_2, \ldots, \hat{z}_T$ to fill in the
     complete trajectory:
@@ -552,12 +599,13 @@
 
 <!-- ================= EM DERIVATION ================= -->
 <section id="derivation">
-  <h2><span class="secnum">6</span>Finding rewards by maximizing our expectations</h2>
+  <!-- <h2><span class="secnum">6</span>Finding rewards by maximizing our expectations</h2> -->
+  <h3><span class="secnum">3.3</span>Act-PRM Part 2: maximizing our expectations to reward good thoughts</h3>
 
   <p>
     To find $z$, we'll first connect this objective to Expectation-Maximization (EM) — finding the
     latent thoughts that make the observed sequence of explicit actions $x$ most likely. We'll then
-    describe how we can implement this as policy-gradient RL, using a likelihood-based reward function
+    describe how we can implement this as policy-gradient RL<sup><a href="#ref-17">[17]</a><a href="#ref-18">[18]</a></sup>, using a likelihood-based reward function
     over these actions.
   </p>
 
@@ -576,7 +624,7 @@
   </div>
   <div class="eq-explain" id="eq-explain">Hover a term to inspect the derivation piece by piece.</div>
 
-  <h3>EM setup</h3>
+  <h4><strong>EM setup</strong></h4>
   <p>Recall that EM iterates over two eponymous steps:</p>
   <ol>
     <li>
@@ -728,7 +776,7 @@
   = \dfrac{\htmlClass{eq-term term-x}{p_{\theta^{(n)}}(x \mid z^{(g)}, s)}}{ \sum_{g'=1}^G \htmlClass{eq-term term-x}{p_{\theta^{(n)}} (x \mid z^{(g')}, s)}}
   $$
   </div>
-  <p>we recover the policy gradient</p>
+  <p>we recover the policy gradient<sup><a href="#ref-17">[17]</a></sup></p>
   <div class="eq-block">
   $$
   \nabla_\theta J(\theta) \approx \sum_{g=1}^G \bar{r}(z^{(g)}) \, \nabla_\theta \htmlClass{eq-term term-joint}{\log p_\theta(x, z^{(g)} \mid s)}
@@ -748,7 +796,8 @@
 
 <!-- ================= IMPLEMENTATION ================= -->
 <section id="implementation">
-  <h2><span class="secnum">7</span>Practical implementation (it's just policy gradient)</h2>
+  <!-- <h2><span class="secnum">7</span>Practical implementation (it's just policy gradient)</h2> -->
+  <h3><span class="secnum">3.4</span>Act-PRM Part 3: practical implementation (it's just policy gradient)</h3>
 
   <p>In practice, we can implement this as a standard RL algorithm.</p>
 
@@ -800,7 +849,7 @@
       since earlier thoughts do add to the context and impact the generation of later ones.
     </li>
     <li>
-      <strong>Group-mean-centered scores (GRPO-style).</strong> Orthogonally, subtract the group mean
+      <strong>Group-mean-centered scores (GRPO-style)<sup><a href="#ref-19">[19]</a><a href="#ref-20">[20]</a></sup>.</strong> Orthogonally, subtract the group mean
       from each likelihood:
       $\tilde{r}_\text{grpo}(z_t^{(g)}) = \tilde{r}(z_t^{(g)}) - \frac{1}{G}\sum_{g'=1}^{G} \tilde{r}(z_t^{(g')})$.
       In practice this may help by giving us <em>negative</em> returns, allowing us to actively
@@ -813,7 +862,7 @@
   </div>
   </details>
 
-  <h3>Distilling Act-PRM traces back into the model</h3>
+  <h4><strong>Distilling Act-PRM traces back into the model</strong></h4>
   <p>
     After Act-PRM training, we use the trained model to relabel each action-only trajectory with its
     highest-reward thoughts, producing a synthetic full-trajectory dataset
@@ -826,7 +875,8 @@
 
 <!-- ================= PLAYGROUND ================= -->
 <section id="playground">
-  <h2><span class="secnum">8</span>Playground: watch the E-step think</h2>
+  <!-- <h2><span class="secnum">8</span>Playground: watch the E-step think</h2> -->
+  <h3><span class="secnum">3.✻</span>Playground: watch the E-step think</h3>
 
   <p>
     The demo below walks the actual mechanics on a (lightly abridged) trajectory from the Snorkel
@@ -856,18 +906,18 @@
 
 <!-- ================= RESULTS ================= -->
 <section id="results">
-  <h2><span class="secnum">9</span>Results</h2>
+  <h2><span class="secnum">4</span>Results</h2>
 
   <p>
     We evaluate Act-PRMs on multi-turn agent tasks spanning real-world tool calling 
-    (<strong>τ²-bench Airline</strong>, <strong>τ²-bench Retail</strong>,
-    <strong>Snorkel Finance Reasoning</strong>) and embodied text games
-    (<strong>TextWorld Coin Collector</strong> and <strong>Treasure Hunter</strong>). We train
-    Qwen3-4B-Instruct-2507 with LoRA using
-    <a href="https://thinkingmachines.ai/blog/announcing-tinker/">Tinker</a>, with
+    (<strong>τ²-bench Airline</strong>, <strong>τ²-bench Retail</strong><sup><a href="#ref-21">[21]</a></sup>,
+    <strong>Snorkel Finance Reasoning</strong><sup><a href="#ref-14">[14]</a></sup>) and embodied text games
+    (<strong>TextWorld Coin Collector</strong> and <strong>Treasure Hunter</strong>)<sup><a href="#ref-13">[13]</a></sup>. We train
+    Qwen3-4B-Instruct-2507<sup><a href="#ref-12">[12]</a></sup> with LoRA using
+    <a href="https://thinkingmachines.ai/blog/announcing-tinker/">Tinker</a><sup><a href="#ref-22">[22]</a></sup>, with
     group size $G = 8$ thoughts per state. We found the simple un-normalized EM reward (likelihoods)
     worked, where (spoiler) we could get Act-PRM-trained models to generate thoughts that close the
-    action-only context gap from Section 3. To expand on this, we discuss three simple results next.
+    action-only context gap from <a href="#motivating">Section 2.2</a>. To expand on this, we discuss three simple results next.
   </p>
 
   <h3>Result 1 — Back to the land of climbable hills</h3>
@@ -1171,7 +1221,7 @@
 
 <!-- ================= DISCUSSION ================= -->
 <section id="discussion">
-  <h2><span class="secnum">10</span>Discussion + what's next</h2>
+  <h2><span class="secnum">5</span>Discussion + what's next</h2>
   <p>
     We showed how to make action-only logs a competitive supervision source, by training a model to
     infer the latent thoughts behind them. The recipe drops out of a classical EM step against the
@@ -1203,9 +1253,9 @@
       <p>
         How do we get a model to produce a <em>thought that leads to a given action</em>, before it's
         been trained to do so? Sampling from the bare policy $p_{\theta}(z \mid s)$ at initialization
-        wastes most samples on thoughts unrelated to what the demonstrator did. The codebase bootstraps
+        wastes most samples on thoughts unrelated to what the demonstrator did. We avoid this by bootstrapping
         with a <strong>reversal trick</strong>: since the logged action is known, we can show it to the
-        model <em>first</em>, and ask for the thought after — turning each offline step from
+        model <em>first</em>, and ask for the thought after. This turns each offline step from
         $(s, z, x)$-order into $(s, x, z)$-order.
       </p>
       <p>
@@ -1219,7 +1269,7 @@
 {thought}
 &lt;/thought&gt;</code></pre>
       <p>
-        For the final turn — the one being generated — the message is truncated right after
+        For the final turn — i.e., the one being generated — the message is truncated right after
         <code>&lt;thought&gt;\n</code> and tokenized with <code>continue_final_message=True</code>, so
         the model sees the action it must explain and is prompted mid-message to complete the thought:
       </p>
@@ -1299,8 +1349,9 @@ reward = exp(mean(target_logprobs))     # ≈ 1 / action-token perplexity
 <section id="notebooks">
   <h2>Companion notebooks</h2>
   <p>
-    Two standalone, didactic notebooks walk through implementing the core loop — sampling thoughts,
-    scoring them with action likelihoods, and training on the result:
+    We include two standalone notebooks to walk through implementing the core loop — sampling thoughts,
+    scoring them with action likelihoods, and training on the result. We also include a standalone script
+    for running the full Act-PRM steps (thought training, SFT on thought-action traces, RL from SFT).
   </p>
   <ul>
     <li>
@@ -1324,6 +1375,35 @@ reward = exp(mean(target_logprobs))     # ≈ 1 / action-token perplexity
       Agent Finance action-only dataset</a> (narration stripped from logged actions).
     </li>
   </ul>
+</section>
+
+<!-- ================= REFERENCES ================= -->
+<section id="references">
+  <h2>References</h2>
+  <ol class="references">
+    <li id="ref-1">Yao, S., Zhao, J., Yu, D., Du, N., Shafran, I., Narasimhan, K., &amp; Cao, Y. (2023). <a href="https://arxiv.org/abs/2210.03629">ReAct: Synergizing reasoning and acting in language models</a>. arXiv:2210.03629.</li>
+    <li id="ref-2">Shinn, N., Cassano, F., Gopinath, A., Narasimhan, K., &amp; Yao, S. (2023). Reflexion: Language agents with verbal reinforcement learning. <em>Advances in Neural Information Processing Systems</em>.</li>
+    <li id="ref-3">Wang, G., Xie, Y., Jiang, Y., Mandlekar, A., Xiao, C., Zhu, Y., Fan, L., &amp; Anandkumar, A. (2023). <a href="https://arxiv.org/abs/2305.16291">Voyager: An open-ended embodied agent with large language models</a>. arXiv:2305.16291.</li>
+    <li id="ref-4">Ouyang, L., Wu, J., Jiang, X., Almeida, D., Wainwright, C. L., Mishkin, P., et al. (2022). <a href="https://arxiv.org/abs/2203.02155">Training language models to follow instructions with human feedback</a>. arXiv:2203.02155.</li>
+    <li id="ref-5">Recht, B. (2018, April 16). <a href="https://archives.argmin.net/2018/04/16/ethical-rewards/">The ethics of reward shaping</a>. arg min blog.</li>
+    <li id="ref-6">Amodei, D., &amp; Clark, J. (2016, December 21). <a href="https://openai.com/index/faulty-reward-functions/">Faulty reward functions in the wild</a>. OpenAI.</li>
+    <li id="ref-7">Uesato, J., Kushman, N., Kumar, R., Song, F., Siegel, N., Wang, L., Creswell, A., Irving, G., &amp; Higgins, I. (2022). <a href="https://arxiv.org/abs/2211.14275">Solving math word problems with process- and outcome-based feedback</a>. arXiv:2211.14275.</li>
+    <li id="ref-8">Lightman, H., Kosaraju, V., Burda, Y., Edwards, H., Baker, B., Lee, T., Leike, J., Schulman, J., Sutskever, I., &amp; Cobbe, K. (2023). <a href="https://arxiv.org/abs/2305.20050">Let's verify step by step</a>. arXiv:2305.20050.</li>
+    <li id="ref-9">Wang, P., Li, L., Shao, Z., Xu, R. X., Dai, D., Li, Y., Chen, D., Wu, Y., &amp; Sui, Z. (2024). <a href="https://arxiv.org/abs/2312.08935">Math-Shepherd: Verify and reinforce LLMs step-by-step without human annotations</a>. arXiv:2312.08935.</li>
+    <li id="ref-10">Chen, L., Lu, K., Rajeswaran, A., Lee, K., Grover, A., Laskin, M., Abbeel, P., Srinivas, A., &amp; Mordatch, I. (2021). <a href="https://arxiv.org/abs/2106.01345">Decision transformer: Reinforcement learning via sequence modeling</a>. arXiv:2106.01345.</li>
+    <li id="ref-11">Peng, X. B., Kumar, A., Zhang, G., &amp; Levine, S. (2019). <a href="https://arxiv.org/abs/1910.00177">Advantage-weighted regression: Simple and scalable off-policy reinforcement learning</a>. arXiv:1910.00177.</li>
+    <li id="ref-12">Yang, A., Li, A., Yang, B., Zhang, B., Hui, B., Zheng, B., et al. (2025). <a href="https://arxiv.org/abs/2505.09388">Qwen3 technical report</a>. arXiv:2505.09388.</li>
+    <li id="ref-13">C&ocirc;t&eacute;, M.-A., K&aacute;d&aacute;r, &Aacute;., Yuan, X., Kybartas, B., Barnes, T., Fine, E., et al. (2018). <a href="https://arxiv.org/abs/1806.11532">TextWorld: A learning environment for text-based games</a>. In <em>Computer Games Workshop at IJCAI</em>. arXiv:1806.11532.</li>
+    <li id="ref-14">Snorkel AI. (2026). <a href="https://snorkel.ai/leaderboard/category/financereasoning/">Snorkel AI leaderboard, finance reasoning</a>. <em>Snorkel AI</em>.</li>
+    <li id="ref-15">Dempster, A. P., Laird, N. M., &amp; Rubin, D. B. (1977). Maximum likelihood from incomplete data via the EM algorithm. <em>Journal of the Royal Statistical Society: Series B (Methodological)</em>, 39(1), 1&ndash;38.</li>
+    <li id="ref-16">Levine, S. (2018). <a href="https://arxiv.org/abs/1805.00909">Reinforcement learning and control as probabilistic inference: Tutorial and review</a>. arXiv:1805.00909.</li>
+    <li id="ref-17">Williams, R. J. (1992). Simple statistical gradient-following algorithms for connectionist reinforcement learning. <em>Machine Learning</em>, 8, 229&ndash;256.</li>
+    <li id="ref-18">Sutton, R. S., &amp; Barto, A. G. (2018). <em>Reinforcement learning: An introduction</em> (2nd ed.). MIT Press.</li>
+    <li id="ref-19">Shao, Z., Wang, P., Zhu, Q., Xu, R., Song, J., Bi, X., et al. (2024). <a href="https://arxiv.org/abs/2402.03300">DeepSeekMath: Pushing the limits of mathematical reasoning in open language models</a>. arXiv:2402.03300.</li>
+    <li id="ref-20">DeepSeek-AI, Guo, D., Yang, D., Zhang, H., Song, J., Zhang, R., et al. (2025). DeepSeek-R1: Incentivizing reasoning capability in LLMs via reinforcement learning. <em>Nature</em>, 645, 633&ndash;638.</li>
+    <li id="ref-21">Barres, V., Dong, H., Ray, S., Si, X., &amp; Narasimhan, K. (2025). <a href="https://arxiv.org/abs/2506.07982">&tau;&sup2;-bench: Evaluating conversational agents in a dual-control environment</a>. arXiv:2506.07982.</li>
+    <li id="ref-22">Thinking Machines. (2025). <a href="https://thinkingmachines.ai/blog/announcing-tinker/">Announcing Tinker: An API for post-training frontier models</a>. Blog post.</li>
+  </ol>
 </section>
 
 <!-- ================= BIBTEX ================= -->

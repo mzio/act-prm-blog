@@ -462,6 +462,12 @@ async def train(cfg):
     if cfg.split_file:
         print(f"loading trajectories via split {cfg.split_file} ...", flush=True)
         train_pool, eval_pool = load_trajectories_split(cfg.split_file)
+        if cfg.system_prompt_file:
+            sp = Path(cfg.system_prompt_file).read_text().strip()
+            for t in train_pool + eval_pool:
+                t["system_prompt"] = sp
+            print(f"  system prompt overridden from {cfg.system_prompt_file} "
+                  f"({len(sp)} chars — matches the RL env)", flush=True)
         eval_trajs = eval_pool[: cfg.eval_trajectories]
         train_trajs = train_pool          # rebatched per iteration below
         print(f"  train pool: {len(train_pool)} tasks | eval pool: {len(eval_pool)} tasks "
@@ -698,6 +704,9 @@ def main():
     p.add_argument("--obs-max-chars", type=int, default=1500)
     p.add_argument("--log-path", default="runs/length_penalty_run.json")
     p.add_argument("--sampler-path", default=None, help="tinker:// path for demo mode")
+    p.add_argument("--system-prompt-file", default=None,
+                   help="override every trajectory's system prompt with this file's text "
+                        "(use when the HF dataset lacks the env's real system prompt)")
     p.add_argument("--split-file", default=None,
                    help="canonical task split json (runs/sftrl/split.json); enables pooled "
                         "training with per-iteration round-robin batching")

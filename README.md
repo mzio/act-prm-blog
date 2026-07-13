@@ -56,6 +56,70 @@ TINKER_API_KEY=sk-...
   experiments ran: `sample_async` (E-step), `compute_logprobs_async` (reward),
   `forward_backward_async(loss_fn="importance_sampling")` (M-step).
 
+## Pipeline: SFT + RL with Act-PRM thoughts (release scripts)
+
+The full research pipeline — generate thoughts for expert demos with an Act-PRM, distill them
+into a student by SFT, then RL the student against the real environment — ships as five
+release-quality standalone scripts (typed, ruff-formatted, behavior-verified against the
+original research scripts by `scripts/test_release_equivalence*.py`, 20/20 passing):
+
+| stage | script | dataset / env knobs |
+|---|---|---|
+| 1. Act-PRM thought generation | `scripts/act_prm_tinker.py` | `--split-file` (the split JSON's `dataset` field names the HF dataset), `--system-prompt-file`, `--reward-method lenpen\|lift`, `--length-penalty`, `--score-with-base` |
+| 2. Relabel demos → SFT traces | `scripts/sftrl_relabel_release.py` | `--run-log` (inherits scorer/λ), `--split-file`, `--sampler-path` (checkpoint vintage), `--system-prompt-file` |
+| 3. SFT | `scripts/sft_tinker_release.py` | `--traces`, `--per-step` (render each turn as the final message — see `notes/cc-4.0`), `--tools finance\|insurance`, `--system-prompt-file` |
+| 4. Env RL | `scripts/rl_env_tinker_release.py` | `--env finance\|insurance`, `--split-file`, `--advantage-mode grpo\|rlvr`, `--init-state` (SFT checkpoint) |
+| 5. pass@k eval | `scripts/sftrl_final_eval_release.py` | `--env`, `--task-set eval\|hard`, `--rollouts`, `--sampler` |
+
+Setup beyond `TINKER_API_KEY`: stages 4–5 grade episodes with a Claude judge via
+`claude-agent-sdk==0.2.82` — put a `CLAUDE_CODE_OAUTH_TOKEN` (from `claude setup-token`) in
+`.env`, and optionally `SFTRL_JUDGE_MODEL` (default `claude-sonnet-4-6`; our round-3 runs used
+`claude-haiku-4-5`). Both are re-read from `.env` on every judge call, so tokens/models can be
+rotated live. Env data lives in `data/snorkel_finance/` and `data/snorkel_insurance/`
+(gitignored; exact clones of the snorkel-ai benchmark repos). Canonical question-level splits:
+`runs/sftrl/split.json` (finance) and `runs/sftrl/split_insurance.json`.
+
+Quickstart (finance, tiny smoke — verified to run end-to-end):
+
+```bash
+# 1. generate thoughts (frozen-base scorer, length penalty)
+uv run --with tinker --with datasets --with python-dotenv --with "transformers>=4.51" \
+       --with numpy --with jinja2 \
+  python scripts/act_prm_tinker.py train \
+    --reward-method lenpen --length-penalty 0.15 --score-with-base \
+    --split-file runs/sftrl/split.json --em-iterations 100 --checkpoint-every 5 \
+    --log-path runs/sftrl/actprm_run.json
+
+# 2. relabel all demo steps with the best checkpoint's thoughts
+uv run ... python scripts/sftrl_relabel_release.py \
+    --run-log runs/sftrl/actprm_run.json --out runs/sftrl/traces_thoughts.jsonl
+
+# 3. SFT (per-step rendering + tool schemas: matches the RL rollout context exactly)
+uv run ... python scripts/sft_tinker_release.py \
+    --traces runs/sftrl/traces_thoughts.jsonl \
+    --eval-traces runs/sftrl/traces_action_only_eval.jsonl \
+    --per-step --tools finance --log-path runs/sftrl/sft_thoughts.json
+
+# 4. RL against the environment (add --with pandas --with "claude-agent-sdk==0.2.82")
+uv run ... python scripts/rl_env_tinker_release.py --env finance \
+    --advantage-mode grpo --init-state <best sft-state from step 3's log> \
+    --log-path runs/sftrl/rl_thoughts.json
+
+# 5. pass@1/4/8 on held-out tasks ("hard" = questions with no successful demo)
+uv run ... python scripts/sftrl_final_eval_release.py --env finance \
+    --sampler <rl-final from step 4> --arm my_arm --rollouts 8 \
+    --out runs/sftrl/final_eval.json
+```
+
+To target a new dataset: build a split JSON (see `scripts/sftrl_split.py`; its `dataset` field
+is the HF dataset id), port/point an environment (`src/sftrl/envs/` has the strl-style
+`Environment` base — finance + insurance included, fidelity-tested by
+`scripts/test_env_fidelity.py`), and pass the env's system prompt via `--system-prompt-file`
+at stages 1–3 so generation, scoring, SFT rendering, and rollouts all share one conditioning
+context. Known limitation: the stage-1 few-shot seed is a fixed finance-flavored example
+(format-teaching only). Experiment logs/findings from our runs: `notes/cc-*.md`
+(results: `cc-2.0`, `cc-6.0`; methodology: `cc-4.0`).
+
 ## Experiment: what happens if thoughts must be *short* as well as *predictive*?
 
 `scripts/act_prm_length_penalty.py` trains an Act-PRM whose reward subtracts a length penalty:
