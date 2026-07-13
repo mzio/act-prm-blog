@@ -82,10 +82,10 @@
     we train LLMs to <em>infer</em> these thoughts from the
     actions — scoring each candidate thought by the
     <span class="chip chip-r">likelihood</span> it assigns to the action that actually followed.
-    We support this idea of treating chain-of-thoughts as latent variables by deriving an exact
-    connection to <strong>Expectation-Maximization</strong> that can be implemented
-    as plain policy-gradient RL, and show across various tool-calling agentic tasks that Act-PRMs
-    can close the context gap while leading to best performance after full SFT + RL post-training steps.
+    We support treating chain-of-thoughts as latent variables in two ways. First we derive an exact
+    connection to <strong>Expectation-Maximization</strong> implemented
+    as plain policy-gradient RL. Then we show across tool-calling agentic tasks that Act-PRMs
+    close the context gap while leading to best performance after full SFT + RL post-training steps.
   </p>
 </div>
 
