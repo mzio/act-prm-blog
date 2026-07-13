@@ -38,14 +38,13 @@
     <summary>Quick Navigation</summary>
     <ol>
       <li value="1"><a href="#intro">Intro + problem</a></li>
-      <li value="2"><a href="#sft-bc">What's insufficient about prior approaches?</a></li>
-      <li class="quicknav-sub"><a href="#sft-demos">Can we SFT on easy-to-collect demonstrations?</a></li>
-      <li class="quicknav-sub"><a href="#motivating">A motivating study: the context gap</a></li>
+      <li class="quicknav-sub"><a href="#sft-demos">SFT on expert demonstrations?</a></li>
+      <li value="2"><a href="#motivating">Motivating study: the context gap</a></li>
       <li value="3"><a href="#method">Method: Action Process Reward Models</a></li>
       <li class="quicknav-sub"><a href="#setup">Setup: multi-turn RL</a></li>
       <li class="quicknav-sub"><a href="#approach">Part 1: thoughts as latent variables</a></li>
       <li class="quicknav-sub"><a href="#derivation">Part 2: maximizing our expectations</a></li>
-      <li class="quicknav-sub"><a href="#implementation">Part 3: practical implementation (it's just policy gradient)</a></li>
+      <li class="quicknav-sub"><a href="#implementation">Part 3: practical implementation</a></li>
       <li class="quicknav-sub"><a href="#playground">Playground: watch the E-step think</a></li>
       <li value="4"><a href="#results">Results</a></li>
       <li value="5"><a href="#discussion">Discussion + what's next</a></li>
@@ -151,7 +150,7 @@
 
 <!-- ================= INTRO ================= -->
 <section id="intro">
-  <h2><span class="secnum">1</span>Intro + problem</h2>
+  <h2><span class="secnum">1</span>Intro + Problem</h2>
 
   <p>
     Towards turning LLMs into useful “agents”, we'd like scalable ways to train these models to
@@ -161,7 +160,7 @@
     completed successfully or not.
   </p>
   <p>
-    To do this, building environments and training with RL is one option<sup><a href="#ref-4">[4]</a></sup>. After all, these tasks are
+    To do this, building environments before training with RL is one option<sup><a href="#ref-4">[4]</a></sup>. After all, these tasks are
     <em>technically verifiable</em> (did the LLM complete the task or not?). However, long multi-turn
     workflows introduce several challenges, especially for the popular policy-gradient methods of today:
   </p>
@@ -209,16 +208,15 @@
       </figcaption>
     </figure>
   </div>
-</section>
 
-<!-- ================= SFT / BC ================= -->
-<section id="sft-bc">
-  <h2><span class="secnum">2</span>What's insufficient about prior approaches?</h2>
+  <!-- ================= 1.1 SFT / BC (folded into Section 1) ================= -->
+  <!-- <h2><span class="secnum">2</span>What's insufficient about existing approaches?</h2> -->
 
-  <h3 id="sft-demos"><span class="secnum">2.1</span>Can we SFT on easy-to-collect demonstrations?</h3>
+  <!-- <h3 id="sft-demos"><span class="secnum">2.1</span>Can we SFT on easy-to-collect demonstrations?</h3> -->
+  <h3 id="sft-demos"><span class="secnum">1.1</span>SFT on expert demonstrations as an alternative?</h3>
 
   <p>
-    Because we are aiming to <em>distill</em> a human's ability to complete a workflow into
+    Meanwhile, because we are aiming to <em>distill</em> a human's ability to complete a workflow into
     an LLM, we could consider supervised finetuning (SFT) over sequences of expert demonstrations,
     i.e., <em>behavioral cloning</em> (BC)<sup><a href="#ref-4">[4]</a><a href="#ref-10">[10]</a><a href="#ref-11">[11]</a></sup>. By collecting successful demonstrations of a human
     completing a task and training an LLM on text representations of these trajectories, we get dense
@@ -302,7 +300,9 @@
 
 <!-- ================= MOTIVATING STUDY ================= -->
 <section id="motivating">
-  <h3><span class="secnum">2.2</span>Quick motivating study: action-only demos provide insufficient context</h3>
+  <!-- <h3><span class="secnum">2.2</span>Quick motivating study: action-only demos provide insufficient context</h3> -->
+  <!-- <h2><span class="secnum">2</span>Motivating study: action-only demos provide insufficient context for SFT</h2> -->
+  <h2><span class="secnum">2</span>Motivating study: actions alone may not provide enough context</h2>
 
   <p>
     To ground our last point above, we see what happens when training with action-only logs of expert demonstrations. 
@@ -526,7 +526,7 @@
   </div>
   <p>
     We could SFT LLMs over $\dot{\tau}$, since generating the explicit actions $x_t$ is enough to reach
-    a success state. However — as <a href="#motivating">Section 2.2</a> showed — $x_1, \ldots, x_t$ alone may not provide
+    a success state. However — as <a href="#motivating">Section 2</a> showed — $x_1, \ldots, x_t$ alone may not provide
     enough context to predict $x_{t+1}$. So we're interested in learning to generate the best
     interweaving <em>inferred thoughts</em> $\hat{z}_1, \hat{z}_2, \ldots, \hat{z}_T$ to fill in the
     complete trajectory:
@@ -917,7 +917,7 @@
     <a href="https://thinkingmachines.ai/blog/announcing-tinker/">Tinker</a><sup><a href="#ref-22">[22]</a></sup>, with
     group size $G = 8$ thoughts per state. We found the simple un-normalized EM reward (likelihoods)
     worked, where (spoiler) we could get Act-PRM-trained models to generate thoughts that close the
-    action-only context gap from <a href="#motivating">Section 2.2</a>. To expand on this, we discuss three simple results next.
+    action-only context gap from <a href="#motivating">Section 2</a>. To expand on this, we discuss three simple results next.
   </p>
 
   <h3>Result 1 — Back to the land of climbable hills</h3>
