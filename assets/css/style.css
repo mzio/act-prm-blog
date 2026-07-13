@@ -691,6 +691,79 @@ details.collapse > .collapse-body > h3:first-child { margin-top: 1.2rem; }
 }
 .eq-tooltip.show { opacity: 1; }
 
+/* ---------- inline citation markers ---------- */
+sup.cite {
+  font-size: 0.7em;
+  line-height: 0;
+  font-weight: 500;
+  white-space: nowrap;
+  margin-left: 0.12em;
+}
+sup.cite a {
+  color: var(--c-thought);
+  border-bottom: none;
+}
+sup.cite a:hover { border-bottom: none; text-decoration: underline; }
+
+/* ---------- citation preview card ---------- */
+.cite-tooltip {
+  position: fixed;
+  z-index: 60;
+  max-width: 320px;
+  background: var(--surface);
+  border: 1px solid var(--baseline);
+  border-radius: 10px;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.12);
+  padding: 0.6rem 0.8rem;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.12s ease;
+}
+.cite-tooltip.show { opacity: 1; }
+.cite-tip-title {
+  display: block;
+  font-size: 0.82rem;
+  font-weight: 500;
+  line-height: 1.35;
+  color: var(--ink);
+}
+.cite-tip-meta {
+  display: block;
+  margin-top: 0.25rem;
+  font-size: 0.76rem;
+  color: var(--ink-muted);
+}
+
+/* ---------- references section ---------- */
+#references { scroll-margin-top: 3.4rem; }
+.refgroup { margin: 1.4rem 0 1.8rem; }
+.refgroup h3 { margin-bottom: 0.25rem; }
+.refgroup-note {
+  margin: 0 0 0.7rem;
+  font-size: 0.9rem;
+  color: var(--ink-secondary);
+}
+ol.reflist {
+  margin: 0;
+  padding-left: 2.2rem;
+}
+ol.reflist li {
+  margin: 0.4rem 0;
+  padding-left: 0.3rem;
+  font-size: 0.9rem;
+  line-height: 1.5;
+  color: var(--ink-secondary);
+  scroll-margin-top: 3.6rem;
+}
+ol.reflist li::marker { color: var(--ink-muted); }
+.reflist .ref-authors { color: var(--ink); font-weight: 500; }
+.reflist .ref-venue { color: var(--ink-muted); }
+.reflist li:target {
+  background: rgba(42, 120, 214, 0.09);
+  border-radius: 6px;
+  box-shadow: 0 0 0 6px rgba(42, 120, 214, 0.09);
+}
+
 /* scoring indicator in the playground */
 .demo .cand .rval.computing {
   color: var(--c-thought);

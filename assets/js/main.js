@@ -30,6 +30,41 @@
   };
   const ALL_TERMS = Object.keys(TERM_INFO);
 
+  /* ---------- reference metadata for citation hover previews (keyed by paper citation #) ---------- */
+  const REF_INFO = {
+    1:  { a: 'Yao et al.',      v: 'ICLR 2023',              t: 'ReAct: Synergizing Reasoning and Acting in Language Models' },
+    2:  { a: 'Shinn et al.',    v: 'NeurIPS 2023',           t: 'Reflexion: Language Agents with Verbal Reinforcement Learning' },
+    3:  { a: 'Wang et al.',     v: 'arXiv 2023',             t: 'Voyager: An Open-Ended Embodied Agent with Large Language Models' },
+    4:  { a: 'Ouyang et al.',   v: 'NeurIPS 2022',           t: 'Training Language Models to Follow Instructions with Human Feedback' },
+    5:  { a: 'Uesato et al.',   v: 'arXiv 2022',             t: 'Solving Math Word Problems with Process- and Outcome-Based Feedback' },
+    6:  { a: 'Lightman et al.', v: 'ICLR 2024',              t: 'Let’s Verify Step by Step' },
+    7:  { a: 'Wang et al.',     v: 'ACL 2024',               t: 'Math-Shepherd: Verify and Reinforce LLMs Step-by-Step Without Human Annotations' },
+    8:  { a: 'Barres et al.',   v: 'arXiv 2025',             t: 'τ²-Bench: Evaluating Conversational Agents in a Dual-Control Environment' },
+    9:  { a: 'Snorkel AI',      v: 'Leaderboard, 2026',      t: 'Snorkel AI Leaderboard: Finance Reasoning' },
+    10: { a: 'Côté et al.', v: 'IJCAI Workshop 2018', t: 'TextWorld: A Learning Environment for Text-Based Games' },
+    11: { a: 'Yang et al.',     v: 'arXiv 2025',             t: 'Qwen3 Technical Report' },
+    12: { a: 'Madaan et al.',   v: 'NeurIPS 2023',           t: 'Self-Refine: Iterative Refinement with Self-Feedback' },
+    13: { a: 'Zhao et al.',     v: 'AAAI 2024',              t: 'ExpeL: LLM Agents Are Experiential Learners' },
+    14: { a: 'Wang et al.',     v: 'arXiv 2024',             t: 'Agent Workflow Memory' },
+    15: { a: 'Ferraz et al.',   v: 'arXiv 2026',             t: 'Retrieval-Augmented LLM Agents: Learning to Learn from Experience' },
+    16: { a: 'Chen et al.',     v: 'NeurIPS 2021',           t: 'Decision Transformer: Reinforcement Learning via Sequence Modeling' },
+    17: { a: 'Schmied et al.',  v: 'ICLR 2025',              t: 'Retrieval-Augmented Decision Transformer: External Memory for In-Context RL' },
+    18: { a: 'Peng et al.',     v: 'arXiv 2019',             t: 'Advantage-Weighted Regression: Simple and Scalable Off-Policy Reinforcement Learning' },
+    19: { a: 'Levine',          v: 'arXiv 2018',             t: 'Reinforcement Learning and Control as Probabilistic Inference: Tutorial and Review' },
+    20: { a: 'Williams',        v: 'Machine Learning, 1992', t: 'Simple Statistical Gradient-Following Algorithms for Connectionist Reinforcement Learning' },
+    21: { a: 'Sutton & Barto', v: 'MIT Press, 2018',    t: 'Reinforcement Learning: An Introduction (2nd ed.)' },
+    22: { a: 'Laskin et al.',   v: 'ICLR 2023',              t: 'In-Context Reinforcement Learning with Algorithm Distillation' },
+    23: { a: 'Ye et al.',       v: 'arXiv 2026',             t: 'In-Context Reinforcement Learning for Tool Use in Large Language Models' },
+    24: { a: 'Garg et al.',     v: 'NeurIPS 2022',           t: 'What Can Transformers Learn In-Context? A Case Study of Simple Function Classes' },
+    25: { a: 'Huang et al.',    v: 'arXiv 2024',             t: 'In-Context Decision Transformer: Reinforcement Learning via Hierarchical Chain-of-Thought' },
+    26: { a: 'Hübotter et al.', v: 'arXiv 2026',        t: 'Reinforcement Learning via Self-Distillation' },
+    27: { a: 'Zhao et al.',     v: 'arXiv 2026',             t: 'Self-Distilled Reasoner: On-Policy Self-Distillation for Large Language Models' },
+    28: { a: 'Dempster et al.', v: 'J. R. Stat. Soc. B, 1977', t: 'Maximum Likelihood from Incomplete Data via the EM Algorithm' },
+    29: { a: 'Shao et al.',     v: 'arXiv 2024',             t: 'DeepSeekMath: Pushing the Limits of Mathematical Reasoning in Open Language Models' },
+    30: { a: 'DeepSeek-AI',     v: 'Nature, 2025',           t: 'DeepSeek-R1: Incentivizing Reasoning Capability in LLMs via Reinforcement Learning' },
+    31: { a: 'Thinking Machines', v: '2025',                 t: 'Announcing Tinker: An API for Post-Training Frontier Models' },
+  };
+
   /* ---------- KaTeX ---------- */
   function renderMath() {
     if (typeof renderMathInElement !== 'function') return setTimeout(renderMath, 60);
@@ -136,6 +171,44 @@
     });
   }
 
+  /* ---------- reference citations: hover preview cards (markers live in plain prose) ---------- */
+  function bindCites() {
+    const tip = document.createElement('div');
+    tip.className = 'cite-tooltip';
+    document.body.appendChild(tip);
+
+    function refOf(el) {
+      const a = el.closest && el.closest('.cite a[data-ref]');
+      return a ? a.getAttribute('data-ref') : null;
+    }
+    function showTip(n, x, y) {
+      const info = REF_INFO[n];
+      if (!info) return;
+      tip.innerHTML =
+        `<span class="cite-tip-title">${info.t}</span><span class="cite-tip-meta">${info.a} · ${info.v}</span>`;
+      tip.classList.add('show');
+      const pad = 14;
+      const w = Math.min(320, window.innerWidth - 24);
+      const left = Math.min(x + pad, window.innerWidth - w - 12);
+      tip.style.left = Math.max(12, left) + 'px';
+      const h = tip.offsetHeight || 80;
+      tip.style.top = (y - h - pad > 8 ? y - h - pad : y + pad) + 'px';
+    }
+    function hideTip() { tip.classList.remove('show'); }
+
+    document.addEventListener('mouseover', (e) => {
+      const n = refOf(e.target);
+      if (n) showTip(n, e.clientX, e.clientY);
+    });
+    document.addEventListener('mousemove', (e) => {
+      const n = refOf(e.target);
+      if (n) showTip(n, e.clientX, e.clientY);
+    });
+    document.addEventListener('mouseout', (e) => {
+      if (refOf(e.target)) hideTip();
+    });
+  }
+
   /* ---------- collapsibles: auto-open ancestors when a hash points inside one ---------- */
   function openCollapseForHash() {
     const id = location.hash.slice(1);
@@ -181,9 +254,13 @@
     });
   });
 
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', renderMath);
-  } else {
+  function init() {
     renderMath();
+    bindCites();
+  }
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+  } else {
+    init();
   }
 })();
