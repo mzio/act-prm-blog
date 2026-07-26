@@ -1,0 +1,13 @@
+# Base HuggingFace agentic-rollout generator with GRPO-style (mean-centered)
+# advantages — for RL against an interactive env (e.g. tau2bench). The policy
+# does env.reset -> generate tool call -> env.step rollouts; the terminal env
+# reward is mean-centered across the group by MeanCenteredTrajectoryGroup.
+name: "hf"
+
+enable_thinking: false
+mean_center: true           # GRPO-style: advantage = reward - group mean
+verbose: false
+streamer: false
+
+ground_truth_generation: false
+ground_truth_incorrects: false

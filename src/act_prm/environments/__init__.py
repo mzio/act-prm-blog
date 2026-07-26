@@ -22,6 +22,15 @@ def get_env(name: str, is_async: bool = True, **kwargs: Any) -> Environment:
 
         return ActPrmTracesEnv(**kwargs)
 
+    if name == "tau2bench":
+        if is_async:
+            from .tau2bench import AsyncTau2BenchEnv
+
+            return AsyncTau2BenchEnv(**kwargs)
+        from .tau2bench import Tau2BenchEnv
+
+        return Tau2BenchEnv(**kwargs)
+
     raise NotImplementedError(f"Sorry, invalid environment: '{name}'.")
 
 
