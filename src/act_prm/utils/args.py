@@ -19,6 +19,12 @@ def get_args() -> argparse.Namespace:
     """
     parser = argparse.ArgumentParser()
     parser.add_argument("--project_name", type=str, default="act-prm")
+    # Human-readable prefix prepended to the run_name (and thus the log/checkpoint
+    # leaf dir), e.g. --run_tag retail_s1_policy_heldout. Purely cosmetic/organizational:
+    # it does NOT change training, but makes checkpoints self-describing and lets two
+    # runs that would otherwise collide (e.g. same env_config, different split_file)
+    # land in distinct dirs. The full auto-encoded run_name still follows the tag.
+    parser.add_argument("--run_tag", type=str, default=None)
 
     # Necessary arguments + configs (to load default args from)
     parser.add_argument("--is_async", action="store_true", help="Use asynchronous environment")
@@ -571,6 +577,7 @@ def get_args() -> argparse.Namespace:
         "lora_checkpoint_path",
         "resume_from",  # a long checkpoint path; must not go into the run name (filename too long)
         "project_name",
+        "run_tag",  # prepended explicitly below; don't also auto-encode it
         "verbose",
         "streamer",
     ]
@@ -578,6 +585,10 @@ def get_args() -> argparse.Namespace:
     if args.base_env_config is not None and args.base_env_config == args.env_config:
         _ignore_args.append("base_env_config")
     args.run_name = get_run_name(args, prefix=args.project_name, ignore_args=_ignore_args)
+    if args.run_tag:
+        # Sanitize like get_run_name does, then prepend so the leaf dir is self-describing.
+        _tag = str(args.run_tag).replace("-", "_").replace(".", "_").replace("/", "_")
+        args.run_name = f"{_tag}-{args.run_name}"
     logger.info("Run name: %s", args.run_name)
 
     # Setup log path and checkpoint / data-saving path
