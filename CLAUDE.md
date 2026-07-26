@@ -71,6 +71,27 @@ returns the stored weights unchanged (no return/mean-centering). `prepare_miniba
 then trains the `(thought+action)` span (`state_action_tokens[state_len:]`) with
 that advantage; `RLTrainer.compute_loss` is the importance-weighted PG loss.
 
+## tau2-bench agentic RL (the eventual RL phase)
+
+`src/act_prm/environments/tau2bench/` wraps τ²-bench's `AgentGymEnv` (real
+airline/retail tasks, tools, and end-of-episode evaluator) as an `Environment`.
+The LoRA policy does agentic rollouts (`hf_grpo` generator: env.reset → tool call
+→ env.step, GRPO-mean-centered advantages) and the `pg` trainer takes the step —
+no new trainer code. The **user simulator + NL-assertion judge** are driven by an
+LLM through a litellm custom provider; two backends are wired:
+- `claude_agent_sdk/<model>` → `litellm_claude_agent_sdk.py` → `ClaudeQueryLLM`
+  (Claude Code OAuth; uses the ambient login on a devserver, else set
+  `CLAUDE_CODE_OAUTH_TOKEN` in `.env` for headless runs). **Default.**
+- `metagen/<model>` → `litellm_metagen.py` → Llama-API passthrough (needs
+  `LLAMA_API_KEY` = `LLM|<id>|<secret>`).
+
+Runs in a **dedicated `.venv-tau2`** (has the training stack + `tau2` + `litellm` +
+`claude-agent-sdk`) so it never disturbs the base `.venv`. Setup + run:
+`./scripts/train_tau2.sh` (see its header — clone `tau2-bench` from a github-capable
+shell, `UV_PROJECT_ENVIRONMENT=.venv-tau2 uv sync --extra tau2`). tau2 tasks are
+task-split-agnostic here; the `rl_eval` hold-outs from `data/splits/*` are the
+intended eval tasks for this phase.
+
 ## Gotchas
 
 - The env tokenizer is loaded from `pretrained_model_config` then overwritten with
