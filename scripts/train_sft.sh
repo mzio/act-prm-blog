@@ -79,10 +79,16 @@ case "$VARIANT" in
   *) echo "bad variant '$VARIANT' (actions_only|thoughts_policy|thoughts_base|expert_thoughts)"; exit 1 ;;
 esac
 
+# Context regime: hide-obs by default. SFT_FULLCTX=1 -> full context (omit the flag;
+# --hide_observations is store_true/default None, so omitting it lets the env yaml's
+# hide_observations:false win). Same pools either way — hide-obs is applied at
+# tokenization, not baked into the cached corpus.
+HIDE_OBS=(--hide_observations); [ "${SFT_FULLCTX:-0}" = 1 ] && HIDE_OBS=()
+
 CMD=(uv run python main_pytorch.py
   --env_config "$ENVCFG" --model_config hf_qwen3_4b_instruct
   --lora_config r8_a16_linear --generator_config "$GEN" --trainer_config sft
-  --replay_buffer_config default --hide_observations
+  --replay_buffer_config default "${HIDE_OBS[@]}"
   --group_size 4 --batch_size 4 --num_batches 60 --eval_every 10 --no_initial_eval
   --length_penalty 0.15 "${MODE[@]}" --verbose "$@")
 
