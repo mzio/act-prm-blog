@@ -310,6 +310,31 @@ def get_args() -> argparse.Namespace:
         help="Act-PRM reward: 'penalty' (p(x|s,z) - lambda*len_frac) or 'lift' (per-token likelihood + lexicographic length selection)",
     )
     parser.add_argument(
+        "--advantage_mode",
+        type=str,
+        default=None,
+        choices=["em", "best", "top_half", "uniform", "grpo"],
+        help="How per-candidate rewards become advantages (em=EM weights, best=argmax, top_half, uniform, grpo=mean-centered)",
+    )
+    parser.add_argument(
+        "--grpo_normalize",
+        action=argparse.BooleanOptionalAction,
+        default=None,
+        help="advantage_mode=grpo: divide mean-centered reward by group std",
+    )
+    parser.add_argument(
+        "--infer_thoughts",
+        action=argparse.BooleanOptionalAction,
+        default=None,
+        help="Infer thoughts (default). --no-infer_thoughts runs the actions-only SFT baseline",
+    )
+    parser.add_argument(
+        "--save_generations",
+        action=argparse.BooleanOptionalAction,
+        default=None,
+        help="Append every generation group to <log_path>/generations.jsonl",
+    )
+    parser.add_argument(
         "--hide_observations",
         action="store_true",
         default=None,

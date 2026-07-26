@@ -1,0 +1,65 @@
+# Supervised fine-tuning trainer for Act-PRM.
+# Same rollout/eval/checkpoint loop as pg, but compute_loss is plain
+# (advantage-weighted) cross-entropy on the (thought+action) span — no PPO ratio.
+# Pair with a generator advantage_mode:
+#   - best      : MLE SFT on the single best thought per group
+#   - em        : soft-distill (EM-weighted over the group)
+#   - top_half  : train on the better half of the group (uniform)
+#   - uniform   : train on all G thoughts equally
+# or with generator.infer_thoughts=false for the actions-only baseline.
+trainer_name: sft
+supervised_fine_tuning: true
+balance_advantages: false
+
+model_name: null
+
+tool_call_kwargs:
+  tool_call_bos: "<tool_call>"
+  tool_call_eos: "</tool_call>"
+  tool_call_argname: "arguments"
+
+# Generation (E-step rollouts)
+num_batches: 200
+num_tries: null
+eval_num_tries: null
+max_tokens: 1024
+temperature: 1.0
+max_input_id_len: null
+max_seq_len: 8192
+
+batch_size: 8
+group_size: 4
+eval_group_size: 1
+num_return_sequences: null
+
+# Training (M-step policy updates)
+learning_rate: 4e-5
+discount_factor: 0.9
+loss_fn: "cross_entropy"
+num_substeps: 1
+mini_batch_size: null
+dataloader_batch_size: 1
+
+compute_post_kl: false
+kl_penalty_coef: 0.0
+kl_discount_factor: 0.0
+
+# Checkpointing / eval
+eval_every: 10
+save_every: 20
+no_initial_eval: false
+best_metric: "final_reward"
+
+# Rollout saving
+save_rollouts_every: 0
+num_tasks_per_save: null
+save_rollouts_to_hub: false
+
+# Other
+base_url: null
+log_path: "./logs"
+load_checkpoint_path: null
+checkpoint_path: "./checkpoints"
+push_to_hub: false
+wandb_project: null
+wandb_name: null

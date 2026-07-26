@@ -1,0 +1,20 @@
+# Actions-only baseline generator: no thought inference. Trains on
+# (state -> logged action) with advantage 1.0 — the ground-truth comparison for
+# the thoughts+actions SFT. Pair with --trainer_config sft.
+name: "act_prm"
+
+enable_thinking: false
+verbose: false
+
+infer_thoughts: false       # <- the baseline: skip thought sampling/scoring
+save_generations: true
+
+# (thought-inference knobs below are unused when infer_thoughts=false)
+max_thought_tokens: 96
+thought_temperature: 1.0
+use_fewshot: true
+max_steps_per_traj: null
+reward_method: "penalty"
+length_penalty: 0.15
+advantage_mode: "uniform"
+grpo_normalize: true

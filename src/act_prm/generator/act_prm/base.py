@@ -73,6 +73,20 @@ class ActPrmGenerator(HuggingFaceGenerator):
         thought_temperature: float = 1.0,
         use_fewshot: bool = True,
         max_steps_per_traj: int | None = None,
+        # How the per-candidate rewards become EpisodeStep advantages:
+        #   "em"       — clamped, group-normalized EM weights (>=0, sum 1) [EM/RL default]
+        #   "best"     — 1.0 on the selected (argmax-reward) thought, else 0 [hard SFT]
+        #   "top_half" — 1.0 on the better half by reward, else 0
+        #   "uniform"  — 1.0 on every thought
+        #   "grpo"     — mean-centered reward (r - mean), optionally /std; can be negative
+        advantage_mode: str = "em",
+        grpo_normalize: bool = True,
+        # infer_thoughts=False -> actions-only baseline: no thought sampling, train on
+        # (state -> logged action) with advantage 1.0 (the ground-truth comparison).
+        infer_thoughts: bool = True,
+        # Persist every generation group (thoughts, rewards, weights, selection) to JSONL.
+        save_generations: bool = True,
+        generations_path: str | None = None,
         **kwargs: Any,
     ) -> None:
         super().__init__(*args, **kwargs)
@@ -84,6 +98,15 @@ class ActPrmGenerator(HuggingFaceGenerator):
         self.thought_temperature = thought_temperature
         self.use_fewshot = use_fewshot
         self.max_steps_per_traj = max_steps_per_traj
+        self.advantage_mode = advantage_mode
+        self.grpo_normalize = grpo_normalize
+        self.infer_thoughts = infer_thoughts
+        self.save_generations = save_generations
+        # Default the generations log under the run's log_path.
+        _log_path = generations_path or (self.cfg.get("log_path", "./logs") if self.cfg else "./logs")
+        self.generations_path = (
+            generations_path if generations_path else f"{_log_path}/generations.jsonl"
+        )
 
     # ------------------------------------------------------------------
     # tokenization helpers
@@ -221,10 +244,42 @@ class ActPrmGenerator(HuggingFaceGenerator):
             likelihoods.append(float(np.exp(action_lp.mean())))  # in (0, 1]
         return likelihoods, gen_logprobs, state_action_tokens, state_len
 
+    @torch.no_grad()
+    def _score_action_only(
+        self, system_prompt: str, state_messages: list[dict[str, str]], target_action: str
+    ) -> tuple[list[float], list[int], int, float]:
+        """Actions-only baseline: score the logged action with NO thought.
+
+        Returns (action logprobs, (state+action) token ids, state_len, p(x|s))."""
+        device = self.llm.model.device
+        scoring_state = [{"role": "system", "content": system_prompt}] + [
+            m for m in state_messages if m["role"] != "system"
+        ]
+        state_len = self._n_tokens(scoring_state, add_generation_prompt=True)
+        full_msgs = scoring_state + [{"role": "assistant", "content": target_action}]
+        model_inputs, _ = get_batch_model_inputs(
+            input_messages=[full_msgs],
+            tools=None,
+            hf_tokenizer=self.hf_tokenizer,
+            padding_side="right",
+            enable_thinking=self.enable_thinking,
+            add_generation_prompt=False,
+            continue_final_message=False,
+        )
+        logits = self.llm.model(**model_inputs.to(device), use_cache=False).logits
+        gen_logprobs, state_action_tokens = get_action_logprobs_and_state_action_tokens(
+            logits=logits, state_lens=[state_len], **model_inputs.to(device)
+        )
+        del logits
+        action_lp = np.array(gen_logprobs[0], dtype=np.float64)
+        likelihood = float(np.exp(action_lp.mean())) if action_lp.size else 0.0
+        return gen_logprobs[0], state_action_tokens[0], state_len, likelihood
+
     def _rewards_and_weights(
         self, likelihoods: list[float], thought_lens: list[int]
     ) -> tuple[list[float], np.ndarray, int]:
-        """Compute per-candidate reward, EM weights, and the selected index."""
+        """Compute per-candidate reward, advantage (per ``advantage_mode``), and
+        the selected (best) index."""
         len_fracs = [min(1.0, n / self.max_thought_tokens) for n in thought_lens]
         if self.reward_method == "lift":
             # Reward = per-action-token likelihood, with a lexicographic selection
@@ -238,8 +293,48 @@ class ActPrmGenerator(HuggingFaceGenerator):
         else:  # "penalty" (default): p(x|s,z) minus a fraction-of-budget penalty
             rewards = [lik - self.length_penalty * lf for lik, lf in zip(likelihoods, len_fracs)]
             best = int(np.argmax(rewards))
-        weights = em_weights(rewards, likelihoods)
-        return rewards, weights, best
+        advantages = self._advantages(rewards, likelihoods, best)
+        return rewards, advantages, best
+
+    def _advantages(
+        self, rewards: list[float], likelihoods: list[float], best: int
+    ) -> np.ndarray:
+        """Map per-candidate rewards to EpisodeStep advantages per ``advantage_mode``."""
+        r = np.array(rewards, dtype=np.float64)
+        g = len(r)
+        mode = self.advantage_mode
+        if mode == "em":
+            return em_weights(rewards, likelihoods)
+        if mode == "best":
+            a = np.zeros(g, dtype=np.float64)
+            a[best] = 1.0
+            return a
+        if mode == "uniform":
+            return np.ones(g, dtype=np.float64)
+        if mode == "top_half":
+            k = max(1, (g + 1) // 2)  # ceil(g/2)
+            top = np.argsort(r)[::-1][:k]
+            a = np.zeros(g, dtype=np.float64)
+            a[top] = 1.0
+            return a
+        if mode == "grpo":
+            adv = r - r.mean()
+            if self.grpo_normalize:
+                adv = adv / (r.std() + 1e-8)
+            return adv
+        raise ValueError(f"Unknown advantage_mode: {mode!r}")
+
+    def _write_generations(self, records: list[dict[str, Any]]) -> None:
+        """Append generation records (one per action-step group) to JSONL."""
+        if not self.save_generations or not records:
+            return
+        import json
+        import os
+
+        os.makedirs(os.path.dirname(self.generations_path) or ".", exist_ok=True)
+        with open(self.generations_path, "a") as f:
+            for rec in records:
+                f.write(json.dumps(rec) + "\n")
 
     # ------------------------------------------------------------------
     # rollout entry point (overrides HuggingFaceGenerator.do_group_rollout)
@@ -286,6 +381,7 @@ class ActPrmGenerator(HuggingFaceGenerator):
 
         committed: list[str] = []
         all_groups: list[TrajectoryGroup] = []
+        gen_records: list[dict[str, Any]] = []
 
         with torch.no_grad():
             for t, idx in enumerate(action_indices):
@@ -297,19 +393,75 @@ class ActPrmGenerator(HuggingFaceGenerator):
                     hide_middle=hide_middle,
                 )
                 x_t = messages[idx]["content"]
+                scoring_state = [{"role": "system", "content": system_prompt}] + [
+                    m for m in state if m["role"] != "system"
+                ]
 
+                if not self.infer_thoughts:
+                    # Actions-only baseline: train on (state -> logged action), adv 1.0.
+                    act_lp, sa_tokens, state_len, likelihood = self._score_action_only(
+                        system_prompt, state, x_t
+                    )
+                    step = EpisodeStep(
+                        state=scoring_state,
+                        action={"role": "assistant", "content": x_t},
+                        next_obs=[],
+                        state_action_tokens=sa_tokens,
+                        state_len=state_len,
+                        old_logprobs=act_lp,
+                        temperature=temperature,
+                        reward=float(likelihood),
+                        done=True,
+                        truncated=False,
+                        timestep=t,
+                        try_step=try_step,
+                        batch_id=batch_id,
+                        sample_id=sample_id,
+                        generation_id=0,
+                        split=split,
+                        is_train="train" in split,
+                        advantage=1.0,
+                        advantage_is_computed=True,
+                        system_prompt=system_prompt,
+                        metrics={
+                            "likelihood": float(likelihood),
+                            "action_tokens": float(len(act_lp)),
+                            "selected": 1.0,
+                        },
+                    )
+                    all_groups.append(
+                        TrajectoryGroup(
+                            trajectories=[
+                                Trajectory(
+                                    episode_steps=[step],
+                                    try_step=try_step,
+                                    discount_factor=self.discount_factor,
+                                    final_reward=float(likelihood),
+                                )
+                            ],
+                            final_rewards=[float(likelihood)],
+                            discount_factor=self.discount_factor,
+                        )
+                    )
+                    gen_records.append({
+                        "batch_id": batch_id, "split": split, "sample_id": sample_id,
+                        "timestep": t, "try_step": try_step, "advantage_mode": "actions_only",
+                        "target_action": x_t, "thoughts": [], "likelihoods": [float(likelihood)],
+                        "rewards": [float(likelihood)], "advantages": [1.0], "thought_tokens": [],
+                        "best": 0,
+                    })
+                    continue
+
+                # Thought inference (E-step): sample G thoughts, score, weight.
                 thoughts, thought_lens = self._sample_thoughts(
                     state, x_t, committed, group_size, max_thought_tokens, temperature
                 )
                 likelihoods, gen_logprobs, sa_tokens, state_len = self._score_thoughts(
                     system_prompt, state, thoughts, x_t
                 )
-                rewards, weights, best = self._rewards_and_weights(likelihoods, thought_lens)
+                rewards, advantages, best = self._rewards_and_weights(likelihoods, thought_lens)
                 committed.append(thoughts[best])
 
-                scoring_state = [{"role": "system", "content": system_prompt}] + [
-                    m for m in state if m["role"] != "system"
-                ]
                 trajectories: list[Trajectory] = []
                 for g in range(len(thoughts)):
                     step = EpisodeStep(
@@ -330,8 +482,8 @@ class ActPrmGenerator(HuggingFaceGenerator):
                         generation_id=g,
                         split=split,
                         is_train="train" in split,
-                        # EM weight -> advantage, pre-computed so the trainer keeps it as-is
-                        advantage=float(weights[g]),
+                        # Advantage per advantage_mode, pre-computed so the trainer keeps it as-is
+                        advantage=float(advantages[g]),
                         advantage_is_computed=True,
                         system_prompt=system_prompt,
                         metrics={
@@ -356,6 +508,15 @@ class ActPrmGenerator(HuggingFaceGenerator):
                         discount_factor=self.discount_factor,
                     )
                 )
+                gen_records.append({
+                    "batch_id": batch_id, "split": split, "sample_id": sample_id,
+                    "timestep": t, "try_step": try_step, "advantage_mode": self.advantage_mode,
+                    "target_action": x_t, "thoughts": thoughts,
+                    "likelihoods": [float(x) for x in likelihoods],
+                    "rewards": [float(x) for x in rewards],
+                    "advantages": [float(x) for x in advantages],
+                    "thought_tokens": [int(n) for n in thought_lens], "best": int(best),
+                })
 
                 if self.verbose:
                     logger.info(
@@ -370,12 +531,13 @@ class ActPrmGenerator(HuggingFaceGenerator):
                         float(np.mean(thought_lens)),
                     )
 
-        # Advantages are pre-set (EM weights); compute_advantages() returns them
-        # unchanged, then we persist the groups to the replay buffer.
+        # Advantages are pre-set; compute_advantages() returns them unchanged, then
+        # we persist the groups to the replay buffer and (optionally) log generations.
         for group in all_groups:
             group.compute_advantages()
             self.replay_buffer.add_trajectory_group(group)
         self.replay_buffer.update_buffer_ds_and_df()
+        self._write_generations(gen_records)
 
         self.hf_tokenizer.padding_side = og_padding_side
         if was_training:

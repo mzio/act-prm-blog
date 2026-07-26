@@ -17,3 +17,17 @@ reward_method: "penalty"    # "penalty": p(x|s,z) - lambda * len_frac ; "lift": 
 length_penalty: 0.15        # lambda (used by reward_method: penalty)
 select_epsilon: 0.05        # reward_method: lift — likelihood tolerance for the shortest-thought selection
 lift_c: 4.0                 # reward_method: lift — length denominator constant
+
+# How per-candidate rewards become EpisodeStep advantages (composes with the trainer:
+# pg = importance-weighted PG; sft = plain weighted CE):
+#   em       -> clamped, group-normalized EM weights (EM/RL default)
+#   best     -> 1.0 on the best thought only (MLE SFT on argmax)
+#   top_half -> 1.0 on the better half by reward (all "positive")
+#   uniform  -> 1.0 on every thought
+#   grpo     -> mean-centered reward (r - mean), optionally /std (top-half positive)
+advantage_mode: "em"
+grpo_normalize: true        # advantage_mode: grpo — divide mean-centered reward by std
+
+# infer_thoughts=false -> actions-only baseline (no thoughts; train on state->action, adv 1.0)
+infer_thoughts: true
+save_generations: true      # append every generation group (thoughts, rewards, advantages) to <log_path>/generations.jsonl
