@@ -340,10 +340,10 @@ class RLTrainer(BaseTrainer):
                     **generate_and_save_trajectories_kwargs,
                 )
 
-            # Skip training if no_train is set (rollout-only mode)
-            if cfg.get("no_train", False):
-                continue
-
+            # NOTE: no_train (relabel / rollout-only) is handled AFTER the train-set
+            # rollouts are generated + saved below — otherwise `continue` here would
+            # skip train-set generation and the relabel would export ONLY eval
+            # trajectories (corpus train:0). See the split-coverage fix.
             # 1. Sample rollouts for training
             env.split = "train"
             rl_start_idx = batch_idx * cfg.batch_size
@@ -374,6 +374,12 @@ class RLTrainer(BaseTrainer):
             )
 
             self.replay_buffer.save_hf_dataset_to_disk(self.last_replay_buffer_path)
+
+            # Relabel / rollout-only mode: TRAIN rollouts are now generated AND saved
+            # to generations.jsonl with this fixed checkpoint — skip only the optimizer
+            # step (so the exported SFT corpus covers train + eval, not eval-only).
+            if cfg.get("no_train", False):
+                continue
 
             # 2. Update policy LLM with generated rollouts
             _t_optim = time.time()
