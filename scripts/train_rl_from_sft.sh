@@ -29,9 +29,11 @@ export HF_TOKEN="${HF_TOKEN:-$(cat "$HOME/models/token" 2>/dev/null || true)}"
 
 [ -f "$SFT_CKPT/adapter_model.safetensors" ] || { echo "no adapter_model.safetensors under $SFT_CKPT"; exit 1; }
 
+# OOM headroom: append --gradient_checkpointing (wired in main_pytorch) if the long
+# agentic rollouts run out of VRAM — off by default (~30% compute cost).
 UV_PROJECT_ENVIRONMENT=.venv-tau2 exec uv run --no-sync python main_pytorch.py \
   --env_config "tau2bench/$DOMAIN" --model_config hf_qwen3_4b_instruct \
   --lora_config r8_a16_linear --generator_config hf_grpo --trainer_config pg \
-  --replay_buffer_config default --resume_from "$SFT_CKPT" --gradient_checkpointing \
+  --replay_buffer_config default --resume_from "$SFT_CKPT" \
   --group_size 4 --batch_size 2 --max_turns 8 --max_tokens 2048 \
   --num_batches 25 --eval_every 5 --no_initial_eval --verbose "$@"

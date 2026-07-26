@@ -82,7 +82,7 @@ esac
 CMD=(uv run python main_pytorch.py
   --env_config "$ENVCFG" --model_config hf_qwen3_4b_instruct
   --lora_config r8_a16_linear --generator_config "$GEN" --trainer_config sft
-  --replay_buffer_config default --hide_observations --gradient_checkpointing
+  --replay_buffer_config default --hide_observations
   --group_size 4 --batch_size 4 --num_batches 60 --eval_every 10 --no_initial_eval
   --length_penalty 0.15 "${MODE[@]}" --verbose "$@")
 
