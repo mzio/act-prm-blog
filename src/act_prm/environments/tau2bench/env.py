@@ -176,18 +176,20 @@ class Tau2BenchEnv(Environment):
         self.nl_assertions_llm = nl_assertions_llm
         self.env_interface_llm = env_interface_llm
 
-        # Route any `metagen/<model>` LLM (user simulator / NL-assertions judge /
-        # env-interface) through the Llama-API passthrough (OpenAICompatibleLLM) by
-        # registering a litellm custom provider -- tau2 calls litellm.completion, so
-        # this must run before the tool-extraction below triggers a user turn.
-        # Lazy import (needs litellm, a tau2 dep) so the module loads without it.
-        if any(
-            str(_m).startswith("metagen/")
-            for _m in (self.user_llm, self.nl_assertions_llm, self.env_interface_llm)
-        ):
-            from .litellm_metagen import register
+        # Route user-simulator / NL-assertions-judge / env-interface models through a
+        # litellm custom provider (tau2 calls litellm.completion). Two backends:
+        #   metagen/<model>            -> Llama-API passthrough (needs LLAMA_API_KEY)
+        #   claude_agent_sdk/<model>   -> Claude Agent SDK (Claude Code OAuth; no API key)
+        # Register whichever prefix is in use. Lazy imports (need litellm / the SDK).
+        _sim_models = (self.user_llm, self.nl_assertions_llm, self.env_interface_llm)
+        if any(str(_m).startswith("metagen/") for _m in _sim_models):
+            from .litellm_metagen import register as _register_metagen
 
-            register()
+            _register_metagen()
+        if any(str(_m).startswith("claude_agent_sdk/") for _m in _sim_models):
+            from .litellm_claude_agent_sdk import register as _register_claude
+
+            _register_claude()
 
         # Tau2 hard-codes DEFAULT_LLM_NL_ASSERTIONS / _ENV_INTERFACE to gpt-4.1.
         # Always monkey-patch with the resolved values above so the judge

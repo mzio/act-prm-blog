@@ -40,6 +40,7 @@ tau2 = [
     "gymnasium>=1.2.0",
     "litellm",
     "openai",
+    "claude-agent-sdk",   # user simulator over Claude Code OAuth (claude_agent_sdk/<model>)
 ]
 
 [tool.uv.sources]
