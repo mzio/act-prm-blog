@@ -23,6 +23,8 @@ MDIR="/tmp/aprm/sft_sweep_$ENVNAME"; mkdir -p "$MDIR"
 log(){ echo "[$(date '+%m-%d %H:%M:%S')] $*" | tee -a "$MDIR/sweep.log"; }
 wait_gpu_free(){ while pgrep -f '[m]ain_pytorch.py' >/dev/null 2>&1; do sleep 60; done; sleep 10; }
 newest(){ ls -dt $1 2>/dev/null | head -1; }
+# a corpus is usable only if train.json is NON-EMPTY (guards the old train:0 relabel bug)
+corpus_ok(){ [ -s "$1/train.json" ] && [ "$(python3 -c "import json;print(len(json.load(open('$1/train.json'))))" 2>/dev/null || echo 0)" -gt 0 ]; }
 
 run_one(){  # $1=sft_variant  $2=label(run_tag)  $3=regime(hide|full)  $4..=extra flags
   local variant=$1 label=$2 regime=$3; shift 3
@@ -40,8 +42,8 @@ run_one(){  # $1=sft_variant  $2=label(run_tag)  $3=regime(hide|full)  $4..=extr
 # _last = step_last (fully trained). Each is an SFT arm. best-corpus is required; _last
 # is skipped if its relabel/export hasn't produced it.
 for k in "" _last; do
-  [ -f "$CORPUS/policy$k/train.json" ] || log "WARN: $CORPUS/policy$k missing (thoughts_policy$k skipped)"
-  [ -f "$CORPUS/base$k/train.json" ]   || log "WARN: $CORPUS/base$k missing (thoughts_base$k skipped)"
+  corpus_ok "$CORPUS/policy$k" || log "WARN: $CORPUS/policy$k missing/empty (thoughts_policy$k skipped)"
+  corpus_ok "$CORPUS/base$k"   || log "WARN: $CORPUS/base$k missing/empty (thoughts_base$k skipped)"
 done
 
 log "=== SFT sweep $ENVCFG : {actions_only, expert_thoughts, thoughts_{policy,base}x{best,last}} x {hide,full} ==="
@@ -49,8 +51,8 @@ for regime in hide full; do
   run_one actions_only    actions_only    "$regime"
   run_one expert_thoughts expert_thoughts "$regime"
   for k in "" _last; do   # "" = step_best corpus, _last = step_last corpus
-    [ -f "$CORPUS/policy$k/train.json" ] && run_one thoughts_policy "thoughts_policy$k" "$regime" --dataset_path "$CORPUS/policy$k"
-    [ -f "$CORPUS/base$k/train.json" ]   && run_one thoughts_base   "thoughts_base$k"   "$regime" --dataset_path "$CORPUS/base$k"
+    corpus_ok "$CORPUS/policy$k" && run_one thoughts_policy "thoughts_policy$k" "$regime" --dataset_path "$CORPUS/policy$k"
+    corpus_ok "$CORPUS/base$k"   && run_one thoughts_base   "thoughts_base$k"   "$regime" --dataset_path "$CORPUS/base$k"
   done
 done
 log "=== SFT sweep $ENVCFG done ==="

@@ -13,8 +13,8 @@ G="${CUDA_VISIBLE_DEVICES:-0}"
 L=/tmp/aprm/tail.log; mkdir -p /tmp/aprm
 echo "[$(date '+%m-%d %H:%M:%S')] === retail tail start (GPU $G) ===" | tee -a "$L"
 
-CUDA_VISIBLE_DEVICES=$G ./scripts/run_relabel_last.sh act_prm/tau2_retail >> "$L" 2>&1 \
-  || echo "[tail] run_relabel_last nonzero (continuing)" | tee -a "$L"
+CUDA_VISIBLE_DEVICES=$G ./scripts/run_relabel.sh act_prm/tau2_retail >> "$L" 2>&1 \
+  || echo "[tail] run_relabel nonzero (continuing)" | tee -a "$L"
 CUDA_VISIBLE_DEVICES=$G ./scripts/run_sft_sweep.sh    act_prm/tau2_retail >> "$L" 2>&1 \
   || echo "[tail] run_sft_sweep nonzero (continuing)" | tee -a "$L"
 CUDA_VISIBLE_DEVICES=$G ./scripts/run_retail_stage3.sh                    >> "$L" 2>&1 \

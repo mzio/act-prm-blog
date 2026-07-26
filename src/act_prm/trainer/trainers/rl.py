@@ -340,11 +340,10 @@ class RLTrainer(BaseTrainer):
                     **generate_and_save_trajectories_kwargs,
                 )
 
-            # Skip training if no_train is set (rollout-only mode)
-            if cfg.get("no_train", False):
-                continue
-
             # 1. Sample rollouts for training
+            # (no_train is handled AFTER generation below, so relabel/rollout-only mode
+            #  still generates + saves TRAIN rollouts to generations.jsonl — it must not
+            #  skip this, or the exported corpus would contain only eval trajectories.)
             env.split = "train"
             rl_start_idx = batch_idx * cfg.batch_size
             if rl_start_idx + cfg.batch_size > wen_shuffle:
@@ -374,6 +373,11 @@ class RLTrainer(BaseTrainer):
             )
 
             self.replay_buffer.save_hf_dataset_to_disk(self.last_replay_buffer_path)
+
+            # Relabel / rollout-only mode: train rollouts have now been generated AND saved
+            # (generations.jsonl) with this fixed checkpoint — skip only the optimizer step.
+            if cfg.get("no_train", False):
+                continue
 
             # 2. Update policy LLM with generated rollouts
             _t_optim = time.time()
