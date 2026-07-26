@@ -172,28 +172,20 @@ log "=== retail matrix start (GPU ${CUDA_VISIBLE_DEVICES:-?}) ==="
 log "waiting for any in-flight main_pytorch runs to finish before detection..."
 wait_gpu_free
 
-# --- Stage 1 + 1.5: run ONCE on split A. The relabel covers act_prm_train + act_prm_eval
-#     = ALL non-rl_eval tasks, so one corpus feeds BOTH SFT splits. The split is a
-#     Stage-2-ONLY choice, so there is NO split-B Stage-1 EM. ---------------------
-declare -A BEST CORP_A CORP_B
+# --- Stage 1 + 1.5: run ONCE on split A. The relabel covers act_prm_train +
+#     act_prm_eval = all non-rl_eval tasks. -------------------------------------
+declare -A BEST CORP_A
 for scorer in policy base; do
   BEST[$scorer]=$(stage1 A "$scorer")
   CORP_A[$scorer]=$(export_corpus A "$scorer" "${BEST[$scorer]:-}")
-  [ -n "${CORP_A[$scorer]:-}" ] && \
-    CORP_B[$scorer]=$(merge_corpus "${CORP_A[$scorer]}" "$CORPUS/tau2_retail_all/$scorer")
 done
 
-# --- Stage 2: the ONLY place the two splits differ ----------------------------
-#   A (heldout): SFT on 49 train, early-stop on 10 eval (eval_action_ppl).
-#   B (all):     SFT on all 59 non-rl_eval, no eval.
+# --- Stage 2: SPLIT A ONLY. SFT on 49 train, early-stop on 10 held-out eval
+#     (eval_action_ppl). (split B / tau2_retail_all is retained in configs but not run.)
 stage2 A actions_only
 stage2 A expert_thoughts
 [ -n "${CORP_A[policy]:-}" ] && stage2 A thoughts_policy --dataset_path "${CORP_A[policy]}"
 [ -n "${CORP_A[base]:-}"   ] && stage2 A thoughts_base   --dataset_path "${CORP_A[base]}"
-stage2 B actions_only
-stage2 B expert_thoughts
-[ -n "${CORP_B[policy]:-}" ] && stage2 B thoughts_policy --dataset_path "${CORP_B[policy]}"
-[ -n "${CORP_B[base]:-}"   ] && stage2 B thoughts_base   --dataset_path "${CORP_B[base]}"
 
 # ============================ STAGE 3 : env-RL (guarded) ======================
 if [ -x .venv-tau2/bin/python ] && [ -d tau2-bench ]; then
