@@ -292,6 +292,8 @@ def get_args() -> argparse.Namespace:
     parser.add_argument("--max_steps_per_traj", type=int, help="Max logged action-steps to infer thoughts for per trajectory")
     parser.add_argument("--max_traj_timestep", type=int, help="Only keep logged trajectories that finished within this many steps")
     parser.add_argument("--obs_max_chars", type=int, help="Max chars per observation before truncation")
+    parser.add_argument("--first_obs_to_show", type=int, help="Act-PRM state compaction: keep the first N observations (initial user prompt)")
+    parser.add_argument("--last_obs_to_show", type=int, help="Act-PRM state compaction: keep the last N observations (most recent tool/user response)")
     parser.add_argument(
         "--synthetic",
         action="store_true",

@@ -273,6 +273,8 @@ class ActPrmGenerator(HuggingFaceGenerator):
         messages = traj["messages"]
         system_prompt = traj["system_prompt"]
         obs_max_chars = getattr(env, "obs_max_chars", 2000)
+        first_obs_to_show = getattr(env, "first_obs_to_show", 1)
+        last_obs_to_show = getattr(env, "last_obs_to_show", 1)
         from act_prm.environments.act_prm_traces.data import compact_observations
 
         action_indices = [i for i, m in enumerate(messages) if m["role"] == "assistant"]
@@ -284,7 +286,12 @@ class ActPrmGenerator(HuggingFaceGenerator):
 
         with torch.no_grad():
             for t, idx in enumerate(action_indices):
-                state = compact_observations(messages[:idx], obs_max_chars)
+                state = compact_observations(
+                    messages[:idx],
+                    obs_max_chars,
+                    first_to_show=first_obs_to_show,
+                    last_to_show=last_obs_to_show,
+                )
                 x_t = messages[idx]["content"]
 
                 thoughts, thought_lens = self._sample_thoughts(

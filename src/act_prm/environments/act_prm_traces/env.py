@@ -41,6 +41,8 @@ class ActPrmTracesEnv(Environment):
         max_traj_timestep: int = 8,
         max_steps_per_traj: int = 3,
         obs_max_chars: int = 2000,
+        first_obs_to_show: int = 1,
+        last_obs_to_show: int = 1,
         system_prompt_file: str | None = None,
         synthetic: bool = False,
         **kwargs: Any,
@@ -52,6 +54,13 @@ class ActPrmTracesEnv(Environment):
         self.dataset = dataset
         self.max_steps_per_traj = max_steps_per_traj
         self.obs_max_chars = obs_max_chars
+        # State compaction: for any state the model sees (1) the system prompt,
+        # (2) the first `first_obs_to_show` observations (the first user prompt),
+        # (3) the last `last_obs_to_show` observations (the most recent tool/user
+        # response), and (4) ALL prior model/assistant messages (untouched);
+        # intermediate observations are replaced with "...".
+        self.first_obs_to_show = first_obs_to_show
+        self.last_obs_to_show = last_obs_to_show
         self.eval_splits = ["eval"]
 
         # Fast path: reuse a previously persisted (train, eval) pool from disk —

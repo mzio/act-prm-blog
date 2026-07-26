@@ -9,7 +9,11 @@ num_trajectories: 64        # logged train trajectories to stream
 eval_trajectories: 8        # held-out eval trajectories
 max_traj_timestep: 8        # only keep trajectories that finished within this many steps
 max_steps_per_traj: 3       # infer thoughts for the first N logged actions per trajectory
-obs_max_chars: 2000         # cap per-observation length (hide middle observations)
+obs_max_chars: 2000         # cap per-observation length (before hiding middle observations)
+# State compaction: the model sees system prompt + first user prompt + last
+# observation + ALL prior model messages; intermediate observations -> "...".
+first_obs_to_show: 1        # keep the first N observations (the initial user prompt)
+last_obs_to_show: 1         # keep the last N observations (the most recent tool/user response)
 
 # Base Environment knobs
 num_tries: 1
