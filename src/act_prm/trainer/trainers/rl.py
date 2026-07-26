@@ -641,9 +641,12 @@ class RLTrainer(BaseTrainer):
             _save_trajectories_to_hf_dataset(_trajectories, ds_name, metadata=metadata)
             logger.info("Saved trajectories to HF Dataset: %s", cfg.dataset_url_sft)
         except Exception as e:
+            # Best-effort: the Hub push is unreachable offline (fwdproxy blocks the
+            # HF CDN for this agent). The per-step generations.jsonl (written by the
+            # generator during the rollouts above) is the offline SFT source, so a
+            # failed Hub push must NOT hang the run on a breakpoint.
             _error_text = f"({type(e).__name__}: {e})"
-            logger.error("Failed to save trajectories to HF Dataset: %s", _error_text)
-            breakpoint()
+            logger.warning("Skipping HF Dataset push (offline / unreachable): %s", _error_text)
 
         if was_training:
             llm.model.train()
