@@ -136,6 +136,103 @@ def load_pools(dataset_path: str) -> tuple[list[dict[str, Any]], list[dict[str, 
     return train_pool, eval_pool
 
 
+def _obs_content(msg: dict[str, Any]) -> str:
+    """Observation content, tolerating the OpenAI-Responses ``output`` field."""
+    return msg.get("content") if msg.get("content") is not None else (msg.get("output") or "")
+
+
+def _terminal_row(rows: list[dict[str, Any]]) -> dict[str, Any]:
+    """The terminal step of a rollout: the done row (max timestep among done rows),
+    else the max-timestep row. Its ``state`` holds the full message history."""
+    dones = [r for r in rows if r.get("done")]
+    pool = dones or rows
+    return max(pool, key=lambda r: r.get("timestep", 0) or 0)
+
+
+def _traj_from_terminal(row: dict[str, Any], min_actions: int = 2) -> list[dict[str, str]] | None:
+    """Reconstruct an action-only trajectory from a terminal step-row's
+    ``state + action``. Each assistant turn is reduced to its explicit action
+    (``<tool_call>`` / ``Final Answer:``); assistant turns with no extractable
+    action (pure reasoning) are dropped. Returns None if < ``min_actions`` remain."""
+    messages = list(row["state"]) + [row["action"]]
+    traj: list[dict[str, str]] = []
+    for m in messages:
+        if m["role"] == "assistant":
+            action = extract_action(m.get("content") or "")
+            if action is None:  # pure-reasoning turn — drop (we re-infer thoughts)
+                continue
+            traj.append({"role": "assistant", "content": action})
+        else:
+            traj.append({"role": m["role"], "content": _obs_content(m)})
+    if sum(t["role"] == "assistant" for t in traj) < min_actions:
+        return None
+    return traj
+
+
+def load_grouped(
+    dataset: str,
+    uids: set[Any] | None = None,
+    min_actions: int = 2,
+) -> dict[Any, dict[str, Any]]:
+    """Stream a per-episode-step dataset (strl replay-buffer format), group rows by
+    (unique_data_sample_id, generation_id), and reconstruct one action-only
+    trajectory per **task** (the highest-return successful generation).
+
+    Works for both the tau2 (retail/airline) and finance dumps. If ``uids`` is
+    given, only those task ids are kept.
+
+    Returns: {task_uid: {messages, system_prompt, uid, generation_id}}.
+    """
+    from collections import defaultdict
+
+    from datasets import load_dataset
+
+    ds = load_dataset(dataset, split="train", streaming=True)
+    groups: dict[tuple[Any, Any], list[dict[str, Any]]] = defaultdict(list)
+    for row in ds:
+        uid = row.get("unique_data_sample_id")
+        if uids is not None and uid not in uids:
+            continue
+        groups[(uid, row.get("generation_id"))].append(row)
+
+    per_task: dict[Any, tuple[float, dict[str, Any]]] = {}
+    for (uid, gen), rows in groups.items():
+        term = _terminal_row(rows)
+        # success = terminal step is done with positive reward
+        if not (term.get("done") and (term.get("reward", 0) or 0) > 0):
+            continue
+        traj = _traj_from_terminal(term, min_actions=min_actions)
+        if traj is None:
+            continue
+        score = float(term.get("return_", 0) or 0)
+        if uid not in per_task or score > per_task[uid][0]:
+            per_task[uid] = (
+                score,
+                {
+                    "messages": traj,
+                    "system_prompt": term.get("system_prompt") or "You are a helpful assistant.",
+                    "uid": uid,
+                    "generation_id": gen,
+                },
+            )
+    return {uid: v[1] for uid, v in per_task.items()}
+
+
+def load_split(split_file: str) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    """Load (act_prm_train, act_prm_eval) trajectory pools from a 3-way split JSON
+    written by ``scripts/make_split.py`` (keys: dataset, act_prm_train, act_prm_eval,
+    rl_eval). The rl_eval tasks are intentionally NOT loaded — held out for RL eval."""
+    split = json.loads(Path(split_file).read_text())
+    dataset = split["dataset"]
+    train_uids = [tuple(u) if isinstance(u, list) else u for u in split["act_prm_train"]]
+    eval_uids = [tuple(u) if isinstance(u, list) else u for u in split["act_prm_eval"]]
+    want = set(train_uids) | set(eval_uids)
+    by_uid = load_grouped(dataset, uids=want)
+    train_pool = [by_uid[u] for u in train_uids if u in by_uid]
+    eval_pool = [by_uid[u] for u in eval_uids if u in by_uid]
+    return train_pool, eval_pool
+
+
 def compact_observations(
     messages: list[dict[str, str]],
     obs_max_chars: int | None,

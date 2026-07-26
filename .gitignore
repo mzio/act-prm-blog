@@ -217,7 +217,8 @@ __marimo__/
 # Streamlit
 .streamlit/secrets.toml
 docs/
-data/
+/data/*
+!/data/splits/
 
 # act-prm training artifacts
 /checkpoints/

@@ -1,0 +1,22 @@
+# tau2-bench retail (GPT-5-mini rollouts), action-only for Act-PRM.
+# Uses a task-level split: act_prm_train + act_prm_eval are loaded; the rl_eval
+# tasks are held out (never seen by act-prm) for eventual RL evaluation.
+name: "act_prm_traces"
+
+dataset: "mzio/aprm-tau2-retail-gpt5m_med-gs8-s0-train"
+split_file: "data/splits/tau2_retail.json"
+dataset_path: "data/tau2_retail"   # first run streams via split + caches; reruns load offline
+synthetic: false
+
+num_trajectories: null      # use all act_prm_train tasks in the split
+eval_trajectories: null     # use all act_prm_eval tasks in the split
+max_steps_per_traj: null    # infer a thought for every logged action
+obs_max_chars: null         # full observations (cap with an int if VRAM-constrained)
+
+# Observation hiding OFF for thought generation (reserved for downstream SFT/RL)
+hide_observations: false
+first_obs_to_show: 1
+last_obs_to_show: 1
+
+num_tries: 1
+seed: 0

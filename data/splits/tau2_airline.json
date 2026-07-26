@@ -1,0 +1,53 @@
+{
+ "dataset": "mzio/aprm-tau2-airline-gpt5m_med-gs4-s0-train",
+ "name": "tau2_airline",
+ "seed": 0,
+ "fractions": {
+  "act_prm_train": 0.7,
+  "act_prm_eval": 0.15,
+  "rl_eval": 0.15
+ },
+ "counts": {
+  "total_usable_tasks": 31,
+  "act_prm_train": 21,
+  "act_prm_eval": 4,
+  "rl_eval": 6
+ },
+ "act_prm_train": [
+  11,
+  18,
+  26,
+  24,
+  13,
+  0,
+  15,
+  8,
+  31,
+  21,
+  28,
+  4,
+  29,
+  10,
+  27,
+  12,
+  6,
+  14,
+  25,
+  19,
+  3
+ ],
+ "act_prm_eval": [
+  17,
+  7,
+  22,
+  23
+ ],
+ "rl_eval": [
+  16,
+  1,
+  20,
+  30,
+  2,
+  5
+ ]
+}

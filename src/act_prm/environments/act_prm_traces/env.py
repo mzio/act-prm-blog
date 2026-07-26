@@ -18,9 +18,9 @@ from ..types import EnvironmentState, EnvironmentStepResult
 from .data import (
     DATASET,
     load_pools,
+    load_split,
     load_synthetic,
     load_trajectories,
-    load_trajectories_split,
     pools_exist,
     save_pools,
 )
@@ -87,8 +87,10 @@ class ActPrmTracesEnv(Environment):
             eval_pool = pool[n_train:] or pool[:1]
             logger.info("ActPrmTracesEnv: using %d synthetic trajectories", len(pool))
         elif split_file:
+            # 3-way task split (act_prm_train / act_prm_eval / rl_eval holdout);
+            # rl_eval tasks are held out for later RL eval and not loaded here.
             logger.info("ActPrmTracesEnv: loading trajectories via split %s", split_file)
-            train_pool, eval_pool = load_trajectories_split(split_file, dataset)
+            train_pool, eval_pool = load_split(split_file)
             if num_trajectories:
                 train_pool = train_pool[:num_trajectories]
             if eval_trajectories:
