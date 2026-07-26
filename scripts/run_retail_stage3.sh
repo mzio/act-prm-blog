@@ -29,7 +29,7 @@ uv run --no-sync python scripts/analyze_sft.py act_prm/tau2_retail >> "$MDIR/sta
 
 # 2) Best SFT init per variant — prefer full-context (RL sees full obs), fall back to hide-obs
 declare -A CKPT
-for v in actions_only expert_thoughts thoughts_policy thoughts_base; do
+for v in actions_only expert_thoughts thoughts_policy thoughts_base thoughts_policy_last thoughts_base_last; do
   c=$(newest "$CKROOT/retail_s2_${v}_heldout_fullctx-*/step_best")
   [ -z "$c" ] && c=$(newest "$CKROOT/retail_s2_${v}_heldout-*/step_best")
   CKPT[$v]="$c"; log "  init[$v] = ${c:-<none>}"
@@ -53,7 +53,7 @@ fi
 log "SMOKE OK (metrics: $SMOKE_M) — launching RL matrix"
 
 # 4) RL from each variant's best SFT checkpoint (serial, resumable)
-for v in actions_only expert_thoughts thoughts_policy thoughts_base; do
+for v in actions_only expert_thoughts thoughts_policy thoughts_base thoughts_policy_last thoughts_base_last; do
   ck="${CKPT[$v]:-}"; [ -z "$ck" ] && { log "RL $v: no ckpt, skip"; continue; }
   tag="retail_s3_${v}_fullctx"
   [ -n "$(newest "$S3ROOT/${tag}-*/step_best")" ] && { log "RL $v: done, skip"; continue; }

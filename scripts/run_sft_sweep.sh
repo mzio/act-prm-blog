@@ -24,9 +24,9 @@ log(){ echo "[$(date '+%m-%d %H:%M:%S')] $*" | tee -a "$MDIR/sweep.log"; }
 wait_gpu_free(){ while pgrep -f '[m]ain_pytorch.py' >/dev/null 2>&1; do sleep 60; done; sleep 10; }
 newest(){ ls -dt $1 2>/dev/null | head -1; }
 
-run_one(){  # $1=variant  $2=regime(hide|full)  $3..=extra flags (e.g. --dataset_path ...)
-  local variant=$1 regime=$2; shift 2
-  local tag="${DOM}_s2_${variant}_heldout"; [ "$regime" = full ] && tag="${tag}_fullctx"
+run_one(){  # $1=sft_variant  $2=label(run_tag)  $3=regime(hide|full)  $4..=extra flags
+  local variant=$1 label=$2 regime=$3; shift 3
+  local tag="${DOM}_s2_${label}_heldout"; [ "$regime" = full ] && tag="${tag}_fullctx"
   if [ -n "$(newest "$CKROOT/${tag}-*/step_best")" ]; then log "$tag: done, skip"; return 0; fi
   local fc=(); [ "$regime" = full ] && fc=(SFT_FULLCTX=1)
   log "$tag: SFT ($regime-obs) $*"
@@ -36,14 +36,21 @@ run_one(){  # $1=variant  $2=regime(hide|full)  $3..=extra flags (e.g. --dataset
     && log "$tag: done" || log "$tag: FAILED (see $MDIR/${tag}.log)"
 }
 
-[ -f "$CORPUS/policy/train.json" ] || log "WARN: $CORPUS/policy missing — thoughts_policy will fail (run Stage 1.5 first)"
-[ -f "$CORPUS/base/train.json" ]   || log "WARN: $CORPUS/base missing — thoughts_base will fail (run Stage 1.5 first)"
+# Thought corpora come from two EM relabel checkpoints: "" = step_best (early-peaked),
+# _last = step_last (fully trained). Each is an SFT arm. best-corpus is required; _last
+# is skipped if its relabel/export hasn't produced it.
+for k in "" _last; do
+  [ -f "$CORPUS/policy$k/train.json" ] || log "WARN: $CORPUS/policy$k missing (thoughts_policy$k skipped)"
+  [ -f "$CORPUS/base$k/train.json" ]   || log "WARN: $CORPUS/base$k missing (thoughts_base$k skipped)"
+done
 
-log "=== SFT sweep $ENVCFG : 4 variants x {hide-obs, full-context} ==="
+log "=== SFT sweep $ENVCFG : {actions_only, expert_thoughts, thoughts_{policy,base}x{best,last}} x {hide,full} ==="
 for regime in hide full; do
-  run_one actions_only    "$regime"
-  run_one expert_thoughts "$regime"
-  run_one thoughts_policy "$regime" --dataset_path "$CORPUS/policy"
-  run_one thoughts_base   "$regime" --dataset_path "$CORPUS/base"
+  run_one actions_only    actions_only    "$regime"
+  run_one expert_thoughts expert_thoughts "$regime"
+  for k in "" _last; do   # "" = step_best corpus, _last = step_last corpus
+    [ -f "$CORPUS/policy$k/train.json" ] && run_one thoughts_policy "thoughts_policy$k" "$regime" --dataset_path "$CORPUS/policy$k"
+    [ -f "$CORPUS/base$k/train.json" ]   && run_one thoughts_base   "thoughts_base$k"   "$regime" --dataset_path "$CORPUS/base$k"
+  done
 done
 log "=== SFT sweep $ENVCFG done ==="
