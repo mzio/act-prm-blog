@@ -578,6 +578,7 @@ def get_args() -> argparse.Namespace:
         "resume_from",  # a long checkpoint path; must not go into the run name (filename too long)
         "project_name",
         "run_tag",  # prepended explicitly below; don't also auto-encode it
+        "dataset_path",  # a long path; run_tag/env already identify the run (kept the name < 255)
         "verbose",
         "streamer",
     ]
@@ -589,6 +590,13 @@ def get_args() -> argparse.Namespace:
         # Sanitize like get_run_name does, then prepend so the leaf dir is self-describing.
         _tag = str(args.run_tag).replace("-", "_").replace(".", "_").replace("/", "_")
         args.run_name = f"{_tag}-{args.run_name}"
+    # Hard-cap the leaf dir component: a single path segment must stay < 255 bytes
+    # (ext4 limit) or os.makedirs raises OSError Errno 36. Keep the readable prefix and
+    # append a short hash so truncated names stay unique.
+    if len(args.run_name) > 200:
+        import hashlib
+        _h = hashlib.md5(args.run_name.encode()).hexdigest()[:8]
+        args.run_name = f"{args.run_name[:190]}-{_h}"
     logger.info("Run name: %s", args.run_name)
 
     # Setup log path and checkpoint / data-saving path
