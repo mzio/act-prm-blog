@@ -544,7 +544,9 @@ class RLTrainer(BaseTrainer):
         except Exception as e:
             _error_text = f"({type(e).__name__}: {e})"
             logger.error("Failed to save trajectories to HF Dataset: %s", _error_text)
-            breakpoint()
+            # Don't breakpoint() in automated/offline runs (background jobs have no
+            # stdin -> hangs forever). The per-step generations.jsonl is the offline
+            # SFT source anyway; a failed Hub push must not stall the relabel pass.
 
         if was_training:
             llm.model.train()
