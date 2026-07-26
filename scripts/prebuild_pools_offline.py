@@ -44,6 +44,12 @@ def main() -> None:
     ap.add_argument("--split_file", required=True)
     ap.add_argument("--dataset_path", required=True)
     ap.add_argument("--parquet", default=None)
+    ap.add_argument(
+        "--keep_expert_thoughts",
+        action="store_true",
+        help="Keep each assistant turn's ORIGINAL content (thought+action) instead of "
+        "stripping to action-only — builds the expert_thoughts SFT pool offline.",
+    )
     args = ap.parse_args()
 
     dataset_repo = json.loads(Path(args.split_file).read_text())["dataset"]
@@ -63,7 +69,9 @@ def main() -> None:
 
     hfds.load_dataset = patched
     try:
-        train_pool, eval_pool = aprm_data.load_split(args.split_file)
+        train_pool, eval_pool = aprm_data.load_split(
+            args.split_file, keep_expert_thoughts=args.keep_expert_thoughts
+        )
     finally:
         hfds.load_dataset = real_load_dataset
 
