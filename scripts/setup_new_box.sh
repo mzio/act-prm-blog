@@ -17,6 +17,16 @@ export HF_TOKEN="${HF_TOKEN:-$(cat "$HOME/models/token" 2>/dev/null || true)}"
 # Keep the model cache where the model configs' cache_dir points (per-box, not dotsynced).
 export HF_HOME="${HF_HOME:-/data/users/$USER/models/hf_cache}"
 
+# uv isn't on a non-interactive shell's PATH by default — add the common install
+# locations, and install it if still missing (uv installer honors the proxy above).
+export PATH="$HOME/.local/bin:$HOME/.cargo/bin:/usr/local/bin:$PATH"
+if ! command -v uv >/dev/null 2>&1; then
+  echo "==> uv not found; installing (via proxy)"
+  curl -LsSf https://astral.sh/uv/install.sh | sh
+  export PATH="$HOME/.local/bin:$HOME/.cargo/bin:$PATH"
+fi
+command -v uv >/dev/null 2>&1 || { echo "ERROR: uv still not found — install it and re-run"; exit 1; }
+
 echo "==> 1/3 base venv (uv sync)"
 uv sync
 
