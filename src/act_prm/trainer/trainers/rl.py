@@ -190,13 +190,21 @@ class RLTrainer(BaseTrainer):
         model = llm.model
         was_training = model.training
         model.eval()
+        # Eval steps are built with is_train=False (they aren't training data), but
+        # the shared prepare_minibatch filters on is_train. These eval trajectories
+        # are ephemeral (never added to the replay buffer / trained on), so flip the
+        # flag so their (thought+action) spans get scored here. drop_zero_advantage
+        # is off so EVERY eval action span is measured, not just the selected best.
+        for _traj in trajectories:
+            for _st in _traj.episode_steps:
+                _st.is_train = True
         loader, _ = self.prepare_minibatch(
             new_trajectories=trajectories,
             hf_tokenizer=hf_tokenizer,
             batch_size=1,
             shuffle=False,
             max_seq_len=cfg.get("max_seq_len", 32768),
-            drop_zero_advantage=cfg.get("drop_zero_advantage", False),
+            drop_zero_advantage=False,
         )
         device = model.device
         total_nll = 0.0
@@ -354,6 +362,16 @@ class RLTrainer(BaseTrainer):
                         title=f"Teacher-forced Eval Metrics, Step {batch_idx}",
                         style="bright_yellow",
                     )
+                # Fallback: if the teacher-forced pass produced no eval/ppl (e.g. no
+                # trainable eval spans), derive it from the generator's per-token
+                # action likelihood (likelihood = exp(mean logprob) = 1/ppl), so
+                # best_metric='eval/ppl' selection never crashes.
+                if "eval/ppl" not in eval_rollout_metrics:
+                    _lik_keys = [k for k in eval_rollout_metrics if k.endswith("/likelihood")]
+                    if _lik_keys:
+                        _lik = eval_rollout_metrics[_lik_keys[0]]
+                        if _lik and _lik > 0:
+                            eval_rollout_metrics["eval/ppl"] = float(1.0 / _lik)
                 metrics.update(eval_rollout_metrics)
 
                 # Save best checkpoints (by cfg.best_metric; e.g. eval/ppl for SFT).
@@ -372,11 +390,14 @@ class RLTrainer(BaseTrainer):
                     logger.info(
                         f"RL EVAL (Step {batch_idx}): Updated best metric to {last_metric} at step {batch_idx}"
                     )
+                    # Avoid a double "eval/eval/..." prefix when best_metric already
+                    # carries a split prefix (e.g. "eval/ppl").
+                    _best_key = self.best_metric_name if "/" in self.best_metric_name else f"eval/{self.best_metric_name}"
                     metrics.update(
                         {
-                            f"eval/{self.best_metric_name}": last_metric,
-                            f"eval/{self.best_metric_name}_best": self.best_metric,
-                            f"eval/{self.best_metric_name}_best_step": self.best_metric_step,
+                            _best_key: last_metric,
+                            f"{_best_key}_best": self.best_metric,
+                            f"{_best_key}_best_step": self.best_metric_step,
                         }
                     )
                     try:  # Saving replay buffer
