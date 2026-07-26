@@ -92,6 +92,26 @@ shell, `UV_PROJECT_ENVIRONMENT=.venv-tau2 uv sync --extra tau2`). tau2 tasks are
 task-split-agnostic here; the `rl_eval` hold-outs from `data/splits/*` are the
 intended eval tasks for this phase.
 
+## Full pipeline (thought-gen → SFT → RL) + scripts
+
+1. **Stage 1 — thought generation (Act-PRM EM)** on the expert datasets:
+   `./scripts/train.sh --env_config act_prm/tau2_retail --generator_config act_prm
+   --trainer_config pg [--score_with_base | --no-score_with_base] ...` (or add
+   `--no_train` for a generate-only relabel pass). Generates over `act_prm_train`
+   (+`act_prm_eval`), holding out `rl_eval`; saves every group to
+   `<log_path>/generations.jsonl`.
+2. **Stage 2 — SFT with hide-observations** (`scripts/train_sft.sh <env> <variant>`):
+   `actions_only` (expert baseline), `thoughts_policy`, `thoughts_base`. Uses the
+   `SFTTrainer` (plain weighted CE) + `advantage_mode best` + `--hide_observations`.
+   For SFT over ALL non-`rl_eval` tasks, regenerate the split with `--eval_frac 0`.
+3. **Stage 3 — RL from the SFT checkpoint** (`scripts/train_rl_from_sft.sh <domain>
+   <sft_ckpt>`): warm-starts the SFT LoRA (`--resume_from`) and RLs on the tau2-gym
+   env. (rl_eval hold-out → tau2-task-index mapping is still a TODO; see the script.)
+
+Setup on a fresh box: `scripts/setup_new_box.sh`. Multi-run VRAM (H100 ~95 GiB):
+uncapped Act-PRM EM peaks ~72 GiB/run (one per GPU); cap with `--obs_max_chars` or
+`--group_size 2` to fit two per GPU.
+
 ## Gotchas
 
 - The env tokenizer is loaded from `pretrained_model_config` then overwritten with
@@ -102,4 +122,11 @@ intended eval tasks for this phase.
 - Logging uses `tinker_cookbook.utils.ml_log` (local JSON under `--log_path`, plus
   W&B if `--project_name` / `WANDB_API_KEY` are set) — importing it does **not**
   require a Tinker API key.
+- **HuggingFace / GitHub access from the devserver:** huggingface.co isn't directly
+  reachable but Meta's forward proxy is — `export https_proxy=http://fwdproxy:8080
+  http_proxy=http://fwdproxy:8080` and `HF_TOKEN=$(cat ~/models/token)` (the run
+  scripts do this). **github.com is BLOCKED by fwdproxy** (403), so git deps like
+  `tau2-bench` must be cloned from a shell that reaches github, and pushes happen from
+  your own terminal. Model/dataset caches live at `/data/users/$USER/models/hf_cache`
+  (per-box, not dotsynced) — re-download on a fresh box.
 - No test suite or linter is configured.

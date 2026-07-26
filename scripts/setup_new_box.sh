@@ -31,8 +31,14 @@ echo "==> 1/3 base venv (uv sync)"
 uv sync
 
 echo "==> 2/3 policy model into $HF_HOME (per-box cache; re-download on a fresh box)"
+# HuggingFace access from a devserver: huggingface.co is NOT directly reachable, but
+# Meta's forward proxy is — https_proxy=http://fwdproxy:8080 (set above). Auth for
+# gated/private repos uses HF_TOKEN (a hf_... token); put it at ~/models/token (this
+# script reads it) or `export HF_TOKEN=...`. github.com is BLOCKED by fwdproxy, so
+# git deps (e.g. tau2-bench) must be cloned from a shell that reaches github.
+[ -n "${HF_TOKEN:-}" ] || echo "  WARN: no HF_TOKEN (set ~/models/token or export HF_TOKEN) — gated/private repos will 401"
 uv run hf download Qwen/Qwen3-4B-Instruct-2507 \
-  || echo "  (couldn't download — set configs/model/*.yaml cache_dir to an existing cache, or HF_HUB_OFFLINE=1)"
+  || echo "  (couldn't download — check https_proxy=$http_proxy + HF_TOKEN, or set cache_dir/HF_HUB_OFFLINE=1)"
 
 echo "==> 3/3 data: act-prm task splits are committed in data/splits/; the per-task"
 echo "    trajectory pools (data/*) rebuild from the HF datasets via the proxy on first run."

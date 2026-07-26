@@ -41,6 +41,10 @@ compute_post_kl: false
 kl_penalty_coef: 0.0
 kl_discount_factor: 0.0
 
+# --no_train: generate + save thoughts (generations.jsonl) WITHOUT a PG step — a
+# "relabel pass" to produce the thought corpus over the whole split.
+no_train: false
+
 # Checkpointing / eval
 eval_every: 10
 save_every: 20
