@@ -501,6 +501,7 @@ class ActPrmGenerator(HuggingFaceGenerator):
                         "target_action": x_t, "thoughts": [], "likelihoods": [float(likelihood)],
                         "rewards": [float(likelihood)], "advantages": [1.0], "thought_tokens": [],
                         "best": 0,
+                        "state": scoring_state, "system_prompt": system_prompt,
                     })
                     continue
 
@@ -568,6 +569,9 @@ class ActPrmGenerator(HuggingFaceGenerator):
                     "rewards": [float(x) for x in rewards],
                     "advantages": [float(x) for x in advantages],
                     "thought_tokens": [int(n) for n in thought_lens], "best": int(best),
+                    # State + system prompt so a relabel pass yields a self-contained,
+                    # offline-retokenizable SFT dataset (see the act_prm_replay generator).
+                    "state": scoring_state, "system_prompt": system_prompt,
                 })
 
                 if self.verbose:

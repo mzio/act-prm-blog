@@ -562,6 +562,11 @@ def get_args() -> argparse.Namespace:
         "load_checkpoint_path",
         "lora_checkpoint_path",
         "resume_from",  # a long checkpoint path; must not go into the run name (filename too long)
+        # Long path-valued args below: encoding them into the run_name (a single
+        # directory component) blows past the 255-char filesystem limit -> OSError
+        # "File name too long" (only actions_only, which set none, used to survive).
+        "dataset_path",
+        "sft_data",  # act_prm_replay: path to a relabel generations.jsonl (Stage-2 (b))
         "project_name",
         "verbose",
         "streamer",
