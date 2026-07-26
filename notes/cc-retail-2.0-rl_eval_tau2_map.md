@@ -133,3 +133,10 @@ tau2's `AgentGymEnv` is indexed by task position/id; confirm the env loads
 `domains/retail/tasks.json` in id order (id == list index here, ids are "0".."113"
 contiguous) so the recommended id set can be passed straight through as the eval task
 indices.
+
+## DECISION (user-confirmed): hybrid eval, label which is which
+Stage-3 RL evaluates on BOTH, reported separately:
+- **Primary (benchmark generalization):** the **19 clean tau2 test tasks** — never-in-dataset ∪ rl_eval-in-test — `{5,12,26,33,36,39,49,51,64,65,68,70,71,77,90,94,100,101,102}`. Uncontaminated by Stage-1/2 training.
+- **Internal hold-out:** the **12 `rl_eval` tasks** → tau2 ids `{19,23,26,35,49,77,91,99,100,102,104,112}`.
+- **Never** report the full 40-task tau2 test split (20/40 are contaminated: their trajectories were in `act_prm_train ∪ act_prm_eval`).
+Remaining wiring (#24): make the tau2 `AgentGymEnv` eval on an explicit task-id list (ids are contiguous 0..113 = list index, verified) — add an `eval_task_ids` path + thread the two labeled sets into `run_retail_stage3.sh`. Shared with airline → coordinate the env edit to avoid divergence.
