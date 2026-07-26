@@ -50,8 +50,8 @@ relabel_export(){  # scorer ckpt tag out gpu
     log "relabel $tag (GPU $gpu) from $ckpt"
     CUDA_VISIBLE_DEVICES="$gpu" ./scripts/train.sh --env_config "$ENVC" --generator_config act_prm \
       --trainer_config pg --model_config $MODEL --lora_config r8_a16_linear --replay_buffer_config default \
-      $swb --no_train --resume_from "$ckpt" --advantage_mode best --group_size 4 --batch_size 4 \
-      --num_batches 40 --no_initial_eval --length_penalty 0.15 --save_generations \
+      $swb --no_train --resume_from "$ckpt" --advantage_mode best --group_size 4 --batch_size 3 \
+      --num_batches 7 --eval_group_size 4 --no_initial_eval --length_penalty 0.15 --save_generations \
       --run_tag "$tag" --verbose > "$MDIR/${tag}.log" 2>&1
     gen=$(newest "$LOGROOT/${tag}-*/generations.jsonl")
   fi
