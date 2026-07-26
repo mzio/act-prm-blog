@@ -8,6 +8,11 @@ split_file: "data/splits/tau2_retail.json"
 dataset_path: "data/tau2_retail"   # first run streams via split + caches; reruns load offline
 synthetic: false
 
+# Keep the original expert reasoning+action per assistant turn as the SFT target
+# (the "expert thought-action" dataset) instead of the action-only span. Use a
+# DISTINCT dataset_path for this variant, since processed pools are cached.
+keep_expert_thoughts: false
+
 num_trajectories: null      # use all act_prm_train tasks in the split
 eval_trajectories: null     # use all act_prm_eval tasks in the split
 max_steps_per_traj: null    # infer a thought for every logged action

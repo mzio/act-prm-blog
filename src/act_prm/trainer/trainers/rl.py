@@ -8,7 +8,6 @@ LoRA helpers are siblings in ``strl.trainer``.
 """
 
 import logging
-import math
 import os
 import random  # noqa: F401 -- parity with prior import surface
 import time
@@ -54,11 +53,9 @@ def get_item(x: Any) -> int | float:
 
 
 def _lower_is_better(metric: str) -> bool:
-    """True for metrics where a SMALLER value is better (loss / perplexity /
-    negative-log-likelihood), matched by substring so ``eval/ppl``,
-    ``train/loss``, etc. are all covered."""
+    """True for metrics where smaller is better (loss / perplexity)."""
     m = metric.lower()
-    return any(t in m for t in ("loss", "ppl", "perplex", "nll"))
+    return "loss" in m or "ppl" in m or "perplexity" in m
 
 
 def is_better(x: float, y: float, metric: str) -> bool:
@@ -94,8 +91,8 @@ class RLTrainer(BaseTrainer):
         self.last_replay_buffer_path = join(self.checkpoint_path, "replay_buffer")
 
         self.best_metric_name = cfg.best_metric
-        # Seed the running-best in the losing direction so the first eval always
-        # improves it: +inf for lower-is-better metrics (loss/ppl), else -inf.
+        # Best direction depends on the metric: loss / perplexity are lower-is-better
+        # (e.g. best_metric: eval_action_ppl for SFT early-stop), else higher-is-better.
         self.best_metric = float("inf") if _lower_is_better(self.best_metric_name) else float("-inf")
         self.best_metric_step = -1
 
@@ -162,84 +159,19 @@ class RLTrainer(BaseTrainer):
             "num_gen_tokens": num_gen_tokens,
         }
 
-    @torch.no_grad()
-    def _teacher_forced_eval_metrics(
+    def eval_extra_metrics(
         self,
-        llm: "HuggingFaceLLM",
-        hf_tokenizer: Any,
-        trajectories: list[Any],
-        cfg: DictConfig,
+        trajectories: Any,
+        split: str = "eval",
+        checkpoint_name: str | None = None,
     ) -> dict[str, float]:
-        """Held-out teacher-forced metrics over the supervised (thought+action)
-        span of the eval trajectories:
+        """Hook for extra offline eval metrics beyond the rollout metrics.
 
-          * ``eval/ppl``            — token-level perplexity, exp(mean NLL)
-          * ``eval/token_accuracy`` — fraction of label tokens whose greedy
-                                      next-token argmax matches the target
-          * ``eval/loss``           — mean NLL (nats)
-          * ``eval/num_scored_tokens``
-
-        This is the intended SFT early-stopping signal (``best_metric: eval/ppl``,
-        lower is better). Uses the same minibatch preparation as training so the
-        scored span matches exactly what SFT trains on (drop_zero_advantage keeps
-        only the selected best thought under advantage_mode=best). Returns {} if
-        there are no trainable eval steps.
+        Default: none. :class:`SFTTrainer` overrides this to add action-token
+        perplexity + accuracy over the eval target span. Returned keys are merged
+        into the eval metrics dict (and so are eligible for ``best_metric``).
         """
-        if not trajectories:
-            return {}
-        model = llm.model
-        was_training = model.training
-        model.eval()
-        # Eval steps are built with is_train=False (they aren't training data), but
-        # the shared prepare_minibatch filters on is_train. These eval trajectories
-        # are ephemeral (never added to the replay buffer / trained on), so flip the
-        # flag so their (thought+action) spans get scored here. drop_zero_advantage
-        # is off so EVERY eval action span is measured, not just the selected best.
-        for _traj in trajectories:
-            for _st in _traj.episode_steps:
-                _st.is_train = True
-        loader, _ = self.prepare_minibatch(
-            new_trajectories=trajectories,
-            hf_tokenizer=hf_tokenizer,
-            batch_size=1,
-            shuffle=False,
-            max_seq_len=cfg.get("max_seq_len", 32768),
-            drop_zero_advantage=False,
-        )
-        device = model.device
-        total_nll = 0.0
-        total_correct = 0.0
-        total_tokens = 0.0
-        for batch in loader:
-            label_mask = batch["label_mask"].to(device).float()
-            model_inputs = {
-                k: v.to(device) for k, v in batch.items() if k in ("input_ids", "attention_mask")
-            }
-            logits = model(**model_inputs, use_cache=False).logits[:, :-1, :]
-            labels = model_inputs["input_ids"][:, 1:]
-            # log p(label_t | x_<t): (B, L-1)
-            logprobs = -F.cross_entropy(
-                logits.transpose(1, 2).to(dtype=torch.float32), labels, reduction="none"
-            )
-            preds = logits.argmax(dim=-1)
-            correct = ((preds == labels).float() * label_mask).sum().item()
-            n_tok = label_mask.sum().item()
-            total_nll += -(logprobs * label_mask).sum().item()
-            total_correct += correct
-            total_tokens += n_tok
-            del logits, labels, logprobs, preds, label_mask, model_inputs
-        torch.cuda.empty_cache()
-        if was_training:
-            model.train()
-        if total_tokens <= 0:
-            return {}
-        mean_nll = total_nll / total_tokens
-        return {
-            "eval/ppl": float(math.exp(mean_nll)),
-            "eval/token_accuracy": float(total_correct / total_tokens),
-            "eval/loss": float(mean_nll),
-            "eval/num_scored_tokens": float(total_tokens),
-        }
+        return {}
 
     def _dispatch_rollouts(self, **kwargs):
         """Hook for subclasses: which run_rollouts variant to call.
@@ -311,7 +243,6 @@ class RLTrainer(BaseTrainer):
             if _is_eval_step:
                 llm.model.eval()
                 eval_rollout_metrics = {}
-                _eval_trajectories: list[Any] = []
                 for eval_split in getattr(eval_env, "eval_splits", ["eval"]):
                     with timed(f"run_evals_{eval_split}", metrics):
                         eval_env.split = eval_split
@@ -333,55 +264,28 @@ class RLTrainer(BaseTrainer):
                             name_or_identifier=name_or_identifier,
                         )
                         eval_rollout_metrics.update(_split_metrics)
-                        # Collect the policy trajectories so we can score held-out
-                        # perplexity / token-accuracy on them (teacher-forced).
-                        if isinstance(_split_trajs, dict):
-                            for _k, _v in _split_trajs.items():
-                                if _k.startswith("policy"):
-                                    _eval_trajectories.extend(_v)
+                        # Extra offline eval metrics (SFT: action-token PPL + accuracy
+                        # over the target span). Best-effort: never crash the eval.
+                        try:
+                            _extra = self.eval_extra_metrics(
+                                _split_trajs, split=eval_split, checkpoint_name=checkpoint_name
+                            )
+                            if _extra:
+                                _split_metrics.update(_extra)
+                                eval_rollout_metrics.update(_extra)
+                        except Exception as _ee:  # noqa: BLE001
+                            logger.warning(
+                                "eval_extra_metrics failed: %s: %s", type(_ee).__name__, _ee
+                            )
                         display_metrics(
                             _split_metrics,
                             title=f"Rollout {eval_split.title()} Metrics, Step {batch_idx}",
                             style="bright_yellow",
                         )
-
-                # Teacher-forced held-out metrics on the eval trajectories: the
-                # perplexity + next-token accuracy of the supervised (thought+action)
-                # span. These are the intended SFT early-stopping signals (eval/ppl).
-                with timed("eval_teacher_forced", metrics):
-                    _tf_metrics = self._teacher_forced_eval_metrics(
-                        llm=llm,
-                        hf_tokenizer=hf_tokenizer,
-                        trajectories=_eval_trajectories,
-                        cfg=cfg,
-                    )
-                if _tf_metrics:
-                    eval_rollout_metrics.update(_tf_metrics)
-                    display_metrics(
-                        _tf_metrics,
-                        title=f"Teacher-forced Eval Metrics, Step {batch_idx}",
-                        style="bright_yellow",
-                    )
-                # Fallback: if the teacher-forced pass produced no eval/ppl (e.g. no
-                # trainable eval spans), derive it from the generator's per-token
-                # action likelihood (likelihood = exp(mean logprob) = 1/ppl), so
-                # best_metric='eval/ppl' selection never crashes.
-                if "eval/ppl" not in eval_rollout_metrics:
-                    _lik_keys = [k for k in eval_rollout_metrics if k.endswith("/likelihood")]
-                    if _lik_keys:
-                        _lik = eval_rollout_metrics[_lik_keys[0]]
-                        if _lik and _lik > 0:
-                            eval_rollout_metrics["eval/ppl"] = float(1.0 / _lik)
                 metrics.update(eval_rollout_metrics)
 
-                # Save best checkpoints (by cfg.best_metric; e.g. eval/ppl for SFT).
-                _match_keys = [k for k in eval_rollout_metrics.keys() if self.best_metric_name in k]
-                if not _match_keys:
-                    raise KeyError(
-                        f"best_metric '{self.best_metric_name}' not found in eval metrics "
-                        f"{sorted(eval_rollout_metrics)}"
-                    )
-                best_metric_key = _match_keys[0]
+                # Save best checkpoints
+                best_metric_key = [k for k in eval_rollout_metrics.keys() if self.best_metric_name in k][0]
                 last_metric = eval_rollout_metrics[best_metric_key]
                 if is_better(last_metric, self.best_metric, self.best_metric_name):
                     self.best_metric = last_metric
@@ -390,14 +294,11 @@ class RLTrainer(BaseTrainer):
                     logger.info(
                         f"RL EVAL (Step {batch_idx}): Updated best metric to {last_metric} at step {batch_idx}"
                     )
-                    # Avoid a double "eval/eval/..." prefix when best_metric already
-                    # carries a split prefix (e.g. "eval/ppl").
-                    _best_key = self.best_metric_name if "/" in self.best_metric_name else f"eval/{self.best_metric_name}"
                     metrics.update(
                         {
-                            _best_key: last_metric,
-                            f"{_best_key}_best": self.best_metric,
-                            f"{_best_key}_best_step": self.best_metric_step,
+                            f"eval/{self.best_metric_name}": last_metric,
+                            f"eval/{self.best_metric_name}_best": self.best_metric,
+                            f"eval/{self.best_metric_name}_best_step": self.best_metric_step,
                         }
                     )
                     try:  # Saving replay buffer
@@ -641,12 +542,9 @@ class RLTrainer(BaseTrainer):
             _save_trajectories_to_hf_dataset(_trajectories, ds_name, metadata=metadata)
             logger.info("Saved trajectories to HF Dataset: %s", cfg.dataset_url_sft)
         except Exception as e:
-            # Best-effort: the Hub push is unreachable offline (fwdproxy blocks the
-            # HF CDN for this agent). The per-step generations.jsonl (written by the
-            # generator during the rollouts above) is the offline SFT source, so a
-            # failed Hub push must NOT hang the run on a breakpoint.
             _error_text = f"({type(e).__name__}: {e})"
-            logger.warning("Skipping HF Dataset push (offline / unreachable): %s", _error_text)
+            logger.error("Failed to save trajectories to HF Dataset: %s", _error_text)
+            breakpoint()
 
         if was_training:
             llm.model.train()

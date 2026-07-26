@@ -51,10 +51,11 @@ kl_discount_factor: 0.0
 eval_every: 10
 save_every: 20
 no_initial_eval: false
-# Early-stop / best-checkpoint selection on held-out eval perplexity (lower is
-# better; see is_better + _teacher_forced_eval_metrics in trainer/trainers/rl.py).
-# eval/token_accuracy and eval/loss are logged alongside for the SFT curves.
-best_metric: "eval/ppl"
+# best_metric selects the step_best checkpoint on the eval metric whose key
+# contains this substring. "eval_action_ppl" -> lowest action-token perplexity
+# over act_prm_eval (offline SFT early-stop); "eval_action_accuracy" -> highest
+# target-token argmax accuracy; "final_reward" (default) -> mean p(x|s,z).
+best_metric: "final_reward"
 
 # Rollout saving
 save_rollouts_every: 0

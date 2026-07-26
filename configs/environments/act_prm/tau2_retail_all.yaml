@@ -1,0 +1,25 @@
+# tau2-bench retail — SPLIT B: train on ALL non-rl_eval tasks (act_prm_eval folded
+# into act_prm_train), same rl_eval hold-out as tau2_retail. act_prm_eval is a 6-task
+# SUBSET OF train (overlap) — present only so the eval env builds (the trainer forces a
+# last-step eval) and logs a sanity metric; it is NOT held out and NOT used for model
+# selection. Use `act_prm/tau2_retail` (split A) for the real eval-metrics/early-stop arm.
+name: "act_prm_traces"
+
+dataset: "mzio/aprm-tau2-retail-gpt5m_med-gs8-s0-train"
+split_file: "data/splits/tau2_retail_all.json"
+dataset_path: "data/tau2_retail_all"   # DISTINCT from split A so cached pools don't collide
+synthetic: false
+
+keep_expert_thoughts: false
+
+num_trajectories: null      # all act_prm_train tasks (= all non-rl_eval)
+eval_trajectories: null     # act_prm_eval is empty in this split
+max_steps_per_traj: null
+obs_max_chars: null
+
+hide_observations: false
+first_obs_to_show: 1
+last_obs_to_show: 1
+
+num_tries: 1
+seed: 0

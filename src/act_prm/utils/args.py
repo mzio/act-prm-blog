@@ -19,6 +19,12 @@ def get_args() -> argparse.Namespace:
     """
     parser = argparse.ArgumentParser()
     parser.add_argument("--project_name", type=str, default="act-prm")
+    # Human-readable prefix prepended to the run_name (and thus the log/checkpoint
+    # leaf dir), e.g. --run_tag retail_s1_policy_heldout. Purely cosmetic/organizational:
+    # it does NOT change training, but makes checkpoints self-describing and lets two
+    # runs that would otherwise collide (e.g. same env_config, different split_file)
+    # land in distinct dirs. The full auto-encoded run_name still follows the tag.
+    parser.add_argument("--run_tag", type=str, default=None)
 
     # Necessary arguments + configs (to load default args from)
     parser.add_argument("--is_async", action="store_true", help="Use asynchronous environment")
@@ -306,6 +312,14 @@ def get_args() -> argparse.Namespace:
         default=None,
         help="Use the built-in synthetic action-only trajectories (offline; no HF download)",
     )
+    parser.add_argument(
+        "--keep_expert_thoughts",
+        action=argparse.BooleanOptionalAction,
+        default=None,
+        help="Keep each assistant turn's ORIGINAL expert reasoning+action as the (SFT target) "
+        "content instead of the action-only span (the 'expert thought-action' SFT dataset). "
+        "Use a distinct --dataset_path since processed pools are cached.",
+    )
     parser.add_argument("--length_penalty", type=float, default=None, help="Act-PRM thought length penalty (lambda)")
     parser.add_argument("--max_thought_tokens", type=int, help="Act-PRM max thought tokens (length-penalty budget)")
     parser.add_argument(
@@ -562,12 +576,9 @@ def get_args() -> argparse.Namespace:
         "load_checkpoint_path",
         "lora_checkpoint_path",
         "resume_from",  # a long checkpoint path; must not go into the run name (filename too long)
-        # Long path-valued args below: encoding them into the run_name (a single
-        # directory component) blows past the 255-char filesystem limit -> OSError
-        # "File name too long" (only actions_only, which set none, used to survive).
-        "dataset_path",
-        "sft_data",  # act_prm_replay: path to a relabel generations.jsonl (Stage-2 (b))
         "project_name",
+        "run_tag",  # prepended explicitly below; don't also auto-encode it
+        "dataset_path",  # a long path; run_tag/env already identify the run (kept the name < 255)
         "verbose",
         "streamer",
     ]
@@ -575,6 +586,17 @@ def get_args() -> argparse.Namespace:
     if args.base_env_config is not None and args.base_env_config == args.env_config:
         _ignore_args.append("base_env_config")
     args.run_name = get_run_name(args, prefix=args.project_name, ignore_args=_ignore_args)
+    if args.run_tag:
+        # Sanitize like get_run_name does, then prepend so the leaf dir is self-describing.
+        _tag = str(args.run_tag).replace("-", "_").replace(".", "_").replace("/", "_")
+        args.run_name = f"{_tag}-{args.run_name}"
+    # Hard-cap the leaf dir component: a single path segment must stay < 255 bytes
+    # (ext4 limit) or os.makedirs raises OSError Errno 36. Keep the readable prefix and
+    # append a short hash so truncated names stay unique.
+    if len(args.run_name) > 200:
+        import hashlib
+        _h = hashlib.md5(args.run_name.encode()).hexdigest()[:8]
+        args.run_name = f"{args.run_name[:190]}-{_h}"
     logger.info("Run name: %s", args.run_name)
 
     # Setup log path and checkpoint / data-saving path

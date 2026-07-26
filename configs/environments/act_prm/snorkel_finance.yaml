@@ -5,6 +5,7 @@ name: "act_prm_traces"
 dataset: "mzio/aprm-snorkelai_agent_finance_reasoning"
 dataset_path: null          # set (or --dataset_path DIR) to persist/reuse pools offline
 synthetic: false            # true (or --synthetic) uses built-in offline traces
+keep_expert_thoughts: false # true keeps original expert reasoning+action per turn (expert thought-action SFT; use a distinct dataset_path)
 
 num_trajectories: 64        # logged train trajectories to stream
 eval_trajectories: 8        # held-out eval trajectories

@@ -45,6 +45,7 @@ class ActPrmTracesEnv(Environment):
         last_obs_to_show: int = 1,
         system_prompt_file: str | None = None,
         synthetic: bool = False,
+        keep_expert_thoughts: bool = False,
         **kwargs: Any,
     ) -> None:
         # max_turns bounds the per-trajectory step count (used for progress bars).
@@ -54,6 +55,11 @@ class ActPrmTracesEnv(Environment):
         self.dataset = dataset
         self.max_steps_per_traj = max_steps_per_traj
         self.obs_max_chars = obs_max_chars
+        # When True, keep each assistant turn's ORIGINAL expert reasoning+action as
+        # the (SFT target) content instead of stripping to the action-only span —
+        # the "expert thought-action" SFT dataset. NOTE: cached pools (dataset_path)
+        # are built once, so use a DISTINCT --dataset_path for this variant.
+        self.keep_expert_thoughts = keep_expert_thoughts
         # State compaction: for any state the model sees (1) the system prompt,
         # (2) the first `first_obs_to_show` observations (the first user prompt),
         # (3) the last `last_obs_to_show` observations (the most recent tool/user
@@ -90,7 +96,7 @@ class ActPrmTracesEnv(Environment):
             # 3-way task split (act_prm_train / act_prm_eval / rl_eval holdout);
             # rl_eval tasks are held out for later RL eval and not loaded here.
             logger.info("ActPrmTracesEnv: loading trajectories via split %s", split_file)
-            train_pool, eval_pool = load_split(split_file)
+            train_pool, eval_pool = load_split(split_file, keep_expert_thoughts=keep_expert_thoughts)
             if num_trajectories:
                 train_pool = train_pool[:num_trajectories]
             if eval_trajectories:
@@ -104,7 +110,9 @@ class ActPrmTracesEnv(Environment):
                 num_trajectories,
                 eval_trajectories,
             )
-            trajs = load_trajectories(total, max_traj_timestep, dataset)
+            trajs = load_trajectories(
+                total, max_traj_timestep, dataset, keep_expert_thoughts=keep_expert_thoughts
+            )
             train_pool = trajs[:num_trajectories]
             eval_pool = trajs[num_trajectories:]
 
@@ -127,6 +135,7 @@ class ActPrmTracesEnv(Environment):
                     "num_trajectories": num_trajectories,
                     "eval_trajectories": eval_trajectories,
                     "max_traj_timestep": max_traj_timestep,
+                    "keep_expert_thoughts": keep_expert_thoughts,
                 },
             )
             logger.info("ActPrmTracesEnv: saved trajectory pools to %s", dataset_path)

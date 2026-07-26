@@ -25,18 +25,26 @@ def extract_action(content: str) -> str | None:
     return None
 
 
-def _traj_from_row(row: dict[str, Any]) -> dict[str, Any] | None:
+def _traj_from_row(row: dict[str, Any], keep_expert_thoughts: bool = False) -> dict[str, Any] | None:
     """Convert one dataset row (state + action, with narration) into an
     action-only trajectory dict, or None if any action is unparseable / the
-    trajectory is too short (< 2 actions)."""
+    trajectory is too short (< 2 actions).
+
+    ``keep_expert_thoughts``: keep each assistant turn's ORIGINAL content
+    (reasoning + action) instead of the extracted action-only span — used for the
+    "expert thought-action" SFT dataset. The set of turns is unchanged (a turn is
+    still dropped only if no action is extractable), so state/action alignment
+    matches the action-only variant.
+    """
     messages = list(row["state"]) + [row["action"]]
     traj: list[dict[str, str]] = []
     for msg in messages:
         if msg["role"] == "assistant":
-            action = extract_action(msg["content"])
+            content = msg["content"]
+            action = extract_action(content)
             if action is None:  # unparseable action -> drop trajectory
                 return None
-            traj.append({"role": "assistant", "content": action})
+            traj.append({"role": "assistant", "content": content if keep_expert_thoughts else action})
         else:
             traj.append({"role": msg["role"], "content": msg["content"]})
     if sum(m["role"] == "assistant" for m in traj) < 2:
@@ -48,10 +56,12 @@ def _traj_from_row(row: dict[str, Any]) -> dict[str, Any] | None:
     }
 
 
-def load_trajectories(n: int, max_timestep: int, dataset: str = DATASET) -> list[dict[str, Any]]:
+def load_trajectories(
+    n: int, max_timestep: int, dataset: str = DATASET, keep_expert_thoughts: bool = False
+) -> list[dict[str, Any]]:
     """Stream the dataset; keep the first ``n`` successful (done, return_>0)
     rollouts that finished within ``max_timestep`` steps. Assistant turns are
-    stripped to action-only content."""
+    stripped to action-only content (unless ``keep_expert_thoughts``)."""
     from datasets import load_dataset
 
     ds = load_dataset(dataset, split="train", streaming=True)
@@ -66,7 +76,7 @@ def load_trajectories(n: int, max_timestep: int, dataset: str = DATASET) -> list
         if uid in seen:
             continue
         seen.add(uid)
-        traj = _traj_from_row(row)
+        traj = _traj_from_row(row, keep_expert_thoughts=keep_expert_thoughts)
         if traj is not None:
             out.append(traj)
         if len(out) >= n:
@@ -77,7 +87,7 @@ def load_trajectories(n: int, max_timestep: int, dataset: str = DATASET) -> list
 
 
 def load_trajectories_split(
-    split_file: str, dataset: str = DATASET
+    split_file: str, dataset: str = DATASET, keep_expert_thoughts: bool = False
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     """Load ALL successful trajectories, partitioned by a canonical task split
     (a JSON with ``train_uids`` / ``eval_uids``). Returns (train_pool, eval_pool),
@@ -98,7 +108,7 @@ def load_trajectories_split(
         if uid not in want or uid in seen:
             continue
         seen.add(uid)
-        traj = _traj_from_row(row)
+        traj = _traj_from_row(row, keep_expert_thoughts=keep_expert_thoughts)
         if traj is None:
             continue
         (train_pool if uid in train_uids else eval_pool).append(traj)
@@ -149,19 +159,28 @@ def _terminal_row(rows: list[dict[str, Any]]) -> dict[str, Any]:
     return max(pool, key=lambda r: r.get("timestep", 0) or 0)
 
 
-def _traj_from_terminal(row: dict[str, Any], min_actions: int = 2) -> list[dict[str, str]] | None:
+def _traj_from_terminal(
+    row: dict[str, Any], min_actions: int = 2, keep_expert_thoughts: bool = False
+) -> list[dict[str, str]] | None:
     """Reconstruct an action-only trajectory from a terminal step-row's
     ``state + action``. Each assistant turn is reduced to its explicit action
     (``<tool_call>`` / ``Final Answer:``); assistant turns with no extractable
-    action (pure reasoning) are dropped. Returns None if < ``min_actions`` remain."""
+    action (pure reasoning) are dropped. Returns None if < ``min_actions`` remain.
+
+    ``keep_expert_thoughts``: keep each kept assistant turn's ORIGINAL content
+    (expert reasoning + action) instead of the extracted action span — the
+    "expert thought-action" SFT target. Turns without an extractable action are
+    still dropped, so the kept-turn structure matches the action-only variant.
+    """
     messages = list(row["state"]) + [row["action"]]
     traj: list[dict[str, str]] = []
     for m in messages:
         if m["role"] == "assistant":
-            action = extract_action(m.get("content") or "")
+            content = m.get("content") or ""
+            action = extract_action(content)
             if action is None:  # pure-reasoning turn — drop (we re-infer thoughts)
                 continue
-            traj.append({"role": "assistant", "content": action})
+            traj.append({"role": "assistant", "content": content if keep_expert_thoughts else action})
         else:
             traj.append({"role": m["role"], "content": _obs_content(m)})
     if sum(t["role"] == "assistant" for t in traj) < min_actions:
@@ -173,6 +192,7 @@ def load_grouped(
     dataset: str,
     uids: set[Any] | None = None,
     min_actions: int = 2,
+    keep_expert_thoughts: bool = False,
 ) -> dict[Any, dict[str, Any]]:
     """Stream a per-episode-step dataset (strl replay-buffer format), group rows by
     (unique_data_sample_id, generation_id), and reconstruct one action-only
@@ -201,7 +221,9 @@ def load_grouped(
         # success = terminal step is done with positive reward
         if not (term.get("done") and (term.get("reward", 0) or 0) > 0):
             continue
-        traj = _traj_from_terminal(term, min_actions=min_actions)
+        traj = _traj_from_terminal(
+            term, min_actions=min_actions, keep_expert_thoughts=keep_expert_thoughts
+        )
         if traj is None:
             continue
         score = float(term.get("return_", 0) or 0)
@@ -218,16 +240,21 @@ def load_grouped(
     return {uid: v[1] for uid, v in per_task.items()}
 
 
-def load_split(split_file: str) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+def load_split(
+    split_file: str, keep_expert_thoughts: bool = False
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     """Load (act_prm_train, act_prm_eval) trajectory pools from a 3-way split JSON
     written by ``scripts/make_split.py`` (keys: dataset, act_prm_train, act_prm_eval,
-    rl_eval). The rl_eval tasks are intentionally NOT loaded — held out for RL eval."""
+    rl_eval). The rl_eval tasks are intentionally NOT loaded — held out for RL eval.
+
+    ``keep_expert_thoughts`` keeps the original expert reasoning+action per turn
+    (the "expert thought-action" SFT target) instead of the action-only span."""
     split = json.loads(Path(split_file).read_text())
     dataset = split["dataset"]
     train_uids = [tuple(u) if isinstance(u, list) else u for u in split["act_prm_train"]]
     eval_uids = [tuple(u) if isinstance(u, list) else u for u in split["act_prm_eval"]]
     want = set(train_uids) | set(eval_uids)
-    by_uid = load_grouped(dataset, uids=want)
+    by_uid = load_grouped(dataset, uids=want, keep_expert_thoughts=keep_expert_thoughts)
     train_pool = [by_uid[u] for u in train_uids if u in by_uid]
     eval_pool = [by_uid[u] for u in eval_uids if u in by_uid]
     return train_pool, eval_pool

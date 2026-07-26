@@ -9,6 +9,7 @@ this collapses to standard maximum-likelihood SFT — no PPO-style importance
 ratio.
 """
 
+import math
 from typing import Any
 
 import torch
@@ -34,6 +35,69 @@ class SFTTrainer(RLTrainer):
     collector in ``state_action_raawr_api``). Non-action tokens are zeroed
     out by ``label_mask`` regardless.
     """
+
+    @torch.no_grad()
+    def eval_extra_metrics(
+        self,
+        trajectories: Any,
+        split: str = "eval",
+        checkpoint_name: str | None = None,
+    ) -> dict[str, float]:
+        """Offline SFT eval metrics over the target (thought+action) span, computed
+        teacher-forced over the eval trajectories:
+
+        - ``eval_action_ppl``      = exp(mean CE over target tokens)
+        - ``eval_action_accuracy`` = fraction of target tokens whose argmax logit
+                                     equals the gold token
+
+        The target span is ``state_action_tokens[state_len:]`` — the same span
+        ``prepare_minibatch`` / ``compute_loss`` supervise. Keyed to match the
+        rollout-metric prefix so ``best_metric: eval_action_ppl`` early-stops on it
+        and a notebook can plot it. Returns {} if there are no scorable tokens.
+        """
+        trajs = trajectories.get("policy") if isinstance(trajectories, dict) else trajectories
+        if not trajs:
+            return {}
+
+        model = self.llm.model
+        device = model.device
+        was_training = model.training
+        model.eval()
+
+        total_ce = 0.0
+        total_correct = 0
+        total_tokens = 0
+        for traj in trajs:
+            for step in traj.episode_steps:
+                ids = getattr(step, "state_action_tokens", None)
+                state_len = getattr(step, "state_len", None)
+                if not ids or state_len is None or state_len >= len(ids):
+                    continue
+                input_ids = torch.tensor([ids], device=device)
+                # Next-token-shifted, exactly as compute_loss / prepare_minibatch.
+                logits = model(input_ids=input_ids, use_cache=False).logits[0, :-1, :]
+                labels = input_ids[0, 1:]
+                start = max(0, state_len - 1)  # first target-token prediction position
+                tgt_logits = logits[start:]
+                tgt_labels = labels[start:]
+                if tgt_labels.numel() == 0:
+                    continue
+                total_ce += F.cross_entropy(
+                    tgt_logits.float(), tgt_labels, reduction="sum"
+                ).item()
+                total_correct += int((tgt_logits.argmax(dim=-1) == tgt_labels).sum().item())
+                total_tokens += int(tgt_labels.numel())
+
+        if was_training:
+            model.train()
+        if total_tokens == 0:
+            return {}
+
+        prefix = f"{checkpoint_name}_{split}" if checkpoint_name is not None else split
+        return {
+            f"{prefix}/eval_action_ppl": math.exp(total_ce / total_tokens),
+            f"{prefix}/eval_action_accuracy": total_correct / total_tokens,
+        }
 
     def compute_loss(
         self,

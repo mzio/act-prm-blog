@@ -7,6 +7,7 @@ dataset: "mzio/aprm-snorkelai_agent_finance_reasoning"
 split_file: "data/splits/snorkel_finance.json"
 dataset_path: "data/snorkel_finance_split"   # first run streams via split + caches; reruns load offline
 synthetic: false
+keep_expert_thoughts: false # true keeps original expert reasoning+action per turn (expert thought-action SFT; use a distinct dataset_path)
 
 num_trajectories: null      # use all act_prm_train tasks in the split
 eval_trajectories: null     # use all act_prm_eval tasks in the split
