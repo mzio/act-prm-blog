@@ -3,6 +3,7 @@
 name: "act_prm_traces"
 
 dataset: "mzio/aprm-snorkelai_agent_finance_reasoning"
+dataset_path: null          # set (or --dataset_path DIR) to persist/reuse pools offline
 synthetic: false            # true (or --synthetic) uses built-in offline traces
 
 num_trajectories: 64        # logged train trajectories to stream
