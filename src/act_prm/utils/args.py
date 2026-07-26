@@ -306,6 +306,14 @@ def get_args() -> argparse.Namespace:
         default=None,
         help="Use the built-in synthetic action-only trajectories (offline; no HF download)",
     )
+    parser.add_argument(
+        "--keep_expert_thoughts",
+        action=argparse.BooleanOptionalAction,
+        default=None,
+        help="Keep each assistant turn's ORIGINAL expert reasoning+action as the (SFT target) "
+        "content instead of the action-only span (the 'expert thought-action' SFT dataset). "
+        "Use a distinct --dataset_path since processed pools are cached.",
+    )
     parser.add_argument("--length_penalty", type=float, default=None, help="Act-PRM thought length penalty (lambda)")
     parser.add_argument("--max_thought_tokens", type=int, help="Act-PRM max thought tokens (length-penalty budget)")
     parser.add_argument(
