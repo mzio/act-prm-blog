@@ -12,9 +12,14 @@ console = Console()
 
 def is_better(x: float, y: float, metric: str) -> bool:
     """
-    Determine if x is better than y for a given metric
+    Determine if x is better than y for a given metric.
+
+    Lower is better for loss / perplexity / NLL-style metrics (matched by
+    substring, so ``eval/ppl``, ``train/loss`` etc. are covered); higher is
+    better otherwise (reward/accuracy).
     """
-    return x <= y if metric in ["loss"] else x >= y
+    lower_is_better = any(t in metric.lower() for t in ("loss", "ppl", "perplex", "nll"))
+    return x <= y if lower_is_better else x >= y
 
 
 def display_metrics(

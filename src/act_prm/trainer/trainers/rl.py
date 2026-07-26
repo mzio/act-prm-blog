@@ -8,6 +8,7 @@ LoRA helpers are siblings in ``strl.trainer``.
 """
 
 import logging
+import math
 import os
 import random  # noqa: F401 -- parity with prior import surface
 import time
@@ -52,11 +53,19 @@ def get_item(x: Any) -> int | float:
         return x.detach().cpu().item()
 
 
+def _lower_is_better(metric: str) -> bool:
+    """True for metrics where a SMALLER value is better (loss / perplexity /
+    negative-log-likelihood), matched by substring so ``eval/ppl``,
+    ``train/loss``, etc. are all covered."""
+    m = metric.lower()
+    return any(t in m for t in ("loss", "ppl", "perplex", "nll"))
+
+
 def is_better(x: float, y: float, metric: str) -> bool:
     """
     Determine if x is better than y for a given metric
     """
-    return x <= y if metric in ["loss"] else x >= y
+    return x <= y if _lower_is_better(metric) else x >= y
 
 
 class RLTrainer(BaseTrainer):
@@ -84,9 +93,11 @@ class RLTrainer(BaseTrainer):
         self.best_replay_buffer_path = join(self.checkpoint_path, "replay_buffer_best")
         self.last_replay_buffer_path = join(self.checkpoint_path, "replay_buffer")
 
-        self.best_metric = float("-inf")
-        self.best_metric_step = -1
         self.best_metric_name = cfg.best_metric
+        # Seed the running-best in the losing direction so the first eval always
+        # improves it: +inf for lower-is-better metrics (loss/ppl), else -inf.
+        self.best_metric = float("inf") if _lower_is_better(self.best_metric_name) else float("-inf")
+        self.best_metric_step = -1
 
     def compute_loss(
         self,
@@ -149,6 +160,77 @@ class RLTrainer(BaseTrainer):
             "ppl": ppl,
             "advantage": mean_advantage,
             "num_gen_tokens": num_gen_tokens,
+        }
+
+    @torch.no_grad()
+    def _teacher_forced_eval_metrics(
+        self,
+        llm: "HuggingFaceLLM",
+        hf_tokenizer: Any,
+        trajectories: list[Any],
+        cfg: DictConfig,
+    ) -> dict[str, float]:
+        """Held-out teacher-forced metrics over the supervised (thought+action)
+        span of the eval trajectories:
+
+          * ``eval/ppl``            — token-level perplexity, exp(mean NLL)
+          * ``eval/token_accuracy`` — fraction of label tokens whose greedy
+                                      next-token argmax matches the target
+          * ``eval/loss``           — mean NLL (nats)
+          * ``eval/num_scored_tokens``
+
+        This is the intended SFT early-stopping signal (``best_metric: eval/ppl``,
+        lower is better). Uses the same minibatch preparation as training so the
+        scored span matches exactly what SFT trains on (drop_zero_advantage keeps
+        only the selected best thought under advantage_mode=best). Returns {} if
+        there are no trainable eval steps.
+        """
+        if not trajectories:
+            return {}
+        model = llm.model
+        was_training = model.training
+        model.eval()
+        loader, _ = self.prepare_minibatch(
+            new_trajectories=trajectories,
+            hf_tokenizer=hf_tokenizer,
+            batch_size=1,
+            shuffle=False,
+            max_seq_len=cfg.get("max_seq_len", 32768),
+            drop_zero_advantage=cfg.get("drop_zero_advantage", False),
+        )
+        device = model.device
+        total_nll = 0.0
+        total_correct = 0.0
+        total_tokens = 0.0
+        for batch in loader:
+            label_mask = batch["label_mask"].to(device).float()
+            model_inputs = {
+                k: v.to(device) for k, v in batch.items() if k in ("input_ids", "attention_mask")
+            }
+            logits = model(**model_inputs, use_cache=False).logits[:, :-1, :]
+            labels = model_inputs["input_ids"][:, 1:]
+            # log p(label_t | x_<t): (B, L-1)
+            logprobs = -F.cross_entropy(
+                logits.transpose(1, 2).to(dtype=torch.float32), labels, reduction="none"
+            )
+            preds = logits.argmax(dim=-1)
+            correct = ((preds == labels).float() * label_mask).sum().item()
+            n_tok = label_mask.sum().item()
+            total_nll += -(logprobs * label_mask).sum().item()
+            total_correct += correct
+            total_tokens += n_tok
+            del logits, labels, logprobs, preds, label_mask, model_inputs
+        torch.cuda.empty_cache()
+        if was_training:
+            model.train()
+        if total_tokens <= 0:
+            return {}
+        mean_nll = total_nll / total_tokens
+        return {
+            "eval/ppl": float(math.exp(mean_nll)),
+            "eval/token_accuracy": float(total_correct / total_tokens),
+            "eval/loss": float(mean_nll),
+            "eval/num_scored_tokens": float(total_tokens),
         }
 
     def _dispatch_rollouts(self, **kwargs):
@@ -221,10 +303,11 @@ class RLTrainer(BaseTrainer):
             if _is_eval_step:
                 llm.model.eval()
                 eval_rollout_metrics = {}
+                _eval_trajectories: list[Any] = []
                 for eval_split in getattr(eval_env, "eval_splits", ["eval"]):
                     with timed(f"run_evals_{eval_split}", metrics):
                         eval_env.split = eval_split
-                        _split_metrics, _ = self._dispatch_rollouts(
+                        _split_metrics, _split_trajs = self._dispatch_rollouts(
                             llm=llm,
                             hf_tokenizer=hf_tokenizer,
                             generator_constructor=self.rl_generator_constructor,
@@ -242,15 +325,45 @@ class RLTrainer(BaseTrainer):
                             name_or_identifier=name_or_identifier,
                         )
                         eval_rollout_metrics.update(_split_metrics)
+                        # Collect the policy trajectories so we can score held-out
+                        # perplexity / token-accuracy on them (teacher-forced).
+                        if isinstance(_split_trajs, dict):
+                            for _k, _v in _split_trajs.items():
+                                if _k.startswith("policy"):
+                                    _eval_trajectories.extend(_v)
                         display_metrics(
                             _split_metrics,
                             title=f"Rollout {eval_split.title()} Metrics, Step {batch_idx}",
                             style="bright_yellow",
                         )
+
+                # Teacher-forced held-out metrics on the eval trajectories: the
+                # perplexity + next-token accuracy of the supervised (thought+action)
+                # span. These are the intended SFT early-stopping signals (eval/ppl).
+                with timed("eval_teacher_forced", metrics):
+                    _tf_metrics = self._teacher_forced_eval_metrics(
+                        llm=llm,
+                        hf_tokenizer=hf_tokenizer,
+                        trajectories=_eval_trajectories,
+                        cfg=cfg,
+                    )
+                if _tf_metrics:
+                    eval_rollout_metrics.update(_tf_metrics)
+                    display_metrics(
+                        _tf_metrics,
+                        title=f"Teacher-forced Eval Metrics, Step {batch_idx}",
+                        style="bright_yellow",
+                    )
                 metrics.update(eval_rollout_metrics)
 
-                # Save best checkpoints
-                best_metric_key = [k for k in eval_rollout_metrics.keys() if self.best_metric_name in k][0]
+                # Save best checkpoints (by cfg.best_metric; e.g. eval/ppl for SFT).
+                _match_keys = [k for k in eval_rollout_metrics.keys() if self.best_metric_name in k]
+                if not _match_keys:
+                    raise KeyError(
+                        f"best_metric '{self.best_metric_name}' not found in eval metrics "
+                        f"{sorted(eval_rollout_metrics)}"
+                    )
+                best_metric_key = _match_keys[0]
                 last_metric = eval_rollout_metrics[best_metric_key]
                 if is_better(last_metric, self.best_metric, self.best_metric_name):
                     self.best_metric = last_metric

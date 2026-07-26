@@ -51,7 +51,10 @@ kl_discount_factor: 0.0
 eval_every: 10
 save_every: 20
 no_initial_eval: false
-best_metric: "final_reward"
+# Early-stop / best-checkpoint selection on held-out eval perplexity (lower is
+# better; see is_better + _teacher_forced_eval_metrics in trainer/trainers/rl.py).
+# eval/token_accuracy and eval/loss are logged alongside for the SFT curves.
+best_metric: "eval/ppl"
 
 # Rollout saving
 save_rollouts_every: 0
