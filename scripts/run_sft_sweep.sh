@@ -15,7 +15,9 @@ export PATH="$HOME/.local/bin:$HOME/.cargo/bin:/usr/local/bin:$PATH"
 ENVCFG="${1:?env config, e.g. act_prm/tau2_retail}"
 ENVNAME="${ENVCFG##*/}"                     # tau2_retail
 DOM="${ENVNAME#tau2_}"                      # retail / airline (matches existing run_tags)
-MODEL=hf_qwen3_4b_instruct
+# Model is parametrized: MODEL_CFG selects both the <MODEL> path dir AND (exported for the
+# train_sft.sh children) their --model_config. Default keeps 4B behavior.
+MODEL="${MODEL_CFG:-hf_qwen3_4b_instruct}"; export MODEL_CFG="$MODEL"
 CKROOT="checkpoints_lora/${ENVCFG//\//_}/$MODEL"
 CORPUS="data/sft_corpus/$ENVNAME"
 MDIR="/tmp/aprm/sft_sweep_$ENVNAME"; mkdir -p "$MDIR"

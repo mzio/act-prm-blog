@@ -15,7 +15,8 @@ export http_proxy="${http_proxy:-http://fwdproxy:8080}"
 export HF_TOKEN="${HF_TOKEN:-$(cat "$HOME/models/token" 2>/dev/null || true)}"
 
 ENVCFG="${1:-act_prm/tau2_retail}"; ENVNAME="${ENVCFG##*/}"; DOM="${ENVNAME#tau2_}"
-MODEL=hf_qwen3_4b_instruct
+# Model is parametrized: MODEL_CFG selects both --model_config AND the <MODEL> path dir.
+MODEL="${MODEL_CFG:-hf_qwen3_4b_instruct}"; export MODEL_CFG="$MODEL"
 CKROOT="checkpoints_lora/${ENVCFG//\//_}/$MODEL"
 LOGROOT="logs/${ENVCFG//\//_}/$MODEL"
 CORPUS="data/sft_corpus/$ENVNAME"

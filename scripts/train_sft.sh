@@ -43,6 +43,9 @@ ENVCFG="${1:?env, e.g. act_prm/tau2_retail}"
 VARIANT="${2:?variant: actions_only | thoughts_policy | thoughts_base | expert_thoughts}"
 shift 2 || true
 ENVNAME="${ENVCFG##*/}"
+# Model is parametrized: MODEL_CFG selects both the --model_config AND (downstream, via
+# main_pytorch) the <MODEL> dir in checkpoint/log paths. Default keeps the 4B behavior.
+MODEL_CFG="${MODEL_CFG:-hf_qwen3_4b_instruct}"
 
 export PATH="$HOME/.local/bin:$HOME/.cargo/bin:/usr/local/bin:$PATH"
 # HuggingFace access (stream datasets / load models): Meta forward proxy + HF token.
@@ -86,7 +89,7 @@ esac
 HIDE_OBS=(--hide_observations); [ "${SFT_FULLCTX:-0}" = 1 ] && HIDE_OBS=()
 
 CMD=(uv run python main_pytorch.py
-  --env_config "$ENVCFG" --model_config hf_qwen3_4b_instruct
+  --env_config "$ENVCFG" --model_config "$MODEL_CFG"
   --lora_config r8_a16_linear --generator_config "$GEN" --trainer_config sft
   --replay_buffer_config default "${HIDE_OBS[@]}"
   --group_size 4 --batch_size 4 --num_batches 60 --eval_every 10 --no_initial_eval

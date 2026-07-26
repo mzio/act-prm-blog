@@ -11,7 +11,9 @@ set -uo pipefail
 cd "$(dirname "$0")/.."
 export PATH="$HOME/.local/bin:$HOME/.cargo/bin:/usr/local/bin:$PATH"
 
-MODEL=hf_qwen3_4b_instruct
+# Model is parametrized: MODEL_CFG selects the <MODEL> path dir AND (exported) the
+# --model_config used by train_rl_from_sft.sh / analyze_sft.py. Default keeps 4B behavior.
+MODEL="${MODEL_CFG:-hf_qwen3_4b_instruct}"; export MODEL_CFG="$MODEL"
 CKROOT="checkpoints_lora/act_prm_tau2_retail/$MODEL"   # SFT (Stage-2) checkpoints
 S3ROOT="checkpoints_lora/tau2bench_retail/$MODEL"      # RL (Stage-3) runs (env tau2bench/retail)
 MDIR=/tmp/aprm/stage3; mkdir -p "$MDIR"
