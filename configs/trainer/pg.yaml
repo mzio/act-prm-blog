@@ -33,6 +33,9 @@ loss_fn: "importance_sampling"
 num_substeps: 1
 mini_batch_size: null
 dataloader_batch_size: 1
+# Keep all group samples for PG (em/grpo advantages weight them). Set true to drop
+# exact-zero-advantage samples (e.g. em thoughts clamped to 0) to save compute.
+drop_zero_advantage: false
 
 compute_post_kl: false
 kl_penalty_coef: 0.0

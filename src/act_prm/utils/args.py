@@ -275,6 +275,12 @@ def get_args() -> argparse.Namespace:
         help="If True, disable Flash Attention 2 and use SDPA instead",
     )
     parser.add_argument("--max_seq_len", type=int, help="Max sequence length for training samples")
+    parser.add_argument(
+        "--drop_zero_advantage",
+        action=argparse.BooleanOptionalAction,
+        default=None,
+        help="Drop zero-advantage samples from the training batch (recommended for best/top_half SFT)",
+    )
 
     ## Environment
     parser.add_argument(

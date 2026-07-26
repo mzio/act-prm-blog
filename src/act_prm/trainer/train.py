@@ -360,13 +360,23 @@ def prepare_minibatch(
     batch_size: int = 2,
     batch_idx: int = 0,  # for debugging
     max_seq_len: int = 32768,
+    drop_zero_advantage: bool = False,
     **dataloader_kwargs: Any,
 ) -> tuple[DataLoader, dict[str, Any]]:
     """
-    Convert a minibatch of trajectories to a PyTorch Dataloader
+    Convert a minibatch of trajectories to a PyTorch Dataloader.
+
+    ``drop_zero_advantage``: when True, episode steps whose advantage is 0 are
+    excluded from the batch entirely (not just weighted to 0). This matters for
+    modes like ``best`` / ``top_half`` where most of the group is 0 — otherwise
+    those samples still run a forward/backward (wasted compute) AND inflate
+    ``len(train_loader)`` → ``gradient_accumulation_steps``, diluting the update
+    on the samples that actually carry signal. Kept off by default (uniform / em /
+    grpo want all samples).
     """
     metrics = {}
     n_skipped = 0
+    n_zero_adv = 0
     # Optional correctness dump: when STRL_VERIFY_DUMP=<path> is set, record, for the first
     # few trainable steps, the exact tokens/logprobs that become the supervised target so the
     # alignment (supervised tokens == action tokens; old_logprobs match them) can be checked
@@ -378,6 +388,11 @@ def prepare_minibatch(
     for trajectory in new_trajectories:
         for episode_step in trajectory.episode_steps:
             if episode_step.is_train:
+                # Drop zero-advantage samples entirely (best/top_half): they carry no
+                # gradient but would still waste compute and dilute the update.
+                if drop_zero_advantage and abs(episode_step.advantage) < 1e-12:
+                    n_zero_adv += 1
+                    continue
                 sa_input_ids = episode_step.state_action_tokens
                 # Skip stub / inference-only steps that carry no trainable tokens
                 # (e.g. API-policy generators that don't compute Qwen logprobs).
@@ -468,6 +483,7 @@ def prepare_minibatch(
             f"WARNING: Skipped {n_skipped}/{n_skipped + len(data_dict)} episodes exceeding max_seq_len={max_seq_len}"
         )
     metrics["n_skipped_seq_len"] = n_skipped
+    metrics["n_dropped_zero_advantage"] = n_zero_adv
     if _verify_path is not None:
         with open(_verify_path, "w") as _vf:
             json.dump(

@@ -356,6 +356,7 @@ class RLTrainer(BaseTrainer):
                 shuffle=True,
                 batch_idx=batch_idx,  # for debugging
                 max_seq_len=cfg.get("max_seq_len", 32768),
+                drop_zero_advantage=cfg.get("drop_zero_advantage", False),
             )
             metrics.update(_minibatch_metrics)  # empty {} for now
 

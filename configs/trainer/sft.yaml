@@ -39,6 +39,9 @@ loss_fn: "cross_entropy"
 num_substeps: 1
 mini_batch_size: null
 dataloader_batch_size: 1
+# Drop zero-advantage samples from the batch (best/top_half train only the kept
+# thoughts; without this the dropped thoughts waste compute + dilute the update).
+drop_zero_advantage: true
 
 compute_post_kl: false
 kl_penalty_coef: 0.0
