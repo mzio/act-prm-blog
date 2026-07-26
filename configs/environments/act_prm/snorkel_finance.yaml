@@ -10,11 +10,14 @@ num_trajectories: 64        # logged train trajectories to stream
 eval_trajectories: 8        # held-out eval trajectories
 max_traj_timestep: 8        # only keep trajectories that finished within this many steps
 max_steps_per_traj: 3       # infer thoughts for the first N logged actions per trajectory
-obs_max_chars: 2000         # cap per-observation length (before hiding middle observations)
-# State compaction: the model sees system prompt + first user prompt + last
-# observation + ALL prior model messages; intermediate observations -> "...".
-first_obs_to_show: 1        # keep the first N observations (the initial user prompt)
-last_obs_to_show: 1         # keep the last N observations (the most recent tool/user response)
+obs_max_chars: 2000         # cap per-observation length (always applied)
+# Observation hiding is OFF for thought generation — the E-step sees the full
+# (length-capped) observations so inferred thoughts are well grounded. The
+# compaction below (system + first user + last obs + all model messages) is
+# reserved for the downstream SFT / RL training contexts.
+hide_observations: false    # true hides intermediate observations (SFT/RL setup)
+first_obs_to_show: 1        # (when hide_observations) keep the first N observations
+last_obs_to_show: 1         # (when hide_observations) keep the last N observations
 
 # Base Environment knobs
 num_tries: 1

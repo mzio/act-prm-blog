@@ -139,15 +139,24 @@ def load_pools(dataset_path: str) -> tuple[list[dict[str, Any]], list[dict[str, 
 def compact_observations(
     messages: list[dict[str, str]],
     obs_max_chars: int,
-    first_to_show: int = 2,
+    first_to_show: int = 1,
     last_to_show: int = 1,
+    hide_middle: bool = False,
 ) -> list[dict[str, str]]:
-    """Cap observation lengths and hide middle observations (the codebase's
-    hide_observations trick) so long tool outputs don't blow up the context."""
+    """Bound observation context length. Always caps each observation to
+    ``obs_max_chars``. When ``hide_middle`` is True, additionally replaces
+    intermediate observations with "..." (keeping the first ``first_to_show`` and
+    last ``last_to_show``) — the hide_observations trick. Assistant/model
+    messages are never touched.
+
+    For Act-PRM *thought generation* we keep ``hide_middle=False`` so inferred
+    thoughts are grounded in the full (length-capped) observations; the hiding is
+    reserved for downstream SFT / RL training contexts.
+    """
     out = [dict(m) for m in messages]
     obs_idx = [i for i, m in enumerate(out) if m["role"] in ("user", "tool")]
     for j, i in enumerate(obs_idx):
-        if j >= first_to_show and j < len(obs_idx) - last_to_show:
+        if hide_middle and j >= first_to_show and j < len(obs_idx) - last_to_show:
             out[i]["content"] = "..."
         elif len(out[i]["content"]) > obs_max_chars:
             out[i]["content"] = out[i]["content"][:obs_max_chars] + " ...[truncated]"
