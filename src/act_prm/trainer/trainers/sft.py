@@ -97,6 +97,7 @@ class SFTTrainer(RLTrainer):
         return {
             f"{prefix}/eval_action_ppl": math.exp(total_ce / total_tokens),
             f"{prefix}/eval_action_accuracy": total_correct / total_tokens,
+            f"{prefix}/eval_action_loss": total_ce / total_tokens,  # mean CE (nats) = log(ppl)
         }
 
     def compute_loss(
@@ -135,6 +136,14 @@ class SFTTrainer(RLTrainer):
 
         # Logging metrics (parallel to RLTrainer.compute_loss for dashboard parity)
         ppl = torch.exp(-(new_logprobs * label_mask).sum() / num_label_tokens).item()
+        # Next-action-token accuracy on the supervised span: fraction of target
+        # tokens whose greedy argmax matches the gold token (train-split analogue of
+        # eval_action_accuracy). Detached — no grad needed for the metric.
+        with torch.no_grad():
+            token_accuracy = (
+                ((logits.argmax(dim=-1) == labels).to(new_logprobs.dtype) * label_mask).sum()
+                / num_label_tokens
+            ).item()
         mean_advantage = (advantages.sum() / num_label_tokens).item()
         per_seq_gen_lens = label_mask.sum(dim=-1).tolist()
         num_gen_tokens = sum(per_seq_gen_lens) / len(per_seq_gen_lens) if per_seq_gen_lens else 0.0
@@ -145,6 +154,7 @@ class SFTTrainer(RLTrainer):
         return {
             "loss": loss,
             "ppl": ppl,
+            "action_accuracy": token_accuracy,
             "advantage": mean_advantage,
             "num_gen_tokens": num_gen_tokens,
         }
