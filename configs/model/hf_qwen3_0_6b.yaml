@@ -1,0 +1,13 @@
+# Colab / CPU-friendly default. Small enough to smoke-test the Act-PRM training
+# path locally; loads on CPU by default (omit device_map). Use hf_qwen3_8b.yaml
+# (GPU) to match the paper's model.
+name: "hf_transformer"
+model_type: "huggingface"
+model_config:
+  pretrained_model_name_or_path: "Qwen/Qwen3-0.6B"
+  low_cpu_mem_usage: true
+  dtype: "float32"
+
+generation_config:
+  do_sample: true
+  temperature: 1.0

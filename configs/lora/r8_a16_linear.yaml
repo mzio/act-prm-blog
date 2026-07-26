@@ -1,0 +1,12 @@
+# Default LoRA config: rank-8 adapters on all linear projections (attn + MLP).
+r: 8
+lora_alpha: 16
+lora_dropout: 0.05
+target_modules:
+  - "self_attn.q_proj"
+  - "self_attn.k_proj"
+  - "self_attn.v_proj"
+  - "self_attn.o_proj"
+  - "mlp.down_proj"
+  - "mlp.gate_proj"
+  - "mlp.up_proj"

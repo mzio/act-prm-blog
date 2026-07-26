@@ -1,0 +1,61 @@
+# Policy-gradient (EM M-step) trainer for Act-PRM.
+# Importance-weighted NLL over the (thought + action) tokens, weighted by the
+# group-normalized EM weights the act_prm generator stores as advantages.
+trainer_name: rl
+supervised_fine_tuning: false
+balance_advantages: false
+
+model_name: null
+
+tool_call_kwargs:
+  tool_call_bos: "<tool_call>"
+  tool_call_eos: "</tool_call>"
+  tool_call_argname: "arguments"
+
+# Generation (E-step rollouts)
+num_batches: 200
+num_tries: null
+eval_num_tries: null
+max_tokens: 1024          # unused by act_prm (thought budget = generator.max_thought_tokens)
+temperature: 1.0
+max_input_id_len: null
+max_seq_len: 8192          # trainable sequences longer than this are skipped (guards OOM)
+
+batch_size: 8             # unique logged trajectories per training step
+group_size: 4             # candidate thoughts sampled per logged action (E-step group)
+eval_group_size: 1
+num_return_sequences: null
+
+# Training (M-step policy updates)
+learning_rate: 4e-5
+discount_factor: 0.9      # unused: single-step episodes, advantages are EM weights
+loss_fn: "importance_sampling"
+num_substeps: 1
+mini_batch_size: null
+dataloader_batch_size: 1
+
+compute_post_kl: false
+kl_penalty_coef: 0.0
+kl_discount_factor: 0.0
+
+# Checkpointing / eval
+eval_every: 10
+save_every: 20
+no_initial_eval: false
+best_metric: "final_reward"   # mean held-out p(x | s, z)
+
+# Rollout saving (disabled by default)
+save_rollouts_every: 0
+num_tasks_per_save: null
+save_rollouts_to_hub: false   # don't auto-push per-try rollouts to the HF Hub
+
+# Other
+base_url: null
+log_path: "./logs"
+load_checkpoint_path: null
+checkpoint_path: "./checkpoints"
+
+push_to_hub: false
+
+wandb_project: null
+wandb_name: null

@@ -218,3 +218,10 @@ __marimo__/
 .streamlit/secrets.toml
 docs/
 data/
+
+# act-prm training artifacts
+/checkpoints/
+/checkpoints_lora/
+/logs/
+/wandb/
+.rollouts/

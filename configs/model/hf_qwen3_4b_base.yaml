@@ -1,0 +1,15 @@
+# Qwen3-4B-Base (GPU) — NOT the recommended default (it's a base, non-instruct
+# model). Kept only because it is already in the local HF cache, for offline
+# smoke tests where the instruct models can't be downloaded. For real runs use
+# hf_qwen3_4b_instruct.yaml (Qwen3-4B-Instruct-2507, the paper's model).
+name: "hf_transformer"
+model_type: "huggingface"
+model_config:
+  pretrained_model_name_or_path: "Qwen/Qwen3-4B-Base"
+  device_map: "auto"
+  low_cpu_mem_usage: true
+  dtype: "bfloat16"
+
+generation_config:
+  do_sample: true
+  temperature: 1.0

@@ -1,0 +1,19 @@
+# Act-PRM EM harness (E-step): sample candidate thoughts behind each logged
+# action, score them by the length-penalized action likelihood p(x | s, z), and
+# emit group-normalized EM weights as advantages for the PG (M-step) trainer.
+name: "act_prm"
+
+enable_thinking: false
+verbose: false
+
+# Thought sampling (E-step)
+max_thought_tokens: 96      # length-penalty budget + max new tokens per thought
+thought_temperature: 1.0
+use_fewshot: true           # seed the reversal format with one worked example
+max_steps_per_traj: null    # null -> use the environment's max_steps_per_traj
+
+# Reward / EM weighting
+reward_method: "penalty"    # "penalty": p(x|s,z) - lambda * len_frac ; "lift": per-token likelihood + shortest-among-best
+length_penalty: 0.15        # lambda (used by reward_method: penalty)
+select_epsilon: 0.05        # reward_method: lift — likelihood tolerance for the shortest-thought selection
+lift_c: 4.0                 # reward_method: lift — length denominator constant

@@ -1,0 +1,9 @@
+# Lighter LoRA: rank-16 adapters on attention projections only.
+r: 16
+lora_alpha: 32
+lora_dropout: 0.05
+target_modules:
+  - "self_attn.q_proj"
+  - "self_attn.k_proj"
+  - "self_attn.v_proj"
+  - "self_attn.o_proj"

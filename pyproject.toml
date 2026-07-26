@@ -1,0 +1,42 @@
+[project]
+name = "act-prm"
+version = "0.1.0"
+description = "Action Process Reward Models (Act-PRM) — infer latent thoughts behind logged actions via an offline EM, trained in PyTorch with LoRA."
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    # config / plumbing
+    "python-dotenv",
+    "omegaconf",
+    "rich",
+    "tqdm",
+    "pydantic",
+    # numerics / data
+    "numpy",
+    "pandas",
+    # local HF training stack (main_pytorch.py path)
+    "torch",
+    "transformers>=4.51",
+    "datasets",
+    "peft",
+    "safetensors",
+    "accelerate",
+    # logging (ml_log used by the trainer / main_pytorch)
+    "tinker-cookbook>=0.4.3",
+    "wandb>=0.28.0",
+]
+
+[project.optional-dependencies]
+# Only needed to reproduce the original Tinker training path in scripts/ + notebooks.
+tinker = [
+    "tinker>=0.22.7",
+]
+
+[build-system]
+requires = ["uv_build>=0.11.27,<0.12.0"]
+build-backend = "uv_build"
+
+[tool.uv.build-backend]
+# Distribution is `act-prm`; the import package is `act_prm` under src/.
+module-name = "act_prm"
+module-root = "src"

@@ -1,0 +1,5 @@
+# Default replay buffer: a plain store for the sampled (thought, action) groups.
+name: "default"
+max_size: 1e10
+remove_duplicates: False
+debug: False

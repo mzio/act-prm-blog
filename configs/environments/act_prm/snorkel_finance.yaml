@@ -1,0 +1,16 @@
+# Logged action-only trajectories: Snorkel Agent Finance reasoning traces.
+# The Act-PRM generator infers the latent thought behind each logged action.
+name: "act_prm_traces"
+
+dataset: "mzio/aprm-snorkelai_agent_finance_reasoning"
+synthetic: false            # true (or --synthetic) uses built-in offline traces
+
+num_trajectories: 64        # logged train trajectories to stream
+eval_trajectories: 8        # held-out eval trajectories
+max_traj_timestep: 8        # only keep trajectories that finished within this many steps
+max_steps_per_traj: 3       # infer thoughts for the first N logged actions per trajectory
+obs_max_chars: 2000         # cap per-observation length (hide middle observations)
+
+# Base Environment knobs
+num_tries: 1
+seed: 0

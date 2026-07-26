@@ -1,0 +1,14 @@
+# The model used in the Act-PRM paper (Qwen/Qwen3-8B). Requires a GPU.
+name: "hf_transformer"
+model_type: "huggingface"
+model_config:
+  pretrained_model_name_or_path: "Qwen/Qwen3-8B"
+  cache_dir: "/data/users/mzio/models/hf_cache/hub"  # local snapshot (set to your own cache / omit to use HF_HOME)
+  device_map: "auto"
+  low_cpu_mem_usage: true
+  dtype: "bfloat16"
+  # attn_implementation: "flash_attention_2"
+
+generation_config:
+  do_sample: true
+  temperature: 1.0
