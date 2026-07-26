@@ -52,11 +52,17 @@ def get_item(x: Any) -> int | float:
         return x.detach().cpu().item()
 
 
+def _lower_is_better(metric: str) -> bool:
+    """True for metrics where smaller is better (loss / perplexity)."""
+    m = metric.lower()
+    return "loss" in m or "ppl" in m or "perplexity" in m
+
+
 def is_better(x: float, y: float, metric: str) -> bool:
     """
     Determine if x is better than y for a given metric
     """
-    return x <= y if metric in ["loss"] else x >= y
+    return x <= y if _lower_is_better(metric) else x >= y
 
 
 class RLTrainer(BaseTrainer):
@@ -84,9 +90,11 @@ class RLTrainer(BaseTrainer):
         self.best_replay_buffer_path = join(self.checkpoint_path, "replay_buffer_best")
         self.last_replay_buffer_path = join(self.checkpoint_path, "replay_buffer")
 
-        self.best_metric = float("-inf")
-        self.best_metric_step = -1
         self.best_metric_name = cfg.best_metric
+        # Best direction depends on the metric: loss / perplexity are lower-is-better
+        # (e.g. best_metric: eval_action_ppl for SFT early-stop), else higher-is-better.
+        self.best_metric = float("inf") if _lower_is_better(self.best_metric_name) else float("-inf")
+        self.best_metric_step = -1
 
     def compute_loss(
         self,
@@ -150,6 +158,20 @@ class RLTrainer(BaseTrainer):
             "advantage": mean_advantage,
             "num_gen_tokens": num_gen_tokens,
         }
+
+    def eval_extra_metrics(
+        self,
+        trajectories: Any,
+        split: str = "eval",
+        checkpoint_name: str | None = None,
+    ) -> dict[str, float]:
+        """Hook for extra offline eval metrics beyond the rollout metrics.
+
+        Default: none. :class:`SFTTrainer` overrides this to add action-token
+        perplexity + accuracy over the eval target span. Returned keys are merged
+        into the eval metrics dict (and so are eligible for ``best_metric``).
+        """
+        return {}
 
     def _dispatch_rollouts(self, **kwargs):
         """Hook for subclasses: which run_rollouts variant to call.
@@ -224,7 +246,7 @@ class RLTrainer(BaseTrainer):
                 for eval_split in getattr(eval_env, "eval_splits", ["eval"]):
                     with timed(f"run_evals_{eval_split}", metrics):
                         eval_env.split = eval_split
-                        _split_metrics, _ = self._dispatch_rollouts(
+                        _split_metrics, _split_trajs = self._dispatch_rollouts(
                             llm=llm,
                             hf_tokenizer=hf_tokenizer,
                             generator_constructor=self.rl_generator_constructor,
@@ -242,6 +264,19 @@ class RLTrainer(BaseTrainer):
                             name_or_identifier=name_or_identifier,
                         )
                         eval_rollout_metrics.update(_split_metrics)
+                        # Extra offline eval metrics (SFT: action-token PPL + accuracy
+                        # over the target span). Best-effort: never crash the eval.
+                        try:
+                            _extra = self.eval_extra_metrics(
+                                _split_trajs, split=eval_split, checkpoint_name=checkpoint_name
+                            )
+                            if _extra:
+                                _split_metrics.update(_extra)
+                                eval_rollout_metrics.update(_extra)
+                        except Exception as _ee:  # noqa: BLE001
+                            logger.warning(
+                                "eval_extra_metrics failed: %s: %s", type(_ee).__name__, _ee
+                            )
                         display_metrics(
                             _split_metrics,
                             title=f"Rollout {eval_split.title()} Metrics, Step {batch_idx}",
