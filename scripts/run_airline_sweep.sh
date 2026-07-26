@@ -82,15 +82,20 @@ POL_LAST=$(newest "$CKR/*swb=0*/step_last"); BAS_LAST=$(newest "$CKR/*swb=1*/ste
 log "ckpts: POL_BEST=$POL_BEST BAS_BEST=$BAS_BEST POL_LAST=$POL_LAST BAS_LAST=$BAS_LAST"
 
 # --- Stage 1.5: step_best (in-flight relabels launched separately) then step_last ---
-log "waiting for any in-flight relabel/train runs..."; wait_gpu_free
-relabel_export policy "$POL_BEST" airline_s1relabel_policy_heldout "$CORPUS/policy" $G0
-relabel_export base   "$BAS_BEST" airline_s1relabel_base_heldout   "$CORPUS/base"   $G0
-# step_last: policy on GPU0, base on GPU1 in parallel
-( relabel_export policy "$POL_LAST" airline_s1relabel_policy_last "$CORPUS/policy_last" $G0 ) &
-p0=$!
-( relabel_export base   "$BAS_LAST" airline_s1relabel_base_last   "$CORPUS/base_last"   $G1 ) &
-p1=$!
+log "waiting for any in-flight runs..."; wait_gpu_free
+# step_best: policy on GPU0, base on GPU1 (parallel)
+( relabel_export policy "$POL_BEST" airline_s1relabel_policy_heldout "$CORPUS/policy" $G0 ) & p0=$!
+( relabel_export base   "$BAS_BEST" airline_s1relabel_base_heldout   "$CORPUS/base"   $G1 ) & p1=$!
 wait $p0; wait $p1
+# step_last: policy on GPU0, base on GPU1 (parallel)
+( relabel_export policy "$POL_LAST" airline_s1relabel_policy_last "$CORPUS/policy_last" $G0 ) & p0=$!
+( relabel_export base   "$BAS_LAST" airline_s1relabel_base_last   "$CORPUS/base_last"   $G1 ) & p1=$!
+wait $p0; wait $p1
+# Sanity: corpora must have train examples (the no_train bug produced train:0)
+for c in policy base policy_last base_last; do
+  n=$(python3 -c "import json;print(len(json.load(open('$CORPUS/$c/train.json'))))" 2>/dev/null || echo 0)
+  log "corpus $c: $n train tasks"; [ "${n:-0}" -lt 1 ] && log "WARN: corpus $c EMPTY (train:0) — check relabel!"
+done
 
 # --- Stage 2: 12 SFT runs (6 per GPU, serial per GPU, both GPUs in parallel) --------
 # job = variant|regime|run_tag|extra-flags
