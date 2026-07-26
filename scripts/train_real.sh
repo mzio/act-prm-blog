@@ -27,8 +27,7 @@ uv run python main_pytorch.py \
   --replay_buffer_config default \
   --dataset_path ./data/snorkel_finance \
   --num_trajectories 32 --eval_trajectories 8 --max_traj_timestep 20 \
-  --obs_max_chars 1000 \
-  --group_size 4 --batch_size 4 --max_steps_per_traj 3 \
+  --group_size 4 --batch_size 4 \
   --num_batches 40 --eval_every 10 --no_initial_eval --save_every 10 \
   --length_penalty 0.15 --learning_rate 4e-5 \
   --verbose "$@"

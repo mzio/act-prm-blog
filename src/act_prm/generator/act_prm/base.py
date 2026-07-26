@@ -81,6 +81,11 @@ class ActPrmGenerator(HuggingFaceGenerator):
         #   "grpo"     — mean-centered reward (r - mean), optionally /std; can be negative
         advantage_mode: str = "em",
         grpo_normalize: bool = True,
+        # Score p(x|s,z) with the frozen BASE model (LoRA disabled) instead of the
+        # current policy. Better aligned when the relabelled thoughts will SFT the
+        # base model, and stops the policy inflating its own reward by co-adapting.
+        # The datum old_logprobs stay the policy's (for importance sampling).
+        score_with_base: bool = False,
         # infer_thoughts=False -> actions-only baseline: no thought sampling, train on
         # (state -> logged action) with advantage 1.0 (the ground-truth comparison).
         infer_thoughts: bool = True,
@@ -100,6 +105,7 @@ class ActPrmGenerator(HuggingFaceGenerator):
         self.max_steps_per_traj = max_steps_per_traj
         self.advantage_mode = advantage_mode
         self.grpo_normalize = grpo_normalize
+        self.score_with_base = score_with_base
         self.infer_thoughts = infer_thoughts
         self.save_generations = save_generations
         # Default the generations log under the run's log_path.
@@ -124,6 +130,50 @@ class ActPrmGenerator(HuggingFaceGenerator):
             if out and isinstance(out[0], (list, tuple)):
                 out = out[0]
         return len(out)
+
+    @torch.no_grad()
+    def _action_logprobs(
+        self, model_inputs: Any, state_len: int, use_base: bool = False
+    ) -> tuple[list[list[float]], list[list[int]]]:
+        """Batched forward -> per-sequence (thought+action) logprobs + token ids.
+
+        ``use_base=True`` disables the LoRA adapter so the frozen base model scores
+        the sequence (frozen-scorer reward). Falls back to per-sample forwards on OOM.
+        """
+        device = self.llm.model.device
+        n = model_inputs["input_ids"].shape[0]
+        import contextlib
+
+        adapter_ctx = self.llm.model.disable_adapter() if use_base else contextlib.nullcontext()
+        try:
+            with adapter_ctx:
+                logits = self.llm.model(**model_inputs.to(device), use_cache=False).logits
+                gen_logprobs, sa_tokens = get_action_logprobs_and_state_action_tokens(
+                    logits=logits, state_lens=[state_len] * n, **model_inputs.to(device)
+                )
+            del logits
+            return gen_logprobs, sa_tokens
+        except torch.OutOfMemoryError:
+            logger.warning(
+                "OOM in %s forward at seq_len=%d; falling back to per-sample",
+                "base" if use_base else "policy",
+                model_inputs["input_ids"].shape[1],
+            )
+            torch.cuda.empty_cache()
+            gen_logprobs, sa_tokens = [], []
+            for s in range(n):
+                single = {k: v[s : s + 1].to(device) for k, v in model_inputs.items()}
+                adapter_ctx = self.llm.model.disable_adapter() if use_base else contextlib.nullcontext()
+                with adapter_ctx:
+                    _logits = self.llm.model(**single, use_cache=False).logits
+                    _lp, _tok = get_action_logprobs_and_state_action_tokens(
+                        logits=_logits, state_lens=[state_len], **single
+                    )
+                gen_logprobs.extend(_lp)
+                sa_tokens.extend(_tok)
+                del _logits
+                torch.cuda.empty_cache()
+            return gen_logprobs, sa_tokens
 
     # ------------------------------------------------------------------
     # E-step pieces
@@ -230,17 +280,18 @@ class ActPrmGenerator(HuggingFaceGenerator):
             add_generation_prompt=False,
             continue_final_message=False,
         )
-        logits = self.llm.model(**model_inputs.to(device), use_cache=False).logits
-        gen_logprobs, state_action_tokens = get_action_logprobs_and_state_action_tokens(
-            logits=logits,
-            state_lens=[state_len] * len(thoughts),
-            **model_inputs.to(device),
-        )
-        del logits
+        # Policy (LoRA) forward -> old_logprobs + token ids for the M-step datum.
+        gen_logprobs, state_action_tokens = self._action_logprobs(model_inputs, state_len, use_base=False)
+        # Reward likelihood p(x|s,z): from the frozen base model if score_with_base,
+        # else from the policy. (old_logprobs stay the policy's for importance sampling.)
+        if self.score_with_base:
+            reward_logprobs, _ = self._action_logprobs(model_inputs, state_len, use_base=True)
+        else:
+            reward_logprobs = gen_logprobs
 
         likelihoods: list[float] = []
         for g, n_action in enumerate(n_actions):
-            action_lp = np.array(gen_logprobs[g][-n_action:], dtype=np.float64)
+            action_lp = np.array(reward_logprobs[g][-n_action:], dtype=np.float64)
             likelihoods.append(float(np.exp(action_lp.mean())))  # in (0, 1]
         return likelihoods, gen_logprobs, state_action_tokens, state_len
 
@@ -266,12 +317,13 @@ class ActPrmGenerator(HuggingFaceGenerator):
             add_generation_prompt=False,
             continue_final_message=False,
         )
-        logits = self.llm.model(**model_inputs.to(device), use_cache=False).logits
-        gen_logprobs, state_action_tokens = get_action_logprobs_and_state_action_tokens(
-            logits=logits, state_lens=[state_len], **model_inputs.to(device)
-        )
-        del logits
-        action_lp = np.array(gen_logprobs[0], dtype=np.float64)
+        # Policy forward -> old_logprobs (datum); base forward for reward if score_with_base.
+        gen_logprobs, state_action_tokens = self._action_logprobs(model_inputs, state_len, use_base=False)
+        if self.score_with_base:
+            reward_logprobs, _ = self._action_logprobs(model_inputs, state_len, use_base=True)
+        else:
+            reward_logprobs = gen_logprobs
+        action_lp = np.array(reward_logprobs[0], dtype=np.float64)
         likelihood = float(np.exp(action_lp.mean())) if action_lp.size else 0.0
         return gen_logprobs[0], state_action_tokens[0], state_len, likelihood
 

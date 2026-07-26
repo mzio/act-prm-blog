@@ -28,6 +28,11 @@ lift_c: 4.0                 # reward_method: lift — length denominator constan
 advantage_mode: "em"
 grpo_normalize: true        # advantage_mode: grpo — divide mean-centered reward by std
 
+# Score p(x|s,z) with the frozen base model (LoRA disabled) instead of the current
+# policy. Better aligned when the thoughts will SFT the base model; datum
+# old_logprobs stay the policy's. Costs a second scoring forward. Empirical — try both.
+score_with_base: false
+
 # infer_thoughts=false -> actions-only baseline (no thoughts; train on state->action, adv 1.0)
 infer_thoughts: true
 save_generations: true      # append every generation group (thoughts, rewards, advantages) to <log_path>/generations.jsonl

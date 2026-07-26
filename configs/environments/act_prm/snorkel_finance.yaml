@@ -9,8 +9,8 @@ synthetic: false            # true (or --synthetic) uses built-in offline traces
 num_trajectories: 64        # logged train trajectories to stream
 eval_trajectories: 8        # held-out eval trajectories
 max_traj_timestep: 8        # only keep trajectories that finished within this many steps
-max_steps_per_traj: 3       # infer thoughts for the first N logged actions per trajectory
-obs_max_chars: 2000         # cap per-observation length (always applied)
+max_steps_per_traj: null    # null -> infer a thought for EVERY logged action in the trajectory
+obs_max_chars: null         # null -> no truncation (keep full observations); set an int to cap
 # Observation hiding is OFF for thought generation — the E-step sees the full
 # (length-capped) observations so inferred thoughts are well grounded. The
 # compaction below (system + first user + last obs + all model messages) is

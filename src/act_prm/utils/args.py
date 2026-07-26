@@ -335,6 +335,12 @@ def get_args() -> argparse.Namespace:
         help="Infer thoughts (default). --no-infer_thoughts runs the actions-only SFT baseline",
     )
     parser.add_argument(
+        "--score_with_base",
+        action=argparse.BooleanOptionalAction,
+        default=None,
+        help="Score p(x|s,z) with the frozen base model (LoRA disabled) instead of the policy",
+    )
+    parser.add_argument(
         "--save_generations",
         action=argparse.BooleanOptionalAction,
         default=None,

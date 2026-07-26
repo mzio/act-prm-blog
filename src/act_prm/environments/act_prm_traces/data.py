@@ -138,13 +138,14 @@ def load_pools(dataset_path: str) -> tuple[list[dict[str, Any]], list[dict[str, 
 
 def compact_observations(
     messages: list[dict[str, str]],
-    obs_max_chars: int,
+    obs_max_chars: int | None,
     first_to_show: int = 1,
     last_to_show: int = 1,
     hide_middle: bool = False,
 ) -> list[dict[str, str]]:
-    """Bound observation context length. Always caps each observation to
-    ``obs_max_chars``. When ``hide_middle`` is True, additionally replaces
+    """Bound observation context length. Caps each observation to
+    ``obs_max_chars`` (set None/0 to disable the cap — keep full observations).
+    When ``hide_middle`` is True, additionally replaces
     intermediate observations with "..." (keeping the first ``first_to_show`` and
     last ``last_to_show``) — the hide_observations trick. Assistant/model
     messages are never touched.
@@ -158,7 +159,7 @@ def compact_observations(
     for j, i in enumerate(obs_idx):
         if hide_middle and j >= first_to_show and j < len(obs_idx) - last_to_show:
             out[i]["content"] = "..."
-        elif len(out[i]["content"]) > obs_max_chars:
+        elif obs_max_chars and len(out[i]["content"]) > obs_max_chars:
             out[i]["content"] = out[i]["content"][:obs_max_chars] + " ...[truncated]"
     return out
 
