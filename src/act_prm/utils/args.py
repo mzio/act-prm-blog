@@ -286,6 +286,7 @@ def get_args() -> argparse.Namespace:
 
     ## Act-PRM environment + generator overrides (override the corresponding YAML key when passed)
     parser.add_argument("--dataset", type=str, default=None, help="Act-PRM traces dataset (HF id, or 'synthetic')")
+    parser.add_argument("--dataset_path", type=str, default=None, help="Local dir to persist/reuse processed trajectory pools (first run streams+saves; later runs load offline)")
     parser.add_argument("--num_trajectories", type=int, help="Number of logged train trajectories to load")
     parser.add_argument("--eval_trajectories", type=int, help="Number of held-out eval trajectories to load")
     parser.add_argument("--max_steps_per_traj", type=int, help="Max logged action-steps to infer thoughts for per trajectory")

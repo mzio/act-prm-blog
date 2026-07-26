@@ -107,6 +107,35 @@ def load_trajectories_split(
     return train_pool, eval_pool
 
 
+def pools_exist(dataset_path: str) -> bool:
+    """True if a persisted (train, eval) pool pair exists at ``dataset_path``."""
+    p = Path(dataset_path)
+    return (p / "train.json").is_file() and (p / "eval.json").is_file()
+
+
+def save_pools(
+    dataset_path: str,
+    train_pool: list[dict[str, Any]],
+    eval_pool: list[dict[str, Any]],
+    meta: dict[str, Any] | None = None,
+) -> None:
+    """Persist processed trajectory pools to disk as JSON so later runs skip the
+    (network) streaming + filtering. Small and human-inspectable."""
+    p = Path(dataset_path)
+    p.mkdir(parents=True, exist_ok=True)
+    (p / "train.json").write_text(json.dumps(train_pool))
+    (p / "eval.json").write_text(json.dumps(eval_pool))
+    (p / "meta.json").write_text(json.dumps(meta or {}, indent=2))
+
+
+def load_pools(dataset_path: str) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    """Load processed trajectory pools previously written by :func:`save_pools`."""
+    p = Path(dataset_path)
+    train_pool = json.loads((p / "train.json").read_text())
+    eval_pool = json.loads((p / "eval.json").read_text())
+    return train_pool, eval_pool
+
+
 def compact_observations(
     messages: list[dict[str, str]],
     obs_max_chars: int,

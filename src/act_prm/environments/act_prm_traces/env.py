@@ -17,9 +17,12 @@ from ..base import Environment
 from ..types import EnvironmentState, EnvironmentStepResult
 from .data import (
     DATASET,
+    load_pools,
     load_synthetic,
     load_trajectories,
     load_trajectories_split,
+    pools_exist,
+    save_pools,
 )
 
 logger = logging.getLogger(__name__)
@@ -31,6 +34,7 @@ class ActPrmTracesEnv(Environment):
     def __init__(
         self,
         dataset: str = DATASET,
+        dataset_path: str | None = None,
         split_file: str | None = None,
         num_trajectories: int = 64,
         eval_trajectories: int = 8,
@@ -49,6 +53,23 @@ class ActPrmTracesEnv(Environment):
         self.max_steps_per_traj = max_steps_per_traj
         self.obs_max_chars = obs_max_chars
         self.eval_splits = ["eval"]
+
+        # Fast path: reuse a previously persisted (train, eval) pool from disk —
+        # no network / streaming. First run with --dataset_path builds + saves it.
+        if dataset_path and pools_exist(dataset_path):
+            train_pool, eval_pool = load_pools(dataset_path)
+            if num_trajectories:
+                train_pool = train_pool[:num_trajectories]
+            if eval_trajectories:
+                eval_pool = eval_pool[:eval_trajectories]
+            self.datasets = {"train": train_pool, "eval": eval_pool}
+            logger.info(
+                "ActPrmTracesEnv: loaded %d train / %d eval trajectories from %s",
+                len(train_pool),
+                len(eval_pool),
+                dataset_path,
+            )
+            return
 
         if synthetic or dataset in ("synthetic", "debug"):
             pool = load_synthetic()
@@ -82,6 +103,22 @@ class ActPrmTracesEnv(Environment):
             for t in train_pool + eval_pool:
                 t["system_prompt"] = sp
             logger.info("ActPrmTracesEnv: system prompt overridden from %s (%d chars)", system_prompt_file, len(sp))
+
+        # Persist the built pools for offline reuse (skip for the synthetic fallback).
+        if dataset_path and not (synthetic or dataset in ("synthetic", "debug")):
+            save_pools(
+                dataset_path,
+                train_pool,
+                eval_pool,
+                meta={
+                    "dataset": dataset,
+                    "split_file": split_file,
+                    "num_trajectories": num_trajectories,
+                    "eval_trajectories": eval_trajectories,
+                    "max_traj_timestep": max_traj_timestep,
+                },
+            )
+            logger.info("ActPrmTracesEnv: saved trajectory pools to %s", dataset_path)
 
         self.datasets: dict[str, list[dict[str, Any]]] = {
             "train": train_pool,
