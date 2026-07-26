@@ -1,7 +1,8 @@
 # tau2-bench retail — SPLIT B: train on ALL non-rl_eval tasks (act_prm_eval folded
-# into act_prm_train), same rl_eval hold-out as tau2_retail. No held-out eval set, so
-# offline SFT early-stopping (eval_action_ppl) is unavailable here — use for the
-# "max training data" arm; use `act_prm/tau2_retail` (split A) for the eval-metrics arm.
+# into act_prm_train), same rl_eval hold-out as tau2_retail. act_prm_eval is a 6-task
+# SUBSET OF train (overlap) — present only so the eval env builds (the trainer forces a
+# last-step eval) and logs a sanity metric; it is NOT held out and NOT used for model
+# selection. Use `act_prm/tau2_retail` (split A) for the real eval-metrics/early-stop arm.
 name: "act_prm_traces"
 
 dataset: "mzio/aprm-tau2-retail-gpt5m_med-gs8-s0-train"

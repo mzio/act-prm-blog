@@ -4,13 +4,13 @@
   "seed": 0,
   "fractions": {
     "act_prm_train": 0.85,
-    "act_prm_eval": 0.0,
+    "act_prm_eval": "overlap(6)",
     "rl_eval": 0.15
   },
   "counts": {
     "total_usable_tasks": 71,
     "act_prm_train": 59,
-    "act_prm_eval": 0,
+    "act_prm_eval": 6,
     "rl_eval": 12
   },
   "act_prm_train": [
@@ -74,7 +74,14 @@
     70,
     71
   ],
-  "act_prm_eval": [],
+  "act_prm_eval": [
+    0,
+    1,
+    2,
+    5,
+    6,
+    7
+  ],
   "rl_eval": [
     43,
     3,
@@ -89,5 +96,5 @@
     58,
     54
   ],
-  "derived_from": "tau2_retail (same rl_eval hold-out; act_prm_eval folded into train)"
+  "note": "Split B (SFT: train on ALL non-rl_eval). act_prm_eval is a 6-task SUBSET OF train (overlap) purely so the eval env builds and logs a sanity metric; it is NOT a held-out set and is NOT used for model selection. Same rl_eval hold-out as tau2_retail."
 }

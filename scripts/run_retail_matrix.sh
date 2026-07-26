@@ -143,26 +143,57 @@ stage2(){
     || log "STAGE2 $S/$variant: FAILED (see $MDIR/s2_${variant}_${stag}.log)"
 }
 
+# Split-B aprm corpus = the SAME relabeled thoughts, eval folded into train (train on
+# all non-rl_eval). Reuses save_pools for exact format. $1=split-A corpus, $2=out dir.
+merge_corpus(){
+  local src=$1 out=$2
+  [ -f "$out/train.json" ] && { log "MERGE: reuse $out"; echo "$out"; return 0; }
+  [ -f "$src/train.json" ] || { log "MERGE: no source corpus $src, skip"; return 1; }
+  uv run --no-sync python - "$src" "$out" <<'PY' >>"$MDIR/orchestrator.log" 2>&1
+import sys
+from act_prm.environments.act_prm_traces.data import load_pools, save_pools
+src, out = sys.argv[1], sys.argv[2]
+tr, ev = load_pools(src)
+train = tr + ev                       # all non-rl_eval steps
+sanity = train[:6]                    # OVERLAPS train: keeps eval env non-empty (rl.py forces a
+                                      # last-step eval); NOT a held-out set, not used for selection.
+save_pools(out, train, sanity, meta={"derived_from": src,
+           "note": "split B: eval folded into train; eval.json is a 6-item overlap sanity set"})
+print(f"MERGE {src}: {len(tr)}+{len(ev)} -> {len(train)} train, {len(sanity)} eval(overlap)")
+PY
+  [ -f "$out/train.json" ] && { log "MERGE: $src (+eval) -> $out"; echo "$out"; } \
+                           || { log "MERGE: FAILED for $src"; return 1; }
+}
+
 # ================================== DRIVE =====================================
 log "=== retail matrix start (GPU ${CUDA_VISIBLE_DEVICES:-?}) ==="
 # Let the in-flight untagged split-A stage-1 runs (policy + chained base) finish first,
 # so reuse-detection picks their (newest) step_best instead of a stale earlier run.
 log "waiting for any in-flight main_pytorch runs to finish before detection..."
 wait_gpu_free
-declare -A BEST CORP
-for S in "${splits[@]}"; do
-  for scorer in policy base; do
-    BEST[$S:$scorer]=$(stage1 "$S" "$scorer")
-    CORP[$S:$scorer]=$(export_corpus "$S" "$scorer" "${BEST[$S:$scorer]}")
-  done
+
+# --- Stage 1 + 1.5: run ONCE on split A. The relabel covers act_prm_train + act_prm_eval
+#     = ALL non-rl_eval tasks, so one corpus feeds BOTH SFT splits. The split is a
+#     Stage-2-ONLY choice, so there is NO split-B Stage-1 EM. ---------------------
+declare -A BEST CORP_A CORP_B
+for scorer in policy base; do
+  BEST[$scorer]=$(stage1 A "$scorer")
+  CORP_A[$scorer]=$(export_corpus A "$scorer" "${BEST[$scorer]:-}")
+  [ -n "${CORP_A[$scorer]:-}" ] && \
+    CORP_B[$scorer]=$(merge_corpus "${CORP_A[$scorer]}" "$CORPUS/tau2_retail_all/$scorer")
 done
 
-for S in "${splits[@]}"; do
-  stage2 "$S" actions_only
-  stage2 "$S" expert_thoughts
-  [ -n "${CORP[$S:policy]:-}" ] && stage2 "$S" thoughts_policy --dataset_path "${CORP[$S:policy]}"
-  [ -n "${CORP[$S:base]:-}" ]   && stage2 "$S" thoughts_base   --dataset_path "${CORP[$S:base]}"
-done
+# --- Stage 2: the ONLY place the two splits differ ----------------------------
+#   A (heldout): SFT on 49 train, early-stop on 10 eval (eval_action_ppl).
+#   B (all):     SFT on all 59 non-rl_eval, no eval.
+stage2 A actions_only
+stage2 A expert_thoughts
+[ -n "${CORP_A[policy]:-}" ] && stage2 A thoughts_policy --dataset_path "${CORP_A[policy]}"
+[ -n "${CORP_A[base]:-}"   ] && stage2 A thoughts_base   --dataset_path "${CORP_A[base]}"
+stage2 B actions_only
+stage2 B expert_thoughts
+[ -n "${CORP_B[policy]:-}" ] && stage2 B thoughts_policy --dataset_path "${CORP_B[policy]}"
+[ -n "${CORP_B[base]:-}"   ] && stage2 B thoughts_base   --dataset_path "${CORP_B[base]}"
 
 # ============================ STAGE 3 : env-RL (guarded) ======================
 if [ -x .venv-tau2/bin/python ] && [ -d tau2-bench ]; then
