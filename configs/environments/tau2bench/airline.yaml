@@ -2,7 +2,7 @@
 # User simulator + NL-assertion judge run over the Llama-API passthrough
 # (metagen/<model>) — see environments/tau2bench/litellm_metagen.py.
 name: "tau2bench"
-data_path: "data/tau2/_repo/data"
+data_path: "tau2-bench/data"
 domain: "airline"
 task_split: null
 is_async: true

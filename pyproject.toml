@@ -31,6 +31,21 @@ dependencies = [
 tinker = [
     "tinker>=0.22.7",
 ]
+# tau2-bench RL environment (real tasks/tools/evaluator) + the litellm user-sim path.
+# Install into a dedicated venv while other runs use the base .venv:
+#   UV_PROJECT_ENVIRONMENT=.venv-tau2 uv sync --extra tau2
+tau2 = [
+    "tau2",
+    "scipy>=1.10.0",
+    "gymnasium>=1.2.0",
+    "litellm",
+    "openai",
+]
+
+[tool.uv.sources]
+# Local clone of sierra-research/tau2-bench @ v1.0.0 (github is blocked by fwdproxy,
+# so it's cloned to ./tau2-bench and installed from the path; not committed).
+tau2 = { path = "tau2-bench" }
 
 [build-system]
 requires = ["uv_build>=0.11.27,<0.12.0"]

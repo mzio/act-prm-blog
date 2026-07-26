@@ -226,3 +226,9 @@ docs/
 /logs/
 /wandb/
 .rollouts/
+
+# separate venv for the tau2 RL stack
+.venv-tau2/
+
+# tau2-bench upstream clone (package + data); installed into .venv-tau2, not committed
+/tau2-bench/
