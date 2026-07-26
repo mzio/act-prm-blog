@@ -75,6 +75,13 @@ stage1(){
 
   log "STAGE1 $S/$scorer: launching EM ($envc $swb, tag=$tag)"
   wait_gpu_free
+  # Re-check after waiting: the chained base run (or a prior invocation) may have
+  # produced step_best while we waited — reuse it instead of launching a duplicate.
+  best=$(newest "$ckr/$MODEL/${tag}-*/step_best")
+  [ -z "$best" ] && best=$(newest "$ckr/$MODEL/*${swbstr}-*/step_best")
+  if [ -n "$best" ] && [ -f "$best/adapter_model.safetensors" ]; then
+    log "STAGE1 $S/$scorer: reuse (post-wait) $best"; echo "$best"; return 0
+  fi
   ./scripts/train.sh --env_config "$envc" --generator_config act_prm --trainer_config pg \
     --model_config $MODEL --lora_config r8_a16_linear --replay_buffer_config default \
     $swb --group_size 4 --batch_size 4 --num_batches 25 --eval_every 5 --no_initial_eval \
