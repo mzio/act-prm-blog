@@ -24,7 +24,16 @@ MDIR=/tmp/aprm/airline_8b; mkdir -p "$MDIR"
 G0=0; G1=1
 log(){ echo "[$(date '+%m-%d %H:%M:%S')] $*" | tee -a "$MDIR/orchestrator.log"; }
 newest(){ ls -dt $1 2>/dev/null | head -1; }
-wait_gpu_free(){ while pgrep -f '[m]ain_pytorch.py' >/dev/null 2>&1; do sleep 60; done; sleep 10; }
+# Initial sleep so a concurrently-launched 4B sweep's main_pytorch has spawned before
+# we check (avoids the race where wait_gpu_free returns early and 8B starts on top of
+# 4B). Then require the GPUs free for 2 consecutive checks.
+wait_gpu_free(){
+  sleep 180
+  local free=0
+  while [ "$free" -lt 2 ]; do
+    if pgrep -f '[m]ain_pytorch.py' >/dev/null 2>&1; then free=0; sleep 60; else free=$((free+1)); sleep 20; fi
+  done
+}
 
 # ---- Stage 1 EM (one scorer on one GPU) -------------------------------------------
 em(){  # scorer gpu
