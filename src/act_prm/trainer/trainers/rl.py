@@ -347,7 +347,13 @@ class RLTrainer(BaseTrainer):
             # 1. Sample rollouts for training
             env.split = "train"
             rl_start_idx = batch_idx * cfg.batch_size
-            if rl_start_idx + cfg.batch_size > wen_shuffle:
+            # Do NOT shuffle in no_train (relabel/export) mode: export_sft_corpus maps
+            # each generation back via pool[sample_id % n] on the UNSHUFFLED pool, so a
+            # mid-run shuffle would graft thoughts onto the wrong task's observations.
+            # Keeping order aligned lets any num_batches produce a correct corpus
+            # (wrap-around across tasks just yields clean augmentation). Training runs
+            # (no_train=False) still shuffle as before.
+            if not cfg.get("no_train", False) and rl_start_idx + cfg.batch_size > wen_shuffle:
                 env.shuffle(split="train")
                 wen_shuffle += len(env.datasets["train"])
 
