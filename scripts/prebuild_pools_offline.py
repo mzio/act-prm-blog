@@ -36,7 +36,8 @@ def find_parquet(dataset_repo: str) -> str:
             f"no cached parquet for {dataset_repo} under {base} — `hf download "
             f"--repo-type dataset {dataset_repo}` from a network-capable shell first"
         )
-    return hits[0]
+    # Return ALL shards (finance etc. can be multi-parquet); load_dataset concatenates.
+    return hits
 
 
 def main() -> None:
@@ -53,10 +54,10 @@ def main() -> None:
     args = ap.parse_args()
 
     dataset_repo = json.loads(Path(args.split_file).read_text())["dataset"]
-    parquet = args.parquet or find_parquet(dataset_repo)
+    parquet = [args.parquet] if args.parquet else find_parquet(dataset_repo)  # list of shard(s)
     print(f"[prebuild] split_file={args.split_file}")
     print(f"[prebuild] dataset_repo={dataset_repo}")
-    print(f"[prebuild] parquet={parquet}")
+    print(f"[prebuild] parquet shards ({len(parquet)}): {parquet}")
 
     # Redirect the one hub-streaming call (load_grouped -> load_dataset(repo,
     # streaming=True)) to the local parquet; leave every other datasets call intact.
