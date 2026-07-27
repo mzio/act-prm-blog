@@ -55,6 +55,11 @@ def get_item(x: Any) -> int | float:
 def _lower_is_better(metric: str) -> bool:
     """True for metrics where smaller is better (loss / perplexity)."""
     m = metric.lower()
+    # Explicit SFT eval perplexity metrics (whole-target + action-only sub-span);
+    # both are valid `best_metric` options and are lower-is-better. The generic
+    # loss/ppl substrings below also catch these — listed for clarity.
+    if m in ("eval_action_ppl", "eval_actiononly_ppl"):
+        return True
     return "loss" in m or "ppl" in m or "perplexity" in m
 
 

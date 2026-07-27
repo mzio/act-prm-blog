@@ -15,7 +15,51 @@ from typing import Any
 import torch
 from torch.nn import functional as F
 
+from act_prm.environments.act_prm_traces.data import extract_action
+
 from .rl import RLTrainer
+
+
+def _action_start_token(
+    tokenizer: Any, ids: list[int], state_len: int, target_content: str | None
+) -> int:
+    """First token index (into ``ids``) at which the explicit action begins within
+    the target span ``ids[state_len:]``.
+
+    Mirrors ``scripts/eval_action_subspan.py::action_start_token`` but operates
+    directly on the *already-tokenized* ``state_action_tokens`` (no re-render / no
+    second forward). The action (``<tool_call>...</tool_call>`` block or a
+    ``Final Answer:`` suffix) is always a **suffix** of the assistant content, so we
+    find the largest token index ``k >= state_len`` such that the decoded tail
+    ``decode(ids[k:])`` still fully contains the action string — that token is the
+    action's first token. Returns ``state_len`` (whole target == action) when there
+    is no separable reasoning prefix, matching the subspan script's fallback.
+    """
+    action_str = extract_action(target_content or "")
+    if not action_str:
+        return state_len  # no separable action -> whole target span is the action
+
+    def _tail_has_action(k: int, needle: str) -> bool:
+        return needle in tokenizer.decode(ids[k:])
+
+    # Sanity: the action must appear somewhere in the target tail. If the exact
+    # extracted string can't be located (chat-template / whitespace artifacts),
+    # fall back to a looser marker, else to the whole-target span.
+    if not _tail_has_action(state_len, action_str):
+        for marker in ("<tool_call>", "Final Answer:"):
+            if _tail_has_action(state_len, marker):
+                action_str = marker
+                break
+        else:
+            return state_len
+
+    a_start = state_len
+    for k in range(state_len, len(ids)):
+        if _tail_has_action(k, action_str):
+            a_start = k
+        else:
+            break
+    return a_start
 
 
 class SFTTrainer(RLTrainer):
@@ -43,17 +87,27 @@ class SFTTrainer(RLTrainer):
         split: str = "eval",
         checkpoint_name: str | None = None,
     ) -> dict[str, float]:
-        """Offline SFT eval metrics over the target (thought+action) span, computed
-        teacher-forced over the eval trajectories:
+        """Offline SFT eval metrics, teacher-forced over the eval trajectories.
 
-        - ``eval_action_ppl``      = exp(mean CE over target tokens)
-        - ``eval_action_accuracy`` = fraction of target tokens whose argmax logit
-                                     equals the gold token
+        Two spans are scored from the SAME forward pass (one forward per step):
 
-        The target span is ``state_action_tokens[state_len:]`` — the same span
-        ``prepare_minibatch`` / ``compute_loss`` supervise. Keyed to match the
-        rollout-metric prefix so ``best_metric: eval_action_ppl`` early-stops on it
-        and a notebook can plot it. Returns {} if there are no scorable tokens.
+        - Whole target span ``state_action_tokens[state_len:]`` (thought+action):
+          ``eval_action_ppl``          = exp(mean CE over target tokens)
+          ``eval_action_accuracy``     = fraction of target tokens argmax==gold
+        - Action **sub-span** only (the ``<tool_call>...</tool_call>`` block or a
+          ``Final Answer:`` suffix; == whole target when there's no reasoning
+          prefix, e.g. an actions_only target). An action-token mask is applied to
+          the already-computed logits — no second forward:
+          ``eval_actiononly_ppl``      = exp(mean CE over action-only tokens)
+          ``eval_actiononly_accuracy`` = fraction of action-only tokens argmax==gold
+
+        The action span is isolated with the same suffix logic as
+        ``scripts/eval_action_subspan.py`` (see ``_action_start_token``), applied to
+        each step's rendered target ``step.action["content"]``. The
+        ``eval_actiononly_*`` keys match the airline box exactly for cross-domain
+        comparability. Keyed to the rollout-metric prefix so ``best_metric`` can
+        early-stop on either ppl and a notebook can plot the per-eval curve.
+        Returns {} if there are no scorable tokens.
         """
         trajs = trajectories.get("policy") if isinstance(trajectories, dict) else trajectories
         if not trajs:
@@ -61,12 +115,18 @@ class SFTTrainer(RLTrainer):
 
         model = self.llm.model
         device = model.device
+        tokenizer = self.hf_tokenizer
         was_training = model.training
         model.eval()
 
+        # Whole-target span accumulators (unchanged).
         total_ce = 0.0
         total_correct = 0
         total_tokens = 0
+        # Action-only sub-span accumulators.
+        act_ce = 0.0
+        act_correct = 0
+        act_tokens = 0
         for traj in trajs:
             for step in traj.episode_steps:
                 ids = getattr(step, "state_action_tokens", None)
@@ -82,11 +142,32 @@ class SFTTrainer(RLTrainer):
                 tgt_labels = labels[start:]
                 if tgt_labels.numel() == 0:
                     continue
+                tgt_logits_f = tgt_logits.float()
+                tgt_argmax = tgt_logits_f.argmax(dim=-1)
                 total_ce += F.cross_entropy(
-                    tgt_logits.float(), tgt_labels, reduction="sum"
+                    tgt_logits_f, tgt_labels, reduction="sum"
                 ).item()
-                total_correct += int((tgt_logits.argmax(dim=-1) == tgt_labels).sum().item())
+                total_correct += int((tgt_argmax == tgt_labels).sum().item())
                 total_tokens += int(tgt_labels.numel())
+
+                # Action sub-span: reuse the SAME shifted logits/labels, just index
+                # from the action's first prediction position (no second forward).
+                target_content = None
+                action_msg = getattr(step, "action", None)
+                if isinstance(action_msg, dict):
+                    target_content = action_msg.get("content")
+                a_start = _action_start_token(tokenizer, ids, state_len, target_content)
+                a_pos = max(0, a_start - 1)  # first action-token prediction position
+                # Offset into the already-sliced target tensors.
+                a_off = a_pos - start
+                if 0 <= a_off < tgt_labels.numel():
+                    a_labels = tgt_labels[a_off:]
+                    a_argmax = tgt_argmax[a_off:]
+                    act_ce += F.cross_entropy(
+                        tgt_logits_f[a_off:], a_labels, reduction="sum"
+                    ).item()
+                    act_correct += int((a_argmax == a_labels).sum().item())
+                    act_tokens += int(a_labels.numel())
 
         if was_training:
             model.train()
@@ -94,10 +175,14 @@ class SFTTrainer(RLTrainer):
             return {}
 
         prefix = f"{checkpoint_name}_{split}" if checkpoint_name is not None else split
-        return {
+        out = {
             f"{prefix}/eval_action_ppl": math.exp(total_ce / total_tokens),
             f"{prefix}/eval_action_accuracy": total_correct / total_tokens,
         }
+        if act_tokens > 0:
+            out[f"{prefix}/eval_actiononly_ppl"] = math.exp(act_ce / act_tokens)
+            out[f"{prefix}/eval_actiononly_accuracy"] = act_correct / act_tokens
+        return out
 
     def compute_loss(
         self,
