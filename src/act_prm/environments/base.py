@@ -82,8 +82,9 @@ class Environment(ABC):
         if self.pretrained_model_config is not None:
             _pretrained_model_config = {k: v for k, v in self.pretrained_model_config.items()}
             _model_name_or_path = _pretrained_model_config["pretrained_model_name_or_path"]
-            if _model_name_or_path == "Qwen/Qwen3-8B":  # hack but get Qwen2.5 tokenizer
-                _model_name_or_path = "Qwen/Qwen2.5-3B-Instruct"
+            # Use the model's OWN tokenizer (a prior hack swapped Qwen3-8B for
+            # Qwen2.5-3B-Instruct — wrong vocab + not cached offline). Harmless here
+            # regardless since main_pytorch overwrites this with llm.tokenizer.
             _pretrained_model_config["pretrained_model_name_or_path"] = _model_name_or_path
             _chat_template_path = _pretrained_model_config.pop("chat_template_path", None)
             tokenizer = AutoTokenizer.from_pretrained(**_pretrained_model_config)
