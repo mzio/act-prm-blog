@@ -43,3 +43,16 @@ leak into the sweep's skip logic.
 {hide,full}, non-empty guarded, skips valid `actions_only` hide) → `run_retail_stage3.sh`
 (analysis → RL smoke gate → RL matrix). Logs under `/tmp/aprm/{tail,relabel_tau2_retail,
 sft_sweep_tau2_retail,stage3}`.
+
+## KEY RESULT (2026-07-27): action-only metric flips the variant ranking
+The fair `eval_actiononly_ppl` (action tokens only, live per-eval) REVERSES the whole-span read.
+Preliminary 4B, hide-obs, best-step (4/12 re-runs done):
+| variant (hide) | action-only PPL | action-acc | whole-span PPL |
+|---|---|---|---|
+| actions_only | 3.84 | 0.761 | 3.84 |
+| **expert_thoughts** | **2.92** | **0.789** | 4.78 |
+| thoughts_policy | 3.18 | 0.782 | 3.68 |
+| thoughts_base | 3.17 | 0.782 | 3.71 |
+- expert_thoughts = BEST on action-only (was WORST on whole-span — the reasoning-token confound).
+- **Act-PRM inferred thoughts (policy/base) beat actions_only** (3.17-3.18 vs 3.84 PPL; .782 vs .761 acc) → thoughts help next-action prediction; inferred recovers much of the expert lift.
+- Pending: full-context regime + best/last corpora + 8B (re-run in progress, 4/12) to confirm.
