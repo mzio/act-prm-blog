@@ -64,9 +64,18 @@ class SFTTrainer(RLTrainer):
         was_training = model.training
         model.eval()
 
+        from act_prm.environments.act_prm_traces.data import extract_action
+
         total_ce = 0.0
         total_correct = 0
         total_tokens = 0
+        # ACTION-SUBSPAN metrics: score ONLY the logged action tokens (the
+        # <tool_call> block), excluding the (possibly verbose) thought — so the
+        # whole-span ppl isn't dominated by hard-to-predict reasoning tokens
+        # (e.g. expert_thoughts). This isolates whether thoughts help ACTION fit.
+        act_ce = 0.0
+        act_correct = 0
+        act_tokens = 0
         for traj in trajs:
             for step in traj.episode_steps:
                 ids = getattr(step, "state_action_tokens", None)
@@ -88,17 +97,37 @@ class SFTTrainer(RLTrainer):
                 total_correct += int((tgt_logits.argmax(dim=-1) == tgt_labels).sum().item())
                 total_tokens += int(tgt_labels.numel())
 
+                # Action subspan = the trailing action tokens of the target span.
+                act = getattr(step, "action", None)
+                content = act.get("content") if isinstance(act, dict) else None
+                action_str = extract_action(content or "") if content else None
+                if action_str:
+                    n_act = len(self.hf_tokenizer(action_str, add_special_tokens=False)["input_ids"])
+                    n_act = min(n_act, int(tgt_labels.numel()))
+                    if n_act > 0:
+                        a_logits = tgt_logits[-n_act:]
+                        a_labels = tgt_labels[-n_act:]
+                        act_ce += F.cross_entropy(a_logits.float(), a_labels, reduction="sum").item()
+                        act_correct += int((a_logits.argmax(dim=-1) == a_labels).sum().item())
+                        act_tokens += n_act
+
         if was_training:
             model.train()
         if total_tokens == 0:
             return {}
 
         prefix = f"{checkpoint_name}_{split}" if checkpoint_name is not None else split
-        return {
+        out = {
             f"{prefix}/eval_action_ppl": math.exp(total_ce / total_tokens),
             f"{prefix}/eval_action_accuracy": total_correct / total_tokens,
             f"{prefix}/eval_action_loss": total_ce / total_tokens,  # mean CE (nats) = log(ppl)
         }
+        if act_tokens > 0:
+            # Action-subspan (tool_call only) — the metric that actually reflects
+            # action fit independent of thought verbosity.
+            out[f"{prefix}/eval_actiononly_ppl"] = math.exp(act_ce / act_tokens)
+            out[f"{prefix}/eval_actiononly_accuracy"] = act_correct / act_tokens
+        return out
 
     def compute_loss(
         self,
