@@ -36,3 +36,20 @@ Unresolved: `uid 30`, `uid 5` (both surfaced the shared default `sara_doe_496`).
    an explicit task-id list).
 
 Status: deferred (Stage 3 pending; Stage 1–2 for 4B + 8B running). Not a blocker yet.
+
+## RESOLVED — task map + Stage-3 wiring (done)
+- `scripts/map_dataset_to_tau2.py` (CPU-only) matches logged tasks -> tau2 ids via UNIQUE
+  reservation-id / (flight_number,date) itinerary args. Robust complement (union, no
+  bijection needed): `covered_any=32` (all logged tasks matched distinct tau2 tasks) →
+  **18 never-seen airline tasks** = clean RL-eval hold-out. Written to
+  `data/splits/tau2_airline_taskmap.json` (covered_tau2_ids [32] / unseen_tau2_ids [18]).
+- unseen_tau2_ids = [0,2,3,5,9,10,11,13,19,26,27,28,31,34,38,39,41,46] (13 tau2-train + 5 tau2-test).
+- **tau2-gym env wired** (`environments/tau2bench/env.py`): new params `train_task_ids`,
+  `eval_task_ids`, `task_id_map_file`. If set, `_init_data` selects tasks by id (train on
+  covered, eval on unseen) instead of the shuffle-split-by-count. Validated: 32 train / 18
+  eval, disjoint, 50/50 covered, task.id round-trips. Safe — tau2bench env is Stage-3 only
+  (not used by the running act_prm_traces SFT).
+- Stage-3 airline RL usage: set `task_id_map_file: data/splits/tau2_airline_taskmap.json`
+  in the tau2 gym env config (or pass `--task_id_map_file …`) → RL trains on the 32 logged
+  tasks, evals strictly on the 18 never-seen. (Can then re-split so all 31 usable act_prm
+  tasks go to train/eval, since rl_eval no longer needs carving.)

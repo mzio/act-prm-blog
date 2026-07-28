@@ -132,6 +132,13 @@ class Tau2BenchEnv(Environment):
         num_train_tasks: int = 80,
         num_val_tasks: int | None = None,
         num_test_tasks: int = 50,
+        # Explicit task-id selection (overrides the shuffle-split-by-count below). For RL:
+        # train on the tasks present in the Act-PRM logs, eval on the never-seen complement.
+        # Either pass lists directly, or a task-map json (scripts/map_dataset_to_tau2.py) —
+        # its covered_tau2_ids -> train, unseen_tau2_ids -> eval.
+        train_task_ids: list | None = None,
+        eval_task_ids: list | None = None,
+        task_id_map_file: str | None = None,
         max_steps: int = 50,
         # Inherited arguments
         max_turns: int = 30,
@@ -251,6 +258,9 @@ class Tau2BenchEnv(Environment):
         self.num_train_tasks = num_train_tasks
         self.num_val_tasks = num_val_tasks
         self.num_test_tasks = num_test_tasks
+        self.train_task_ids = train_task_ids
+        self.eval_task_ids = eval_task_ids
+        self.task_id_map_file = task_id_map_file
         self.max_steps = max_steps
         self.system_prompt = system_prompt
         self.eval_num_tries = eval_num_tries
@@ -312,6 +322,38 @@ class Tau2BenchEnv(Environment):
         from tau2 import registry
 
         all_tasks = registry.get_tasks_loader(self.domain)()
+
+        # --- Explicit task-id selection (RL: train on logged tasks, eval on never-seen) ---
+        # Overrides the shuffle-split-by-count below. task.id is round-trippable through
+        # AgentGymEnv(task_id=task.id), so we just filter the canonical list by id.
+        train_ids, eval_ids = self.train_task_ids, self.eval_task_ids
+        if (train_ids is None or eval_ids is None) and self.task_id_map_file:
+            import json as _json
+            _m = _json.loads(open(self.task_id_map_file).read())
+            train_ids = train_ids if train_ids is not None else _m.get("covered_tau2_ids")
+            eval_ids = eval_ids if eval_ids is not None else _m.get("unseen_tau2_ids")
+        if train_ids is not None and eval_ids is not None:
+            by_id = {str(t.id): t for t in all_tasks}
+            train_ids = [str(i) for i in train_ids]
+            eval_ids = [str(i) for i in eval_ids]
+            missing = [i for i in (train_ids + eval_ids) if i not in by_id]
+            if missing:
+                logger.warning("tau2bench %s: %d task ids not found: %s", self.domain, len(missing), missing[:10])
+            all_train_tasks = [by_id[i] for i in train_ids if i in by_id]
+            eval_tasks = [by_id[i] for i in eval_ids if i in by_id]
+            n_te = (self.num_val_tasks if self.num_val_tasks
+                    else max(1, len(all_train_tasks) // 5)) if len(all_train_tasks) > 1 else 0
+            datasets = {
+                "train": all_train_tasks[: len(all_train_tasks) - n_te],
+                "train_eval": all_train_tasks[len(all_train_tasks) - n_te:],
+                "train_all": all_train_tasks,
+                "eval": eval_tasks,
+                "test": eval_tasks,
+            }
+            for k, v in datasets.items():
+                logger.info("tau2bench [%s] %s (explicit ids): %d tasks", self.domain, k, len(v))
+            return datasets
+
         total_needed = self.num_train_tasks + self.num_test_tasks
         if self.num_val_tasks is not None:
             total_needed += self.num_val_tasks
