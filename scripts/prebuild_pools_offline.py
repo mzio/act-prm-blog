@@ -36,7 +36,15 @@ def find_parquet(dataset_repo: str) -> str:
             f"no cached parquet for {dataset_repo} under {base} — `hf download "
             f"--repo-type dataset {dataset_repo}` from a network-capable shell first"
         )
-    # Return ALL shards (finance etc. can be multi-parquet); load_dataset concatenates.
+    # Prefer the canonical `train-*.parquet` split when present: a repo may also
+    # ship auxiliary parquet CONFIGS (e.g. finance's aprm_sft_* dumps) with the
+    # SAME schema and OVERLAPPING unique_data_sample_ids. Concatenating those in
+    # lets load_grouped pick a higher-return aux generation over the expert trace
+    # (observed: 19/141 finance tasks silently overridden). train-* still matches
+    # all shards of a genuinely multi-shard split (train-00000-of-000NN).
+    train_shards = [h for h in hits if os.path.basename(h).startswith("train-")]
+    if train_shards:
+        return train_shards
     return hits
 
 

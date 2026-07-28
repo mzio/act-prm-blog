@@ -227,6 +227,11 @@ docs/
 /wandb/
 .rollouts/
 
+# FinQABenchmark raw tables + benchmark CSVs for the snorkel_finance interactive
+# gym (Stage 3). Reproducible via the env README (git clone snorkel-ai/FinQABenchmark);
+# includes a nested _repo clone, so keep it out of the bundle.
+/src/act_prm/data/
+
 # separate venv for the tau2 RL stack
 .venv-tau2/
 

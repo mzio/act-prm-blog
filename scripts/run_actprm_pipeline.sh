@@ -46,7 +46,8 @@ RELABEL_NB=$(python3 -c "print((int($NTRAIN)+3)//4 + 2)")     # ceil(n/4)+2, bat
 EM_NB=$(python3 -c "print(max(25, ((int($NTRAIN)+3)//4)*2))") # ~2 epochs of coverage
 log "env=$ENVC model=$MODEL | train_tasks=$NTRAIN | EM_nb=$EM_NB relabel_nb=$RELABEL_NB | corpus=$CORPUS"
 
-em(){ local s=$1 g=$2 swb tag="${ENVNAME}_s1_${TAGM}${s}"
+em(){ local s=$1 g=$2 swb tag
+  tag="${ENVNAME}_s1_${TAGM}${s}"   # separate line: same-line ${s} expands under set -u before s is assigned
   [ "$s" = base ] && swb=--score_with_base || swb=--no-score_with_base
   [ -n "$(newest "$CKR/${tag}-*/step_best")" ] && { log "EM $s: skip (exists)"; return 0; }
   log "EM $s (GPU $g)"
