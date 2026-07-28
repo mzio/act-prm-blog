@@ -18,6 +18,7 @@ export PATH="$HOME/.local/bin:$HOME/.cargo/bin:/usr/local/bin:$PATH"
 MODEL="${MODEL_CFG:-hf_qwen3_4b_instruct}"; export MODEL_CFG="$MODEL"
 CKROOT="checkpoints_lora/act_prm_tau2_retail/$MODEL"   # SFT (Stage-2) checkpoints
 S3ROOT="checkpoints_lora/tau2bench_retail/$MODEL"      # RL (Stage-3) runs (env tau2bench/retail)
+S3LOGROOT="logs/tau2bench_retail/$MODEL"               # RL (Stage-3) LOGS root (metrics.jsonl lives here)
 MDIR=/tmp/aprm/stage3; mkdir -p "$MDIR"
 # DRY=1: resolve + print each arm's exact command (no GPU, no analysis/smoke/RL,
 # no snapshot). Used to verify the matrix without touching the GPU.
@@ -69,13 +70,15 @@ if [ "$DRY" != 1 ]; then
     --num_batches 1 --batch_size 1 --group_size 2 --max_turns 4 --num_test_tasks 1 \
     --no_initial_eval > "$MDIR/s3_smoke.log" 2>&1
   SMOKE_RC=$?
-  SMOKE_M=$(newest "$S3ROOT/retail_s3_smoke-*/metrics.jsonl")
-  if [ "$SMOKE_RC" -ne 0 ] || [ -z "$SMOKE_M" ]; then
+  # metrics.jsonl lives under the LOGS root (not the checkpoints root $S3ROOT).
+  # PASS if rc==0 AND (metrics.jsonl exists under $S3LOGROOT OR the log has "Rewards:").
+  SMOKE_M=$(newest "$S3LOGROOT/retail_s3_smoke-*/metrics.jsonl")
+  if [ "$SMOKE_RC" -ne 0 ] || { [ -z "$SMOKE_M" ] && ! grep -q "Rewards:" "$MDIR/s3_smoke.log" 2>/dev/null; }; then
     log "SMOKE FAILED (rc=$SMOKE_RC, metrics=${SMOKE_M:-none}). tau2-gym RL not validated —"
     log "  NOT launching the RL matrix. Diagnose: $MDIR/s3_smoke.log"
     exit 1
   fi
-  log "SMOKE OK (metrics: $SMOKE_M) — launching RL matrix"
+  log "SMOKE OK (metrics: ${SMOKE_M:-<none, matched Rewards: in log>}) — launching RL matrix"
 fi
 
 # 4) RL matrix — 7 arms (airline-aligned retail_rl_* naming), serial + resumable:

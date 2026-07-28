@@ -50,6 +50,9 @@ eval_every: 10
 save_every: 20
 no_initial_eval: false
 best_metric: "final_reward"   # mean held-out p(x | s, z)
+# RL/SFT early-stop: stop if best_metric hasn't improved for this many EVAL checks
+# (0 = off). best_metric=final_reward (eval RL reward, higher=better).
+early_stop_patience: 5
 
 # Rollout saving (disabled by default)
 save_rollouts_every: 0

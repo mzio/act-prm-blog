@@ -332,6 +332,23 @@ class RLTrainer(BaseTrainer):
                         _flush_exc,
                     )
 
+                # Patience early-stop on the eval metric: halt if best_metric hasn't
+                # improved for `early_stop_patience` eval checks (0/absent = off). Safe
+                # to break here — step_best is already saved whenever the best improved.
+                _pat = cfg.get("early_stop_patience", 0)
+                if (
+                    _pat
+                    and _pat > 0
+                    and self.best_metric_step >= 0
+                    and (batch_idx - self.best_metric_step) >= _pat * eval_every
+                ):
+                    logger.info(
+                        f"[early-stop] no {self.best_metric_name} improvement for "
+                        f"{_pat} evals (best step {self.best_metric_step}) — "
+                        f"stopping at {batch_idx}"
+                    )
+                    break
+
             # Generate and save trajectories to a HF Dataset
             _save_rollouts_every = cfg.get("save_rollouts_every", num_steps)
             do_save_rollouts = _save_rollouts_every > 0 and (

@@ -53,4 +53,4 @@ UV_PROJECT_ENVIRONMENT=.venv-tau2 exec uv run --no-sync python main_pytorch.py \
   --lora_config r8_a16_linear --generator_config hf_grpo --trainer_config pg \
   --replay_buffer_config default "${RESUME_ARGS[@]}" \
   --group_size 4 --batch_size 2 --max_turns 20 --max_tokens 2048 \
-  --num_batches 25 --eval_every 5 --no_initial_eval --verbose "$@"
+  --num_batches 100 --eval_every 5 --no_initial_eval --verbose "$@"
