@@ -1,2108 +1,2159 @@
 {
- "0": "84",
- "1": "9",
- "2": "30",
- "3": "102",
- "4": "91",
- "5": "3",
- "6": "61",
- "7": "54",
- "8": "92",
- "9": "6",
- "10": "60",
- "11": "43",
- "12": "86",
- "13": "99",
- "14": "45",
- "15": "76",
- "16": "62",
- "17": "27",
- "18": "18",
- "19": "11",
- "20": "98",
- "21": "109",
- "22": "56",
- "23": "75",
- "24": "85",
- "25": "1",
- "26": "83",
- "27": "42",
- "28": "41",
- "29": "4",
- "30": "15",
- "31": "17",
- "32": "52",
- "33": "40",
- "34": "38",
- "35": "7",
- "36": "53",
- "37": "104",
- "38": "63",
- "39": "0",
- "40": "34",
- "41": "28",
- "42": "55",
- "43": "35",
- "44": "23",
- "45": "31",
- "46": "74",
- "47": "57",
- "48": "95",
- "49": "97",
- "50": "32",
- "51": "96",
- "52": "14",
- "53": "78",
- "54": "19",
- "55": "29",
- "56": "49",
- "57": "111",
- "58": "112",
- "59": "79",
- "60": "69",
- "61": "80",
- "62": "21",
- "63": "107",
- "64": "72",
- "65": "77",
- "66": "26",
- "67": "37",
- "68": "81",
- "69": "100",
- "70": "47",
- "71": "108",
- "_meta": {
-  "description": "Map from aprm-tau2-retail dataset unique_data_sample_id (uid) to tau2-bench retail task id.",
-  "method": "user_id string (from find_user_id_* tool RESULTS in next_obs + downstream action args) canonicalized on both sides; disambiguated among a user's tasks by exact write-action(order_id) overlap, then reason_for_call token overlap; per-user greedy bijective assignment.",
-  "dataset": "mzio/aprm-tau2-retail-gpt5m_med-gs8-s0-train",
-  "n_uids": 72,
-  "n_matched": 72
- },
- "coverage": {
-  "covered_tau2_ids": [
-   "0",
-   "1",
-   "3",
-   "4",
-   "6",
-   "7",
-   "9",
-   "11",
-   "14",
-   "15",
-   "17",
-   "18",
-   "19",
-   "21",
-   "23",
-   "26",
-   "27",
-   "28",
-   "29",
-   "30",
-   "31",
-   "32",
-   "34",
-   "35",
-   "37",
-   "38",
-   "40",
-   "41",
-   "42",
-   "43",
-   "45",
-   "47",
-   "49",
-   "52",
-   "53",
-   "54",
-   "55",
-   "56",
-   "57",
-   "60",
-   "61",
-   "62",
-   "63",
-   "69",
-   "72",
-   "74",
-   "75",
-   "76",
-   "77",
-   "78",
-   "79",
-   "80",
-   "81",
-   "83",
-   "84",
-   "85",
-   "86",
-   "91",
-   "92",
-   "95",
-   "96",
-   "97",
-   "98",
-   "99",
-   "100",
-   "102",
-   "104",
-   "107",
-   "108",
-   "109",
-   "111",
-   "112"
-  ],
-  "n_covered": 72,
-  "train_ids_total": 74,
-  "train_ids_covered": [
-   "0",
-   "1",
-   "3",
-   "4",
-   "6",
-   "7",
-   "11",
-   "14",
-   "15",
-   "19",
-   "21",
-   "23",
-   "28",
-   "29",
-   "30",
-   "31",
-   "34",
-   "35",
-   "37",
-   "41",
-   "43",
-   "47",
-   "52",
-   "54",
-   "57",
-   "63",
-   "69",
-   "72",
-   "75",
-   "76",
-   "78",
-   "80",
-   "81",
-   "83",
-   "84",
-   "85",
-   "91",
-   "92",
-   "95",
-   "96",
-   "98",
-   "99",
-   "104",
-   "107",
-   "109",
-   "112"
-  ],
-  "train_ids_missing": [
-   "2",
-   "8",
-   "10",
-   "13",
-   "16",
-   "20",
-   "22",
-   "24",
-   "25",
-   "44",
-   "46",
-   "48",
-   "50",
-   "58",
-   "59",
-   "66",
-   "67",
-   "73",
-   "82",
-   "87",
-   "88",
-   "89",
-   "93",
-   "103",
-   "105",
-   "106",
-   "110",
-   "113"
-  ],
-  "test_ids_total": 40,
-  "test_ids_covered": [
-   "9",
-   "17",
-   "18",
-   "26",
-   "27",
-   "32",
-   "38",
-   "40",
-   "42",
-   "45",
-   "49",
-   "53",
-   "55",
-   "56",
-   "60",
-   "61",
-   "62",
-   "74",
-   "77",
-   "79",
-   "86",
-   "97",
-   "100",
-   "102",
-   "108",
-   "111"
-  ],
-  "test_ids_missing_count": 14,
-  "covered_in_train": 46,
-  "covered_in_test": 26
- },
- "evidence": {
-  "0": {
-   "user_id": "chen_silva_7485",
-   "tau2_task_id": "84",
-   "ds_write_actions": [
-    [
-     [
-      "return_delivered_order_items",
-      "#W9571698"
-     ],
-     8
+  "0": "84",
+  "1": "9",
+  "2": "30",
+  "3": "102",
+  "4": "91",
+  "5": "3",
+  "6": "61",
+  "7": "54",
+  "8": "92",
+  "9": "6",
+  "10": "60",
+  "11": "43",
+  "12": "86",
+  "13": "99",
+  "14": "45",
+  "15": "76",
+  "16": "62",
+  "17": "27",
+  "18": "18",
+  "19": "11",
+  "20": "98",
+  "21": "109",
+  "22": "56",
+  "23": "75",
+  "24": "85",
+  "25": "1",
+  "26": "83",
+  "27": "42",
+  "28": "41",
+  "29": "4",
+  "30": "15",
+  "31": "17",
+  "32": "52",
+  "33": "40",
+  "34": "38",
+  "35": "7",
+  "36": "53",
+  "37": "104",
+  "38": "63",
+  "39": "0",
+  "40": "34",
+  "41": "28",
+  "42": "55",
+  "43": "35",
+  "44": "23",
+  "45": "31",
+  "46": "74",
+  "47": "57",
+  "48": "95",
+  "49": "97",
+  "50": "32",
+  "51": "96",
+  "52": "14",
+  "53": "78",
+  "54": "19",
+  "55": "29",
+  "56": "49",
+  "57": "111",
+  "58": "112",
+  "59": "79",
+  "60": "69",
+  "61": "80",
+  "62": "21",
+  "63": "107",
+  "64": "72",
+  "65": "77",
+  "66": "26",
+  "67": "37",
+  "68": "81",
+  "69": "100",
+  "70": "47",
+  "71": "108",
+  "_meta": {
+    "description": "Map from aprm-tau2-retail dataset unique_data_sample_id (uid) to tau2-bench retail task id.",
+    "method": "user_id string (from find_user_id_* tool RESULTS in next_obs + downstream action args) canonicalized on both sides; disambiguated among a user's tasks by exact write-action(order_id) overlap, then reason_for_call token overlap; per-user greedy bijective assignment.",
+    "dataset": "mzio/aprm-tau2-retail-gpt5m_med-gs8-s0-train",
+    "n_uids": 72,
+    "n_matched": 72
+  },
+  "coverage": {
+    "covered_tau2_ids": [
+      "0",
+      "1",
+      "3",
+      "4",
+      "6",
+      "7",
+      "9",
+      "11",
+      "14",
+      "15",
+      "17",
+      "18",
+      "19",
+      "21",
+      "23",
+      "26",
+      "27",
+      "28",
+      "29",
+      "30",
+      "31",
+      "32",
+      "34",
+      "35",
+      "37",
+      "38",
+      "40",
+      "41",
+      "42",
+      "43",
+      "45",
+      "47",
+      "49",
+      "52",
+      "53",
+      "54",
+      "55",
+      "56",
+      "57",
+      "60",
+      "61",
+      "62",
+      "63",
+      "69",
+      "72",
+      "74",
+      "75",
+      "76",
+      "77",
+      "78",
+      "79",
+      "80",
+      "81",
+      "83",
+      "84",
+      "85",
+      "86",
+      "91",
+      "92",
+      "95",
+      "96",
+      "97",
+      "98",
+      "99",
+      "100",
+      "102",
+      "104",
+      "107",
+      "108",
+      "109",
+      "111",
+      "112"
     ],
-    [
-     [
-      "return_delivered_order_items",
-      "#W3069600"
-     ],
-     7
-    ]
-   ],
-   "score": {
-    "total": 1060,
-    "write_exact": 1,
-    "name_ovl": 1
-   }
-  },
-  "1": {
-   "user_id": "mei_kovacs_8020",
-   "tau2_task_id": "9",
-   "ds_write_actions": [
-    [
-     [
-      "exchange_delivered_order_items",
-      "#W6390527"
-     ],
-     8
-    ]
-   ],
-   "score": {
-    "total": 1055,
-    "write_exact": 1,
-    "name_ovl": 1
-   }
-  },
-  "2": {
-   "user_id": "olivia_lopez_3865",
-   "tau2_task_id": "30",
-   "ds_write_actions": [
-    [
-     [
-      "return_delivered_order_items",
-      "#W7449508"
-     ],
-     8
+    "n_covered": 72,
+    "train_ids_total": 74,
+    "train_ids_covered": [
+      "0",
+      "1",
+      "3",
+      "4",
+      "6",
+      "7",
+      "11",
+      "14",
+      "15",
+      "19",
+      "21",
+      "23",
+      "28",
+      "29",
+      "30",
+      "31",
+      "34",
+      "35",
+      "37",
+      "41",
+      "43",
+      "47",
+      "52",
+      "54",
+      "57",
+      "63",
+      "69",
+      "72",
+      "75",
+      "76",
+      "78",
+      "80",
+      "81",
+      "83",
+      "84",
+      "85",
+      "91",
+      "92",
+      "95",
+      "96",
+      "98",
+      "99",
+      "104",
+      "107",
+      "109",
+      "112"
     ],
-    [
-     [
-      "cancel_pending_order",
-      "#W9373487"
-     ],
-     7
+    "train_ids_missing": [
+      "2",
+      "8",
+      "10",
+      "13",
+      "16",
+      "20",
+      "22",
+      "24",
+      "25",
+      "44",
+      "46",
+      "48",
+      "50",
+      "58",
+      "59",
+      "66",
+      "67",
+      "73",
+      "82",
+      "87",
+      "88",
+      "89",
+      "93",
+      "103",
+      "105",
+      "106",
+      "110",
+      "113"
     ],
-    [
-     [
-      "exchange_delivered_order_items",
-      "#W2692684"
-     ],
-     4
+    "test_ids_total": 40,
+    "test_ids_covered": [
+      "9",
+      "17",
+      "18",
+      "26",
+      "27",
+      "32",
+      "38",
+      "40",
+      "42",
+      "45",
+      "49",
+      "53",
+      "55",
+      "56",
+      "60",
+      "61",
+      "62",
+      "74",
+      "77",
+      "79",
+      "86",
+      "97",
+      "100",
+      "102",
+      "108",
+      "111"
     ],
-    [
-     [
-      "return_delivered_order_items",
-      "#W2692684"
-     ],
-     4
-    ]
-   ],
-   "score": {
-    "total": 3115,
-    "write_exact": 3,
-    "name_ovl": 2
-   }
+    "test_ids_missing_count": 14,
+    "covered_in_train": 46,
+    "covered_in_test": 26,
+    "reconciled_distinct_covered": 72
   },
-  "3": {
-   "user_id": "noah_ito_3850",
-   "tau2_task_id": "102",
-   "ds_write_actions": [
-    [
-     [
-      "modify_pending_order_address",
-      "#W4219264"
-     ],
-     8
+  "evidence": {
+    "0": {
+      "user_id": "chen_silva_7485",
+      "tau2_task_id": "84",
+      "ds_write_actions": [
+        [
+          [
+            "return_delivered_order_items",
+            "#W9571698"
+          ],
+          8
+        ],
+        [
+          [
+            "return_delivered_order_items",
+            "#W3069600"
+          ],
+          7
+        ]
+      ],
+      "score": {
+        "total": 1060,
+        "write_exact": 1,
+        "name_ovl": 1
+      }
+    },
+    "1": {
+      "user_id": "mei_kovacs_8020",
+      "tau2_task_id": "9",
+      "ds_write_actions": [
+        [
+          [
+            "exchange_delivered_order_items",
+            "#W6390527"
+          ],
+          8
+        ]
+      ],
+      "score": {
+        "total": 1055,
+        "write_exact": 1,
+        "name_ovl": 1
+      }
+    },
+    "2": {
+      "user_id": "olivia_lopez_3865",
+      "tau2_task_id": "30",
+      "ds_write_actions": [
+        [
+          [
+            "return_delivered_order_items",
+            "#W7449508"
+          ],
+          8
+        ],
+        [
+          [
+            "cancel_pending_order",
+            "#W9373487"
+          ],
+          7
+        ],
+        [
+          [
+            "exchange_delivered_order_items",
+            "#W2692684"
+          ],
+          4
+        ],
+        [
+          [
+            "return_delivered_order_items",
+            "#W2692684"
+          ],
+          4
+        ]
+      ],
+      "score": {
+        "total": 3115,
+        "write_exact": 3,
+        "name_ovl": 2
+      }
+    },
+    "3": {
+      "user_id": "noah_ito_3850",
+      "tau2_task_id": "102",
+      "ds_write_actions": [
+        [
+          [
+            "modify_pending_order_address",
+            "#W4219264"
+          ],
+          8
+        ],
+        [
+          [
+            "modify_pending_order_items",
+            "#W4219264"
+          ],
+          8
+        ],
+        [
+          [
+            "exchange_delivered_order_items",
+            "#W3445693"
+          ],
+          8
+        ]
+      ],
+      "score": {
+        "total": 3167,
+        "write_exact": 3,
+        "name_ovl": 3
+      }
+    },
+    "4": {
+      "user_id": "mei_ahmed_4909",
+      "tau2_task_id": "91",
+      "ds_write_actions": [
+        [
+          [
+            "return_delivered_order_items",
+            "#W7553978"
+          ],
+          8
+        ],
+        [
+          [
+            "exchange_delivered_order_items",
+            "#W3239882"
+          ],
+          8
+        ]
+      ],
+      "score": {
+        "total": 2116,
+        "write_exact": 2,
+        "name_ovl": 2
+      }
+    },
+    "5": {
+      "user_id": "yusuf_rossi_9620",
+      "tau2_task_id": "3",
+      "ds_write_actions": [
+        [
+          [
+            "modify_pending_order_items",
+            "#W4776164"
+          ],
+          8
+        ]
+      ],
+      "score": {
+        "total": 1066,
+        "write_exact": 1,
+        "name_ovl": 1
+      }
+    },
+    "6": {
+      "user_id": "chen_johnson_4204",
+      "tau2_task_id": "61",
+      "ds_write_actions": [
+        [
+          [
+            "modify_pending_order_items",
+            "#W5061109"
+          ],
+          8
+        ]
+      ],
+      "score": {
+        "total": 1058,
+        "write_exact": 1,
+        "name_ovl": 1
+      }
+    },
+    "7": {
+      "user_id": "amelia_silva_7726",
+      "tau2_task_id": "54",
+      "ds_write_actions": [
+        [
+          [
+            "cancel_pending_order",
+            "#W4836353"
+          ],
+          8
+        ],
+        [
+          [
+            "cancel_pending_order",
+            "#W7342738"
+          ],
+          8
+        ],
+        [
+          [
+            "return_delivered_order_items",
+            "#W4597054"
+          ],
+          8
+        ]
+      ],
+      "score": {
+        "total": 3109,
+        "write_exact": 3,
+        "name_ovl": 2
+      }
+    },
+    "8": {
+      "user_id": "mei_ahmed_4909",
+      "tau2_task_id": "92",
+      "ds_write_actions": [
+        [
+          [
+            "return_delivered_order_items",
+            "#W7553978"
+          ],
+          6
+        ],
+        [
+          [
+            "return_delivered_order_items",
+            "#W3239882"
+          ],
+          4
+        ]
+      ],
+      "score": {
+        "total": 2060,
+        "write_exact": 2,
+        "name_ovl": 1
+      }
+    },
+    "9": {
+      "user_id": "mei_kovacs_8020",
+      "tau2_task_id": "6",
+      "ds_write_actions": [
+        [
+          [
+            "exchange_delivered_order_items",
+            "#W6390527"
+          ],
+          8
+        ]
+      ],
+      "score": {
+        "total": 1058,
+        "write_exact": 1,
+        "name_ovl": 1
+      }
+    },
+    "10": {
+      "user_id": "chen_johnson_4204",
+      "tau2_task_id": "60",
+      "ds_write_actions": [
+        [
+          [
+            "modify_pending_order_items",
+            "#W5061109"
+          ],
+          8
+        ]
+      ],
+      "score": {
+        "total": 1062,
+        "write_exact": 1,
+        "name_ovl": 1
+      }
+    },
+    "11": {
+      "user_id": "lucas_santos_6600",
+      "tau2_task_id": "43",
+      "ds_write_actions": [
+        [
+          [
+            "modify_user_address",
+            "None"
+          ],
+          7
+        ]
+      ],
+      "score": {
+        "total": 1071,
+        "write_exact": 1,
+        "name_ovl": 1
+      }
+    },
+    "12": {
+      "user_id": "yusuf_hernandez_6785",
+      "tau2_task_id": "86",
+      "ds_write_actions": [
+        [
+          [
+            "modify_user_address",
+            "None"
+          ],
+          8
+        ],
+        [
+          [
+            "modify_pending_order_items",
+            "#W2466703"
+          ],
+          7
+        ]
+      ],
+      "score": {
+        "total": 2111,
+        "write_exact": 2,
+        "name_ovl": 2
+      }
+    },
+    "13": {
+      "user_id": "sofia_li_9219",
+      "tau2_task_id": "99",
+      "ds_write_actions": [
+        [
+          [
+            "exchange_delivered_order_items",
+            "#W3916020"
+          ],
+          8
+        ],
+        [
+          [
+            "exchange_delivered_order_items",
+            "#W4689314"
+          ],
+          8
+        ]
+      ],
+      "score": {
+        "total": 2082,
+        "write_exact": 2,
+        "name_ovl": 1
+      }
+    },
+    "14": {
+      "user_id": "daiki_johnson_9523",
+      "tau2_task_id": "45",
+      "ds_write_actions": [
+        [
+          [
+            "exchange_delivered_order_items",
+            "#W9502127"
+          ],
+          7
+        ]
+      ],
+      "score": {
+        "total": 1066,
+        "write_exact": 1,
+        "name_ovl": 1
+      }
+    },
+    "15": {
+      "user_id": "ava_nguyen_6646",
+      "tau2_task_id": "76",
+      "ds_write_actions": [
+        [
+          [
+            "cancel_pending_order",
+            "#W8367380"
+          ],
+          8
+        ],
+        [
+          [
+            "cancel_pending_order",
+            "#W1242543"
+          ],
+          5
+        ],
+        [
+          [
+            "modify_pending_order_items",
+            "#W1242543"
+          ],
+          3
+        ]
+      ],
+      "score": {
+        "total": 2070,
+        "write_exact": 2,
+        "name_ovl": 1
+      }
+    },
+    "16": {
+      "user_id": "chen_johnson_4204",
+      "tau2_task_id": "62",
+      "ds_write_actions": [],
+      "score": {
+        "total": 27,
+        "write_exact": 0,
+        "name_ovl": 0
+      }
+    },
+    "17": {
+      "user_id": "isabella_johansson_2152",
+      "tau2_task_id": "27",
+      "ds_write_actions": [
+        [
+          [
+            "return_delivered_order_items",
+            "#W7181492"
+          ],
+          8
+        ],
+        [
+          [
+            "exchange_delivered_order_items",
+            "#W7181492"
+          ],
+          8
+        ]
+      ],
+      "score": {
+        "total": 1058,
+        "write_exact": 1,
+        "name_ovl": 1
+      }
+    },
+    "18": {
+      "user_id": "mei_davis_8935",
+      "tau2_task_id": "18",
+      "ds_write_actions": [
+        [
+          [
+            "exchange_delivered_order_items",
+            "#W2890441"
+          ],
+          8
+        ]
+      ],
+      "score": {
+        "total": 1063,
+        "write_exact": 1,
+        "name_ovl": 1
+      }
+    },
+    "19": {
+      "user_id": "mia_garcia_4516",
+      "tau2_task_id": "11",
+      "ds_write_actions": [
+        [
+          [
+            "return_delivered_order_items",
+            "#W5490111"
+          ],
+          8
+        ],
+        [
+          [
+            "return_delivered_order_items",
+            "#W7387996"
+          ],
+          8
+        ]
+      ],
+      "score": {
+        "total": 2060,
+        "write_exact": 2,
+        "name_ovl": 1
+      }
+    },
+    "20": {
+      "user_id": "sofia_li_9219",
+      "tau2_task_id": "98",
+      "ds_write_actions": [
+        [
+          [
+            "cancel_pending_order",
+            "#W8855135"
+          ],
+          8
+        ],
+        [
+          [
+            "exchange_delivered_order_items",
+            "#W3916020"
+          ],
+          8
+        ],
+        [
+          [
+            "exchange_delivered_order_items",
+            "#W4689314"
+          ],
+          8
+        ]
+      ],
+      "score": {
+        "total": 3135,
+        "write_exact": 3,
+        "name_ovl": 2
+      }
+    },
+    "21": {
+      "user_id": "sophia_martin_8570",
+      "tau2_task_id": "109",
+      "ds_write_actions": [
+        [
+          [
+            "modify_pending_order_items",
+            "#W1603792"
+          ],
+          8
+        ],
+        [
+          [
+            "modify_user_address",
+            "None"
+          ],
+          6
+        ],
+        [
+          [
+            "modify_pending_order_address",
+            "#W1092119"
+          ],
+          4
+        ],
+        [
+          [
+            "modify_pending_order_address",
+            "#W1603792"
+          ],
+          4
+        ]
+      ],
+      "score": {
+        "total": 3173,
+        "write_exact": 3,
+        "name_ovl": 3
+      }
+    },
+    "22": {
+      "user_id": "ivan_hernandez_6923",
+      "tau2_task_id": "56",
+      "ds_write_actions": [
+        [
+          [
+            "modify_pending_order_items",
+            "#W4284542"
+          ],
+          8
+        ]
+      ],
+      "score": {
+        "total": 1061,
+        "write_exact": 1,
+        "name_ovl": 1
+      }
+    },
+    "23": {
+      "user_id": "liam_moore_4057",
+      "tau2_task_id": "75",
+      "ds_write_actions": [
+        [
+          [
+            "exchange_delivered_order_items",
+            "#W6908222"
+          ],
+          9
+        ]
+      ],
+      "score": {
+        "total": 1062,
+        "write_exact": 1,
+        "name_ovl": 1
+      }
+    },
+    "24": {
+      "user_id": "yusuf_hernandez_6785",
+      "tau2_task_id": "85",
+      "ds_write_actions": [
+        [
+          [
+            "modify_pending_order_items",
+            "#W2466703"
+          ],
+          7
+        ]
+      ],
+      "score": {
+        "total": 1056,
+        "write_exact": 1,
+        "name_ovl": 1
+      }
+    },
+    "25": {
+      "user_id": "yusuf_rossi_9620",
+      "tau2_task_id": "1",
+      "ds_write_actions": [
+        [
+          [
+            "exchange_delivered_order_items",
+            "#W2378156"
+          ],
+          8
+        ]
+      ],
+      "score": {
+        "total": 1069,
+        "write_exact": 1,
+        "name_ovl": 1
+      }
+    },
+    "26": {
+      "user_id": "chen_silva_7485",
+      "tau2_task_id": "83",
+      "ds_write_actions": [
+        [
+          [
+            "return_delivered_order_items",
+            "#W9571698"
+          ],
+          7
+        ]
+      ],
+      "score": {
+        "total": 1055,
+        "write_exact": 1,
+        "name_ovl": 1
+      }
+    },
+    "27": {
+      "user_id": "mei_patel_7272",
+      "tau2_task_id": "42",
+      "ds_write_actions": [
+        [
+          [
+            "modify_user_address",
+            "None"
+          ],
+          8
+        ],
+        [
+          [
+            "modify_pending_order_address",
+            "#W9583042"
+          ],
+          8
+        ],
+        [
+          [
+            "modify_pending_order_address",
+            "#W4082615"
+          ],
+          8
+        ],
+        [
+          [
+            "modify_pending_order_items",
+            "#W4082615"
+          ],
+          8
+        ]
+      ],
+      "score": {
+        "total": 4166,
+        "write_exact": 4,
+        "name_ovl": 3
+      }
+    },
+    "28": {
+      "user_id": "mei_patel_7272",
+      "tau2_task_id": "41",
+      "ds_write_actions": [
+        [
+          [
+            "modify_user_address",
+            "None"
+          ],
+          8
+        ],
+        [
+          [
+            "modify_pending_order_address",
+            "#W4082615"
+          ],
+          8
+        ],
+        [
+          [
+            "modify_pending_order_items",
+            "#W4082615"
+          ],
+          8
+        ]
+      ],
+      "score": {
+        "total": 3171,
+        "write_exact": 3,
+        "name_ovl": 3
+      }
+    },
+    "29": {
+      "user_id": "yusuf_rossi_9620",
+      "tau2_task_id": "4",
+      "ds_write_actions": [
+        [
+          [
+            "modify_pending_order_items",
+            "#W6247578"
+          ],
+          8
+        ],
+        [
+          [
+            "modify_pending_order_items",
+            "#W4776164"
+          ],
+          8
+        ]
+      ],
+      "score": {
+        "total": 2065,
+        "write_exact": 2,
+        "name_ovl": 1
+      }
+    },
+    "30": {
+      "user_id": "fatima_johnson_7581",
+      "tau2_task_id": "15",
+      "ds_write_actions": [
+        [
+          [
+            "modify_pending_order_items",
+            "#W5199551"
+          ],
+          8
+        ]
+      ],
+      "score": {
+        "total": 1061,
+        "write_exact": 1,
+        "name_ovl": 1
+      }
+    },
+    "31": {
+      "user_id": "fatima_johnson_7581",
+      "tau2_task_id": "17",
+      "ds_write_actions": [
+        [
+          [
+            "modify_pending_order_address",
+            "#W8665881"
+          ],
+          8
+        ]
+      ],
+      "score": {
+        "total": 1053,
+        "write_exact": 1,
+        "name_ovl": 1
+      }
+    },
+    "32": {
+      "user_id": "sofia_li_9219",
+      "tau2_task_id": "52",
+      "ds_write_actions": [
+        [
+          [
+            "exchange_delivered_order_items",
+            "#W4689314"
+          ],
+          8
+        ]
+      ],
+      "score": {
+        "total": 1069,
+        "write_exact": 1,
+        "name_ovl": 1
+      }
+    },
+    "33": {
+      "user_id": "isabella_lopez_6490",
+      "tau2_task_id": "40",
+      "ds_write_actions": [
+        [
+          [
+            "modify_pending_order_payment",
+            "#W4923227"
+          ],
+          8
+        ]
+      ],
+      "score": {
+        "total": 1063,
+        "write_exact": 1,
+        "name_ovl": 1
+      }
+    },
+    "34": {
+      "user_id": "daiki_sanchez_3253",
+      "tau2_task_id": "38",
+      "ds_write_actions": [
+        [
+          [
+            "cancel_pending_order",
+            "#W9348897"
+          ],
+          8
+        ]
+      ],
+      "score": {
+        "total": 1067,
+        "write_exact": 1,
+        "name_ovl": 1
+      }
+    },
+    "35": {
+      "user_id": "mei_kovacs_8020",
+      "tau2_task_id": "7",
+      "ds_write_actions": [
+        [
+          [
+            "return_delivered_order_items",
+            "#W6390527"
+          ],
+          6
+        ],
+        [
+          [
+            "exchange_delivered_order_items",
+            "#W6390527"
+          ],
+          2
+        ]
+      ],
+      "score": {
+        "total": 1058,
+        "write_exact": 1,
+        "name_ovl": 1
+      }
+    },
+    "36": {
+      "user_id": "sofia_li_9219",
+      "tau2_task_id": "53",
+      "ds_write_actions": [
+        [
+          [
+            "return_delivered_order_items",
+            "#W3916020"
+          ],
+          8
+        ]
+      ],
+      "score": {
+        "total": 1062,
+        "write_exact": 1,
+        "name_ovl": 1
+      }
+    },
+    "37": {
+      "user_id": "lucas_brown_6720",
+      "tau2_task_id": "104",
+      "ds_write_actions": [
+        [
+          [
+            "return_delivered_order_items",
+            "#W6239298"
+          ],
+          8
+        ],
+        [
+          [
+            "return_delivered_order_items",
+            "#W8660475"
+          ],
+          8
+        ],
+        [
+          [
+            "return_delivered_order_items",
+            "#W9218746"
+          ],
+          8
+        ],
+        [
+          [
+            "modify_pending_order_address",
+            "#W4860251"
+          ],
+          8
+        ],
+        [
+          [
+            "modify_pending_order_items",
+            "#W4860251"
+          ],
+          7
+        ]
+      ],
+      "score": {
+        "total": 5159,
+        "write_exact": 5,
+        "name_ovl": 3
+      }
+    },
+    "38": {
+      "user_id": "chen_johnson_4204",
+      "tau2_task_id": "63",
+      "ds_write_actions": [
+        [
+          [
+            "modify_pending_order_items",
+            "#W5061109"
+          ],
+          8
+        ]
+      ],
+      "score": {
+        "total": 1075,
+        "write_exact": 1,
+        "name_ovl": 1
+      }
+    },
+    "39": {
+      "user_id": "yusuf_rossi_9620",
+      "tau2_task_id": "0",
+      "ds_write_actions": [
+        [
+          [
+            "exchange_delivered_order_items",
+            "#W2378156"
+          ],
+          8
+        ]
+      ],
+      "score": {
+        "total": 1068,
+        "write_exact": 1,
+        "name_ovl": 1
+      }
+    },
+    "40": {
+      "user_id": "noah_patel_6952",
+      "tau2_task_id": "34",
+      "ds_write_actions": [
+        [
+          [
+            "modify_pending_order_address",
+            "#W1845024"
+          ],
+          4
+        ]
+      ],
+      "score": {
+        "total": 1074,
+        "write_exact": 1,
+        "name_ovl": 1
+      }
+    },
+    "41": {
+      "user_id": "isabella_johansson_2152",
+      "tau2_task_id": "28",
+      "ds_write_actions": [
+        [
+          [
+            "return_delivered_order_items",
+            "#W3792453"
+          ],
+          8
+        ],
+        [
+          [
+            "return_delivered_order_items",
+            "#W7181492"
+          ],
+          8
+        ],
+        [
+          [
+            "return_delivered_order_items",
+            "#W5565470"
+          ],
+          8
+        ]
+      ],
+      "score": {
+        "total": 3060,
+        "write_exact": 3,
+        "name_ovl": 1
+      }
+    },
+    "42": {
+      "user_id": "amelia_silva_7726",
+      "tau2_task_id": "55",
+      "ds_write_actions": [
+        [
+          [
+            "cancel_pending_order",
+            "#W4836353"
+          ],
+          8
+        ],
+        [
+          [
+            "cancel_pending_order",
+            "#W7342738"
+          ],
+          8
+        ],
+        [
+          [
+            "return_delivered_order_items",
+            "#W4597054"
+          ],
+          8
+        ],
+        [
+          [
+            "return_delivered_order_items",
+            "#W7773202"
+          ],
+          8
+        ]
+      ],
+      "score": {
+        "total": 4114,
+        "write_exact": 4,
+        "name_ovl": 2
+      }
+    },
+    "43": {
+      "user_id": "aarav_santos_2259",
+      "tau2_task_id": "35",
+      "ds_write_actions": [
+        [
+          [
+            "modify_pending_order_items",
+            "#W9672333"
+          ],
+          9
+        ],
+        [
+          [
+            "return_delivered_order_items",
+            "#W8528674"
+          ],
+          7
+        ]
+      ],
+      "score": {
+        "total": 2109,
+        "write_exact": 2,
+        "name_ovl": 2
+      }
+    },
+    "44": {
+      "user_id": "sofia_hernandez_5364",
+      "tau2_task_id": "23",
+      "ds_write_actions": [
+        [
+          [
+            "exchange_delivered_order_items",
+            "#W3947049"
+          ],
+          8
+        ],
+        [
+          [
+            "exchange_delivered_order_items",
+            "#W6876713"
+          ],
+          8
+        ],
+        [
+          [
+            "modify_pending_order_items",
+            "#W3561391"
+          ],
+          8
+        ]
+      ],
+      "score": {
+        "total": 3118,
+        "write_exact": 3,
+        "name_ovl": 2
+      }
+    },
+    "45": {
+      "user_id": "olivia_lopez_3865",
+      "tau2_task_id": "31",
+      "ds_write_actions": [
+        [
+          [
+            "cancel_pending_order",
+            "#W9373487"
+          ],
+          3
+        ],
+        [
+          [
+            "return_delivered_order_items",
+            "#W7449508"
+          ],
+          3
+        ]
+      ],
+      "score": {
+        "total": 2116,
+        "write_exact": 2,
+        "name_ovl": 2
+      }
+    },
+    "46": {
+      "user_id": "lei_li_6575",
+      "tau2_task_id": "74",
+      "ds_write_actions": [
+        [
+          [
+            "modify_pending_order_items",
+            "#W5166363"
+          ],
+          8
+        ],
+        [
+          [
+            "return_delivered_order_items",
+            "#W6289770"
+          ],
+          6
+        ]
+      ],
+      "score": {
+        "total": 1063,
+        "write_exact": 1,
+        "name_ovl": 1
+      }
+    },
+    "47": {
+      "user_id": "ivan_hernandez_6923",
+      "tau2_task_id": "57",
+      "ds_write_actions": [],
+      "score": {
+        "total": 11,
+        "write_exact": 0,
+        "name_ovl": 0
+      }
+    },
+    "48": {
+      "user_id": "lei_wilson_4541",
+      "tau2_task_id": "95",
+      "ds_write_actions": [
+        [
+          [
+            "exchange_delivered_order_items",
+            "#W2905754"
+          ],
+          8
+        ],
+        [
+          [
+            "exchange_delivered_order_items",
+            "#W4073673"
+          ],
+          8
+        ]
+      ],
+      "score": {
+        "total": 2063,
+        "write_exact": 2,
+        "name_ovl": 1
+      }
+    },
+    "49": {
+      "user_id": "yusuf_li_7255",
+      "tau2_task_id": "97",
+      "ds_write_actions": [
+        [
+          [
+            "modify_pending_order_items",
+            "#W6750959"
+          ],
+          8
+        ],
+        [
+          [
+            "modify_pending_order_address",
+            "#W6750959"
+          ],
+          8
+        ]
+      ],
+      "score": {
+        "total": 2112,
+        "write_exact": 2,
+        "name_ovl": 2
+      }
+    },
+    "50": {
+      "user_id": "olivia_lopez_3865",
+      "tau2_task_id": "32",
+      "ds_write_actions": [
+        [
+          [
+            "cancel_pending_order",
+            "#W9373487"
+          ],
+          6
+        ],
+        [
+          [
+            "cancel_pending_order",
+            "#W5481803"
+          ],
+          6
+        ],
+        [
+          [
+            "return_delivered_order_items",
+            "#W7449508"
+          ],
+          6
+        ]
+      ],
+      "score": {
+        "total": 3113,
+        "write_exact": 3,
+        "name_ovl": 2
+      }
+    },
+    "51": {
+      "user_id": "yusuf_li_7255",
+      "tau2_task_id": "96",
+      "ds_write_actions": [
+        [
+          [
+            "modify_pending_order_address",
+            "#W6750959"
+          ],
+          8
+        ],
+        [
+          [
+            "modify_pending_order_items",
+            "#W6750959"
+          ],
+          8
+        ]
+      ],
+      "score": {
+        "total": 2109,
+        "write_exact": 2,
+        "name_ovl": 2
+      }
+    },
+    "52": {
+      "user_id": "mia_garcia_4516",
+      "tau2_task_id": "14",
+      "ds_write_actions": [
+        [
+          [
+            "return_delivered_order_items",
+            "#W5490111"
+          ],
+          8
+        ],
+        [
+          [
+            "return_delivered_order_items",
+            "#W7387996"
+          ],
+          8
+        ]
+      ],
+      "score": {
+        "total": 2057,
+        "write_exact": 2,
+        "name_ovl": 1
+      }
+    },
+    "53": {
+      "user_id": "yara_muller_8652",
+      "tau2_task_id": "78",
+      "ds_write_actions": [
+        [
+          [
+            "modify_pending_order_items",
+            "#W5056519"
+          ],
+          8
+        ],
+        [
+          [
+            "modify_pending_order_address",
+            "#W5056519"
+          ],
+          8
+        ],
+        [
+          [
+            "cancel_pending_order",
+            "#W5995614"
+          ],
+          8
+        ]
+      ],
+      "score": {
+        "total": 3163,
+        "write_exact": 3,
+        "name_ovl": 3
+      }
+    },
+    "54": {
+      "user_id": "mei_davis_8935",
+      "tau2_task_id": "19",
+      "ds_write_actions": [
+        [
+          [
+            "return_delivered_order_items",
+            "#W2890441"
+          ],
+          8
+        ]
+      ],
+      "score": {
+        "total": 1061,
+        "write_exact": 1,
+        "name_ovl": 1
+      }
+    },
+    "55": {
+      "user_id": "isabella_johansson_2152",
+      "tau2_task_id": "29",
+      "ds_write_actions": [
+        [
+          [
+            "exchange_delivered_order_items",
+            "#W3792453"
+          ],
+          9
+        ],
+        [
+          [
+            "exchange_delivered_order_items",
+            "#W7181492"
+          ],
+          6
+        ]
+      ],
+      "score": {
+        "total": 2069,
+        "write_exact": 2,
+        "name_ovl": 1
+      }
+    },
+    "56": {
+      "user_id": "aarav_anderson_8794",
+      "tau2_task_id": "49",
+      "ds_write_actions": [
+        [
+          [
+            "exchange_delivered_order_items",
+            "#W3470184"
+          ],
+          8
+        ]
+      ],
+      "score": {
+        "total": 1065,
+        "write_exact": 1,
+        "name_ovl": 1
+      }
+    },
+    "57": {
+      "user_id": "yara_silva_7567",
+      "tau2_task_id": "111",
+      "ds_write_actions": [
+        [
+          [
+            "modify_pending_order_items",
+            "#W3730488"
+          ],
+          9
+        ],
+        [
+          [
+            "modify_pending_order_address",
+            "#W3730488"
+          ],
+          8
+        ],
+        [
+          [
+            "modify_pending_order_items",
+            "#W9810810"
+          ],
+          8
+        ]
+      ],
+      "score": {
+        "total": 3119,
+        "write_exact": 3,
+        "name_ovl": 2
+      }
+    },
+    "58": {
+      "user_id": "yara_silva_7567",
+      "tau2_task_id": "112",
+      "ds_write_actions": [
+        [
+          [
+            "modify_pending_order_items",
+            "#W3730488"
+          ],
+          8
+        ],
+        [
+          [
+            "modify_pending_order_address",
+            "#W3730488"
+          ],
+          7
+        ],
+        [
+          [
+            "modify_pending_order_items",
+            "#W9810810"
+          ],
+          7
+        ]
+      ],
+      "score": {
+        "total": 3110,
+        "write_exact": 3,
+        "name_ovl": 2
+      }
+    },
+    "59": {
+      "user_id": "emma_kovacs_9839",
+      "tau2_task_id": "79",
+      "ds_write_actions": [
+        [
+          [
+            "modify_pending_order_items",
+            "#W8661412"
+          ],
+          8
+        ]
+      ],
+      "score": {
+        "total": 1058,
+        "write_exact": 1,
+        "name_ovl": 1
+      }
+    },
+    "60": {
+      "user_id": "emma_smith_8564",
+      "tau2_task_id": "69",
+      "ds_write_actions": [
+        [
+          [
+            "cancel_pending_order",
+            "#W2417020"
+          ],
+          4
+        ]
+      ],
+      "score": {
+        "total": 1060,
+        "write_exact": 1,
+        "name_ovl": 1
+      }
+    },
+    "61": {
+      "user_id": "amelia_gonzalez_4098",
+      "tau2_task_id": "80",
+      "ds_write_actions": [
+        [
+          [
+            "exchange_delivered_order_items",
+            "#W7209932"
+          ],
+          8
+        ]
+      ],
+      "score": {
+        "total": 1065,
+        "write_exact": 1,
+        "name_ovl": 1
+      }
+    },
+    "62": {
+      "user_id": "ethan_garcia_1261",
+      "tau2_task_id": "21",
+      "ds_write_actions": [
+        [
+          [
+            "modify_pending_order_items",
+            "#W9911714"
+          ],
+          8
+        ]
+      ],
+      "score": {
+        "total": 1058,
+        "write_exact": 1,
+        "name_ovl": 1
+      }
+    },
+    "63": {
+      "user_id": "yara_ito_8499",
+      "tau2_task_id": "107",
+      "ds_write_actions": [
+        [
+          [
+            "exchange_delivered_order_items",
+            "#W1304208"
+          ],
+          8
+        ],
+        [
+          [
+            "exchange_delivered_order_items",
+            "#W8353027"
+          ],
+          8
+        ]
+      ],
+      "score": {
+        "total": 2065,
+        "write_exact": 2,
+        "name_ovl": 1
+      }
+    },
+    "64": {
+      "user_id": "ivan_khan_7475",
+      "tau2_task_id": "72",
+      "ds_write_actions": [
+        [
+          [
+            "modify_pending_order_address",
+            "#W5270061"
+          ],
+          8
+        ],
+        [
+          [
+            "modify_pending_order_items",
+            "#W5270061"
+          ],
+          7
+        ],
+        [
+          [
+            "modify_user_address",
+            "None"
+          ],
+          2
+        ]
+      ],
+      "score": {
+        "total": 2130,
+        "write_exact": 2,
+        "name_ovl": 2
+      }
+    },
+    "65": {
+      "user_id": "ivan_johnson_6036",
+      "tau2_task_id": "77",
+      "ds_write_actions": [
+        [
+          [
+            "exchange_delivered_order_items",
+            "#W1671835"
+          ],
+          6
+        ]
+      ],
+      "score": {
+        "total": 1054,
+        "write_exact": 1,
+        "name_ovl": 1
+      }
+    },
+    "66": {
+      "user_id": "isabella_johansson_2152",
+      "tau2_task_id": "26",
+      "ds_write_actions": [
+        [
+          [
+            "return_delivered_order_items",
+            "#W5565470"
+          ],
+          6
+        ]
+      ],
+      "score": {
+        "total": 1060,
+        "write_exact": 1,
+        "name_ovl": 1
+      }
+    },
+    "67": {
+      "user_id": "daiki_sanchez_3253",
+      "tau2_task_id": "37",
+      "ds_write_actions": [
+        [
+          [
+            "modify_pending_order_items",
+            "#W9348897"
+          ],
+          9
+        ]
+      ],
+      "score": {
+        "total": 1069,
+        "write_exact": 1,
+        "name_ovl": 1
+      }
+    },
+    "68": {
+      "user_id": "james_kim_7213",
+      "tau2_task_id": "81",
+      "ds_write_actions": [
+        [
+          [
+            "cancel_pending_order",
+            "#W3289292"
+          ],
+          8
+        ],
+        [
+          [
+            "cancel_pending_order",
+            "#W9722559"
+          ],
+          8
+        ]
+      ],
+      "score": {
+        "total": 2067,
+        "write_exact": 2,
+        "name_ovl": 1
+      }
+    },
+    "69": {
+      "user_id": "liam_thomas_7882",
+      "tau2_task_id": "100",
+      "ds_write_actions": [
+        [
+          [
+            "return_delivered_order_items",
+            "#W8488728"
+          ],
+          8
+        ],
+        [
+          [
+            "modify_pending_order_items",
+            "#W3295833"
+          ],
+          8
+        ],
+        [
+          [
+            "modify_pending_order_payment",
+            "#W3295833"
+          ],
+          2
+        ]
+      ],
+      "score": {
+        "total": 2119,
+        "write_exact": 2,
+        "name_ovl": 2
+      }
+    },
+    "70": {
+      "user_id": "daiki_johnson_9523",
+      "tau2_task_id": "47",
+      "ds_write_actions": [
+        [
+          [
+            "return_delivered_order_items",
+            "#W9502127"
+          ],
+          8
+        ]
+      ],
+      "score": {
+        "total": 1065,
+        "write_exact": 1,
+        "name_ovl": 1
+      }
+    },
+    "71": {
+      "user_id": "yusuf_gonzalez_8900",
+      "tau2_task_id": "108",
+      "ds_write_actions": [
+        [
+          [
+            "return_delivered_order_items",
+            "#W1679211"
+          ],
+          8
+        ]
+      ],
+      "score": {
+        "total": 1057,
+        "write_exact": 1,
+        "name_ovl": 1
+      }
+    }
+  },
+  "rl_eval": {
+    "uids": [
+      43,
+      3,
+      37,
+      65,
+      44,
+      56,
+      66,
+      69,
+      4,
+      13,
+      58,
+      54
     ],
-    [
-     [
-      "modify_pending_order_items",
-      "#W4219264"
-     ],
-     8
+    "uid_to_tau2_id": {
+      "43": "35",
+      "3": "102",
+      "37": "104",
+      "65": "77",
+      "44": "23",
+      "56": "49",
+      "66": "26",
+      "69": "100",
+      "4": "91",
+      "13": "99",
+      "58": "112",
+      "54": "19"
+    },
+    "tau2_ids": [
+      "19",
+      "23",
+      "26",
+      "35",
+      "49",
+      "77",
+      "91",
+      "99",
+      "100",
+      "102",
+      "104",
+      "112"
     ],
-    [
-     [
-      "exchange_delivered_order_items",
-      "#W3445693"
-     ],
-     8
-    ]
-   ],
-   "score": {
-    "total": 3167,
-    "write_exact": 3,
-    "name_ovl": 3
-   }
-  },
-  "4": {
-   "user_id": "mei_ahmed_4909",
-   "tau2_task_id": "91",
-   "ds_write_actions": [
-    [
-     [
-      "return_delivered_order_items",
-      "#W7553978"
-     ],
-     8
+    "in_tau2_train_split": [
+      "19",
+      "23",
+      "35",
+      "91",
+      "99",
+      "104",
+      "112"
     ],
-    [
-     [
-      "exchange_delivered_order_items",
-      "#W3239882"
-     ],
-     8
-    ]
-   ],
-   "score": {
-    "total": 2116,
-    "write_exact": 2,
-    "name_ovl": 2
-   }
-  },
-  "5": {
-   "user_id": "yusuf_rossi_9620",
-   "tau2_task_id": "3",
-   "ds_write_actions": [
-    [
-     [
-      "modify_pending_order_items",
-      "#W4776164"
-     ],
-     8
-    ]
-   ],
-   "score": {
-    "total": 1066,
-    "write_exact": 1,
-    "name_ovl": 1
-   }
-  },
-  "6": {
-   "user_id": "chen_johnson_4204",
-   "tau2_task_id": "61",
-   "ds_write_actions": [
-    [
-     [
-      "modify_pending_order_items",
-      "#W5061109"
-     ],
-     8
-    ]
-   ],
-   "score": {
-    "total": 1058,
-    "write_exact": 1,
-    "name_ovl": 1
-   }
-  },
-  "7": {
-   "user_id": "amelia_silva_7726",
-   "tau2_task_id": "54",
-   "ds_write_actions": [
-    [
-     [
-      "cancel_pending_order",
-      "#W4836353"
-     ],
-     8
+    "in_tau2_test_split": [
+      "26",
+      "49",
+      "77",
+      "100",
+      "102"
     ],
-    [
-     [
-      "cancel_pending_order",
-      "#W7342738"
-     ],
-     8
+    "match_confidence": "high \u2014 every rl_eval uid has an exact write-action (name+order_id) match to its assigned task"
+  },
+  "contamination_analysis": {
+    "note": "'seen' = tau2 ids reached by act_prm_train \u222a act_prm_eval dataset uids (used in Stage-1 EM + Stage-2 SFT). rl_eval uids held out.",
+    "test_seen_contaminated": [
+      "9",
+      "17",
+      "18",
+      "32",
+      "38",
+      "40",
+      "42",
+      "45",
+      "53",
+      "55",
+      "56",
+      "60",
+      "61",
+      "62",
+      "74",
+      "79",
+      "86",
+      "97",
+      "108",
+      "111"
     ],
-    [
-     [
-      "return_delivered_order_items",
-      "#W4597054"
-     ],
-     8
-    ]
-   ],
-   "score": {
-    "total": 3109,
-    "write_exact": 3,
-    "name_ovl": 2
-   }
-  },
-  "8": {
-   "user_id": "mei_ahmed_4909",
-   "tau2_task_id": "92",
-   "ds_write_actions": [
-    [
-     [
-      "return_delivered_order_items",
-      "#W7553978"
-     ],
-     6
+    "test_in_rl_eval_holdout": [
+      "26",
+      "49",
+      "77",
+      "100",
+      "102"
     ],
-    [
-     [
-      "return_delivered_order_items",
-      "#W3239882"
-     ],
-     4
-    ]
-   ],
-   "score": {
-    "total": 2060,
-    "write_exact": 2,
-    "name_ovl": 1
-   }
-  },
-  "9": {
-   "user_id": "mei_kovacs_8020",
-   "tau2_task_id": "6",
-   "ds_write_actions": [
-    [
-     [
-      "exchange_delivered_order_items",
-      "#W6390527"
-     ],
-     8
-    ]
-   ],
-   "score": {
-    "total": 1058,
-    "write_exact": 1,
-    "name_ovl": 1
-   }
-  },
-  "10": {
-   "user_id": "chen_johnson_4204",
-   "tau2_task_id": "60",
-   "ds_write_actions": [
-    [
-     [
-      "modify_pending_order_items",
-      "#W5061109"
-     ],
-     8
-    ]
-   ],
-   "score": {
-    "total": 1062,
-    "write_exact": 1,
-    "name_ovl": 1
-   }
-  },
-  "11": {
-   "user_id": "lucas_santos_6600",
-   "tau2_task_id": "43",
-   "ds_write_actions": [
-    [
-     [
-      "modify_user_address",
-      "None"
-     ],
-     7
-    ]
-   ],
-   "score": {
-    "total": 1071,
-    "write_exact": 1,
-    "name_ovl": 1
-   }
-  },
-  "12": {
-   "user_id": "yusuf_hernandez_6785",
-   "tau2_task_id": "86",
-   "ds_write_actions": [
-    [
-     [
-      "modify_user_address",
-      "None"
-     ],
-     8
+    "test_never_in_dataset_truly_unseen": [
+      "5",
+      "12",
+      "33",
+      "36",
+      "39",
+      "51",
+      "64",
+      "65",
+      "68",
+      "70",
+      "71",
+      "90",
+      "94",
+      "101"
     ],
-    [
-     [
-      "modify_pending_order_items",
-      "#W2466703"
-     ],
-     7
+    "recommended_clean_test_eval_set": [
+      "5",
+      "12",
+      "26",
+      "33",
+      "36",
+      "39",
+      "49",
+      "51",
+      "64",
+      "65",
+      "68",
+      "70",
+      "71",
+      "77",
+      "90",
+      "94",
+      "100",
+      "101",
+      "102"
     ]
-   ],
-   "score": {
-    "total": 2111,
-    "write_exact": 2,
-    "name_ovl": 2
-   }
   },
-  "13": {
-   "user_id": "sofia_li_9219",
-   "tau2_task_id": "99",
-   "ds_write_actions": [
-    [
-     [
-      "exchange_delivered_order_items",
-      "#W3916020"
-     ],
-     8
-    ],
-    [
-     [
-      "exchange_delivered_order_items",
-      "#W4689314"
-     ],
-     8
+  "never_in_logs": {
+    "note": "tau2 retail tasks NEVER in the expert dataset (114 total - 72 covered). Purer RL hold-out: train RL on the 72 logged, eval on these unseen tasks. Matches airline design.",
+    "count": 42,
+    "n_from_tau2_train_split": 28,
+    "n_from_tau2_test_split": 14,
+    "ids": [
+      "2",
+      "5",
+      "8",
+      "10",
+      "12",
+      "13",
+      "16",
+      "20",
+      "22",
+      "24",
+      "25",
+      "33",
+      "36",
+      "39",
+      "44",
+      "46",
+      "48",
+      "50",
+      "51",
+      "58",
+      "59",
+      "64",
+      "65",
+      "66",
+      "67",
+      "68",
+      "70",
+      "71",
+      "73",
+      "82",
+      "87",
+      "88",
+      "89",
+      "90",
+      "93",
+      "94",
+      "101",
+      "103",
+      "105",
+      "106",
+      "110",
+      "113"
     ]
-   ],
-   "score": {
-    "total": 2082,
-    "write_exact": 2,
-    "name_ovl": 1
-   }
-  },
-  "14": {
-   "user_id": "daiki_johnson_9523",
-   "tau2_task_id": "45",
-   "ds_write_actions": [
-    [
-     [
-      "exchange_delivered_order_items",
-      "#W9502127"
-     ],
-     7
-    ]
-   ],
-   "score": {
-    "total": 1066,
-    "write_exact": 1,
-    "name_ovl": 1
-   }
-  },
-  "15": {
-   "user_id": "ava_nguyen_6646",
-   "tau2_task_id": "76",
-   "ds_write_actions": [
-    [
-     [
-      "cancel_pending_order",
-      "#W8367380"
-     ],
-     8
-    ],
-    [
-     [
-      "cancel_pending_order",
-      "#W1242543"
-     ],
-     5
-    ],
-    [
-     [
-      "modify_pending_order_items",
-      "#W1242543"
-     ],
-     3
-    ]
-   ],
-   "score": {
-    "total": 2070,
-    "write_exact": 2,
-    "name_ovl": 1
-   }
-  },
-  "16": {
-   "user_id": "chen_johnson_4204",
-   "tau2_task_id": "62",
-   "ds_write_actions": [],
-   "score": {
-    "total": 27,
-    "write_exact": 0,
-    "name_ovl": 0
-   }
-  },
-  "17": {
-   "user_id": "isabella_johansson_2152",
-   "tau2_task_id": "27",
-   "ds_write_actions": [
-    [
-     [
-      "return_delivered_order_items",
-      "#W7181492"
-     ],
-     8
-    ],
-    [
-     [
-      "exchange_delivered_order_items",
-      "#W7181492"
-     ],
-     8
-    ]
-   ],
-   "score": {
-    "total": 1058,
-    "write_exact": 1,
-    "name_ovl": 1
-   }
-  },
-  "18": {
-   "user_id": "mei_davis_8935",
-   "tau2_task_id": "18",
-   "ds_write_actions": [
-    [
-     [
-      "exchange_delivered_order_items",
-      "#W2890441"
-     ],
-     8
-    ]
-   ],
-   "score": {
-    "total": 1063,
-    "write_exact": 1,
-    "name_ovl": 1
-   }
-  },
-  "19": {
-   "user_id": "mia_garcia_4516",
-   "tau2_task_id": "11",
-   "ds_write_actions": [
-    [
-     [
-      "return_delivered_order_items",
-      "#W5490111"
-     ],
-     8
-    ],
-    [
-     [
-      "return_delivered_order_items",
-      "#W7387996"
-     ],
-     8
-    ]
-   ],
-   "score": {
-    "total": 2060,
-    "write_exact": 2,
-    "name_ovl": 1
-   }
-  },
-  "20": {
-   "user_id": "sofia_li_9219",
-   "tau2_task_id": "98",
-   "ds_write_actions": [
-    [
-     [
-      "cancel_pending_order",
-      "#W8855135"
-     ],
-     8
-    ],
-    [
-     [
-      "exchange_delivered_order_items",
-      "#W3916020"
-     ],
-     8
-    ],
-    [
-     [
-      "exchange_delivered_order_items",
-      "#W4689314"
-     ],
-     8
-    ]
-   ],
-   "score": {
-    "total": 3135,
-    "write_exact": 3,
-    "name_ovl": 2
-   }
-  },
-  "21": {
-   "user_id": "sophia_martin_8570",
-   "tau2_task_id": "109",
-   "ds_write_actions": [
-    [
-     [
-      "modify_pending_order_items",
-      "#W1603792"
-     ],
-     8
-    ],
-    [
-     [
-      "modify_user_address",
-      "None"
-     ],
-     6
-    ],
-    [
-     [
-      "modify_pending_order_address",
-      "#W1092119"
-     ],
-     4
-    ],
-    [
-     [
-      "modify_pending_order_address",
-      "#W1603792"
-     ],
-     4
-    ]
-   ],
-   "score": {
-    "total": 3173,
-    "write_exact": 3,
-    "name_ovl": 3
-   }
-  },
-  "22": {
-   "user_id": "ivan_hernandez_6923",
-   "tau2_task_id": "56",
-   "ds_write_actions": [
-    [
-     [
-      "modify_pending_order_items",
-      "#W4284542"
-     ],
-     8
-    ]
-   ],
-   "score": {
-    "total": 1061,
-    "write_exact": 1,
-    "name_ovl": 1
-   }
-  },
-  "23": {
-   "user_id": "liam_moore_4057",
-   "tau2_task_id": "75",
-   "ds_write_actions": [
-    [
-     [
-      "exchange_delivered_order_items",
-      "#W6908222"
-     ],
-     9
-    ]
-   ],
-   "score": {
-    "total": 1062,
-    "write_exact": 1,
-    "name_ovl": 1
-   }
-  },
-  "24": {
-   "user_id": "yusuf_hernandez_6785",
-   "tau2_task_id": "85",
-   "ds_write_actions": [
-    [
-     [
-      "modify_pending_order_items",
-      "#W2466703"
-     ],
-     7
-    ]
-   ],
-   "score": {
-    "total": 1056,
-    "write_exact": 1,
-    "name_ovl": 1
-   }
-  },
-  "25": {
-   "user_id": "yusuf_rossi_9620",
-   "tau2_task_id": "1",
-   "ds_write_actions": [
-    [
-     [
-      "exchange_delivered_order_items",
-      "#W2378156"
-     ],
-     8
-    ]
-   ],
-   "score": {
-    "total": 1069,
-    "write_exact": 1,
-    "name_ovl": 1
-   }
-  },
-  "26": {
-   "user_id": "chen_silva_7485",
-   "tau2_task_id": "83",
-   "ds_write_actions": [
-    [
-     [
-      "return_delivered_order_items",
-      "#W9571698"
-     ],
-     7
-    ]
-   ],
-   "score": {
-    "total": 1055,
-    "write_exact": 1,
-    "name_ovl": 1
-   }
-  },
-  "27": {
-   "user_id": "mei_patel_7272",
-   "tau2_task_id": "42",
-   "ds_write_actions": [
-    [
-     [
-      "modify_user_address",
-      "None"
-     ],
-     8
-    ],
-    [
-     [
-      "modify_pending_order_address",
-      "#W9583042"
-     ],
-     8
-    ],
-    [
-     [
-      "modify_pending_order_address",
-      "#W4082615"
-     ],
-     8
-    ],
-    [
-     [
-      "modify_pending_order_items",
-      "#W4082615"
-     ],
-     8
-    ]
-   ],
-   "score": {
-    "total": 4166,
-    "write_exact": 4,
-    "name_ovl": 3
-   }
-  },
-  "28": {
-   "user_id": "mei_patel_7272",
-   "tau2_task_id": "41",
-   "ds_write_actions": [
-    [
-     [
-      "modify_user_address",
-      "None"
-     ],
-     8
-    ],
-    [
-     [
-      "modify_pending_order_address",
-      "#W4082615"
-     ],
-     8
-    ],
-    [
-     [
-      "modify_pending_order_items",
-      "#W4082615"
-     ],
-     8
-    ]
-   ],
-   "score": {
-    "total": 3171,
-    "write_exact": 3,
-    "name_ovl": 3
-   }
-  },
-  "29": {
-   "user_id": "yusuf_rossi_9620",
-   "tau2_task_id": "4",
-   "ds_write_actions": [
-    [
-     [
-      "modify_pending_order_items",
-      "#W6247578"
-     ],
-     8
-    ],
-    [
-     [
-      "modify_pending_order_items",
-      "#W4776164"
-     ],
-     8
-    ]
-   ],
-   "score": {
-    "total": 2065,
-    "write_exact": 2,
-    "name_ovl": 1
-   }
-  },
-  "30": {
-   "user_id": "fatima_johnson_7581",
-   "tau2_task_id": "15",
-   "ds_write_actions": [
-    [
-     [
-      "modify_pending_order_items",
-      "#W5199551"
-     ],
-     8
-    ]
-   ],
-   "score": {
-    "total": 1061,
-    "write_exact": 1,
-    "name_ovl": 1
-   }
-  },
-  "31": {
-   "user_id": "fatima_johnson_7581",
-   "tau2_task_id": "17",
-   "ds_write_actions": [
-    [
-     [
-      "modify_pending_order_address",
-      "#W8665881"
-     ],
-     8
-    ]
-   ],
-   "score": {
-    "total": 1053,
-    "write_exact": 1,
-    "name_ovl": 1
-   }
-  },
-  "32": {
-   "user_id": "sofia_li_9219",
-   "tau2_task_id": "52",
-   "ds_write_actions": [
-    [
-     [
-      "exchange_delivered_order_items",
-      "#W4689314"
-     ],
-     8
-    ]
-   ],
-   "score": {
-    "total": 1069,
-    "write_exact": 1,
-    "name_ovl": 1
-   }
-  },
-  "33": {
-   "user_id": "isabella_lopez_6490",
-   "tau2_task_id": "40",
-   "ds_write_actions": [
-    [
-     [
-      "modify_pending_order_payment",
-      "#W4923227"
-     ],
-     8
-    ]
-   ],
-   "score": {
-    "total": 1063,
-    "write_exact": 1,
-    "name_ovl": 1
-   }
-  },
-  "34": {
-   "user_id": "daiki_sanchez_3253",
-   "tau2_task_id": "38",
-   "ds_write_actions": [
-    [
-     [
-      "cancel_pending_order",
-      "#W9348897"
-     ],
-     8
-    ]
-   ],
-   "score": {
-    "total": 1067,
-    "write_exact": 1,
-    "name_ovl": 1
-   }
-  },
-  "35": {
-   "user_id": "mei_kovacs_8020",
-   "tau2_task_id": "7",
-   "ds_write_actions": [
-    [
-     [
-      "return_delivered_order_items",
-      "#W6390527"
-     ],
-     6
-    ],
-    [
-     [
-      "exchange_delivered_order_items",
-      "#W6390527"
-     ],
-     2
-    ]
-   ],
-   "score": {
-    "total": 1058,
-    "write_exact": 1,
-    "name_ovl": 1
-   }
-  },
-  "36": {
-   "user_id": "sofia_li_9219",
-   "tau2_task_id": "53",
-   "ds_write_actions": [
-    [
-     [
-      "return_delivered_order_items",
-      "#W3916020"
-     ],
-     8
-    ]
-   ],
-   "score": {
-    "total": 1062,
-    "write_exact": 1,
-    "name_ovl": 1
-   }
-  },
-  "37": {
-   "user_id": "lucas_brown_6720",
-   "tau2_task_id": "104",
-   "ds_write_actions": [
-    [
-     [
-      "return_delivered_order_items",
-      "#W6239298"
-     ],
-     8
-    ],
-    [
-     [
-      "return_delivered_order_items",
-      "#W8660475"
-     ],
-     8
-    ],
-    [
-     [
-      "return_delivered_order_items",
-      "#W9218746"
-     ],
-     8
-    ],
-    [
-     [
-      "modify_pending_order_address",
-      "#W4860251"
-     ],
-     8
-    ],
-    [
-     [
-      "modify_pending_order_items",
-      "#W4860251"
-     ],
-     7
-    ]
-   ],
-   "score": {
-    "total": 5159,
-    "write_exact": 5,
-    "name_ovl": 3
-   }
-  },
-  "38": {
-   "user_id": "chen_johnson_4204",
-   "tau2_task_id": "63",
-   "ds_write_actions": [
-    [
-     [
-      "modify_pending_order_items",
-      "#W5061109"
-     ],
-     8
-    ]
-   ],
-   "score": {
-    "total": 1075,
-    "write_exact": 1,
-    "name_ovl": 1
-   }
-  },
-  "39": {
-   "user_id": "yusuf_rossi_9620",
-   "tau2_task_id": "0",
-   "ds_write_actions": [
-    [
-     [
-      "exchange_delivered_order_items",
-      "#W2378156"
-     ],
-     8
-    ]
-   ],
-   "score": {
-    "total": 1068,
-    "write_exact": 1,
-    "name_ovl": 1
-   }
-  },
-  "40": {
-   "user_id": "noah_patel_6952",
-   "tau2_task_id": "34",
-   "ds_write_actions": [
-    [
-     [
-      "modify_pending_order_address",
-      "#W1845024"
-     ],
-     4
-    ]
-   ],
-   "score": {
-    "total": 1074,
-    "write_exact": 1,
-    "name_ovl": 1
-   }
-  },
-  "41": {
-   "user_id": "isabella_johansson_2152",
-   "tau2_task_id": "28",
-   "ds_write_actions": [
-    [
-     [
-      "return_delivered_order_items",
-      "#W3792453"
-     ],
-     8
-    ],
-    [
-     [
-      "return_delivered_order_items",
-      "#W7181492"
-     ],
-     8
-    ],
-    [
-     [
-      "return_delivered_order_items",
-      "#W5565470"
-     ],
-     8
-    ]
-   ],
-   "score": {
-    "total": 3060,
-    "write_exact": 3,
-    "name_ovl": 1
-   }
-  },
-  "42": {
-   "user_id": "amelia_silva_7726",
-   "tau2_task_id": "55",
-   "ds_write_actions": [
-    [
-     [
-      "cancel_pending_order",
-      "#W4836353"
-     ],
-     8
-    ],
-    [
-     [
-      "cancel_pending_order",
-      "#W7342738"
-     ],
-     8
-    ],
-    [
-     [
-      "return_delivered_order_items",
-      "#W4597054"
-     ],
-     8
-    ],
-    [
-     [
-      "return_delivered_order_items",
-      "#W7773202"
-     ],
-     8
-    ]
-   ],
-   "score": {
-    "total": 4114,
-    "write_exact": 4,
-    "name_ovl": 2
-   }
-  },
-  "43": {
-   "user_id": "aarav_santos_2259",
-   "tau2_task_id": "35",
-   "ds_write_actions": [
-    [
-     [
-      "modify_pending_order_items",
-      "#W9672333"
-     ],
-     9
-    ],
-    [
-     [
-      "return_delivered_order_items",
-      "#W8528674"
-     ],
-     7
-    ]
-   ],
-   "score": {
-    "total": 2109,
-    "write_exact": 2,
-    "name_ovl": 2
-   }
-  },
-  "44": {
-   "user_id": "sofia_hernandez_5364",
-   "tau2_task_id": "23",
-   "ds_write_actions": [
-    [
-     [
-      "exchange_delivered_order_items",
-      "#W3947049"
-     ],
-     8
-    ],
-    [
-     [
-      "exchange_delivered_order_items",
-      "#W6876713"
-     ],
-     8
-    ],
-    [
-     [
-      "modify_pending_order_items",
-      "#W3561391"
-     ],
-     8
-    ]
-   ],
-   "score": {
-    "total": 3118,
-    "write_exact": 3,
-    "name_ovl": 2
-   }
-  },
-  "45": {
-   "user_id": "olivia_lopez_3865",
-   "tau2_task_id": "31",
-   "ds_write_actions": [
-    [
-     [
-      "cancel_pending_order",
-      "#W9373487"
-     ],
-     3
-    ],
-    [
-     [
-      "return_delivered_order_items",
-      "#W7449508"
-     ],
-     3
-    ]
-   ],
-   "score": {
-    "total": 2116,
-    "write_exact": 2,
-    "name_ovl": 2
-   }
-  },
-  "46": {
-   "user_id": "lei_li_6575",
-   "tau2_task_id": "74",
-   "ds_write_actions": [
-    [
-     [
-      "modify_pending_order_items",
-      "#W5166363"
-     ],
-     8
-    ],
-    [
-     [
-      "return_delivered_order_items",
-      "#W6289770"
-     ],
-     6
-    ]
-   ],
-   "score": {
-    "total": 1063,
-    "write_exact": 1,
-    "name_ovl": 1
-   }
-  },
-  "47": {
-   "user_id": "ivan_hernandez_6923",
-   "tau2_task_id": "57",
-   "ds_write_actions": [],
-   "score": {
-    "total": 11,
-    "write_exact": 0,
-    "name_ovl": 0
-   }
-  },
-  "48": {
-   "user_id": "lei_wilson_4541",
-   "tau2_task_id": "95",
-   "ds_write_actions": [
-    [
-     [
-      "exchange_delivered_order_items",
-      "#W2905754"
-     ],
-     8
-    ],
-    [
-     [
-      "exchange_delivered_order_items",
-      "#W4073673"
-     ],
-     8
-    ]
-   ],
-   "score": {
-    "total": 2063,
-    "write_exact": 2,
-    "name_ovl": 1
-   }
-  },
-  "49": {
-   "user_id": "yusuf_li_7255",
-   "tau2_task_id": "97",
-   "ds_write_actions": [
-    [
-     [
-      "modify_pending_order_items",
-      "#W6750959"
-     ],
-     8
-    ],
-    [
-     [
-      "modify_pending_order_address",
-      "#W6750959"
-     ],
-     8
-    ]
-   ],
-   "score": {
-    "total": 2112,
-    "write_exact": 2,
-    "name_ovl": 2
-   }
-  },
-  "50": {
-   "user_id": "olivia_lopez_3865",
-   "tau2_task_id": "32",
-   "ds_write_actions": [
-    [
-     [
-      "cancel_pending_order",
-      "#W9373487"
-     ],
-     6
-    ],
-    [
-     [
-      "cancel_pending_order",
-      "#W5481803"
-     ],
-     6
-    ],
-    [
-     [
-      "return_delivered_order_items",
-      "#W7449508"
-     ],
-     6
-    ]
-   ],
-   "score": {
-    "total": 3113,
-    "write_exact": 3,
-    "name_ovl": 2
-   }
-  },
-  "51": {
-   "user_id": "yusuf_li_7255",
-   "tau2_task_id": "96",
-   "ds_write_actions": [
-    [
-     [
-      "modify_pending_order_address",
-      "#W6750959"
-     ],
-     8
-    ],
-    [
-     [
-      "modify_pending_order_items",
-      "#W6750959"
-     ],
-     8
-    ]
-   ],
-   "score": {
-    "total": 2109,
-    "write_exact": 2,
-    "name_ovl": 2
-   }
-  },
-  "52": {
-   "user_id": "mia_garcia_4516",
-   "tau2_task_id": "14",
-   "ds_write_actions": [
-    [
-     [
-      "return_delivered_order_items",
-      "#W5490111"
-     ],
-     8
-    ],
-    [
-     [
-      "return_delivered_order_items",
-      "#W7387996"
-     ],
-     8
-    ]
-   ],
-   "score": {
-    "total": 2057,
-    "write_exact": 2,
-    "name_ovl": 1
-   }
-  },
-  "53": {
-   "user_id": "yara_muller_8652",
-   "tau2_task_id": "78",
-   "ds_write_actions": [
-    [
-     [
-      "modify_pending_order_items",
-      "#W5056519"
-     ],
-     8
-    ],
-    [
-     [
-      "modify_pending_order_address",
-      "#W5056519"
-     ],
-     8
-    ],
-    [
-     [
-      "cancel_pending_order",
-      "#W5995614"
-     ],
-     8
-    ]
-   ],
-   "score": {
-    "total": 3163,
-    "write_exact": 3,
-    "name_ovl": 3
-   }
-  },
-  "54": {
-   "user_id": "mei_davis_8935",
-   "tau2_task_id": "19",
-   "ds_write_actions": [
-    [
-     [
-      "return_delivered_order_items",
-      "#W2890441"
-     ],
-     8
-    ]
-   ],
-   "score": {
-    "total": 1061,
-    "write_exact": 1,
-    "name_ovl": 1
-   }
-  },
-  "55": {
-   "user_id": "isabella_johansson_2152",
-   "tau2_task_id": "29",
-   "ds_write_actions": [
-    [
-     [
-      "exchange_delivered_order_items",
-      "#W3792453"
-     ],
-     9
-    ],
-    [
-     [
-      "exchange_delivered_order_items",
-      "#W7181492"
-     ],
-     6
-    ]
-   ],
-   "score": {
-    "total": 2069,
-    "write_exact": 2,
-    "name_ovl": 1
-   }
-  },
-  "56": {
-   "user_id": "aarav_anderson_8794",
-   "tau2_task_id": "49",
-   "ds_write_actions": [
-    [
-     [
-      "exchange_delivered_order_items",
-      "#W3470184"
-     ],
-     8
-    ]
-   ],
-   "score": {
-    "total": 1065,
-    "write_exact": 1,
-    "name_ovl": 1
-   }
-  },
-  "57": {
-   "user_id": "yara_silva_7567",
-   "tau2_task_id": "111",
-   "ds_write_actions": [
-    [
-     [
-      "modify_pending_order_items",
-      "#W3730488"
-     ],
-     9
-    ],
-    [
-     [
-      "modify_pending_order_address",
-      "#W3730488"
-     ],
-     8
-    ],
-    [
-     [
-      "modify_pending_order_items",
-      "#W9810810"
-     ],
-     8
-    ]
-   ],
-   "score": {
-    "total": 3119,
-    "write_exact": 3,
-    "name_ovl": 2
-   }
-  },
-  "58": {
-   "user_id": "yara_silva_7567",
-   "tau2_task_id": "112",
-   "ds_write_actions": [
-    [
-     [
-      "modify_pending_order_items",
-      "#W3730488"
-     ],
-     8
-    ],
-    [
-     [
-      "modify_pending_order_address",
-      "#W3730488"
-     ],
-     7
-    ],
-    [
-     [
-      "modify_pending_order_items",
-      "#W9810810"
-     ],
-     7
-    ]
-   ],
-   "score": {
-    "total": 3110,
-    "write_exact": 3,
-    "name_ovl": 2
-   }
-  },
-  "59": {
-   "user_id": "emma_kovacs_9839",
-   "tau2_task_id": "79",
-   "ds_write_actions": [
-    [
-     [
-      "modify_pending_order_items",
-      "#W8661412"
-     ],
-     8
-    ]
-   ],
-   "score": {
-    "total": 1058,
-    "write_exact": 1,
-    "name_ovl": 1
-   }
-  },
-  "60": {
-   "user_id": "emma_smith_8564",
-   "tau2_task_id": "69",
-   "ds_write_actions": [
-    [
-     [
-      "cancel_pending_order",
-      "#W2417020"
-     ],
-     4
-    ]
-   ],
-   "score": {
-    "total": 1060,
-    "write_exact": 1,
-    "name_ovl": 1
-   }
-  },
-  "61": {
-   "user_id": "amelia_gonzalez_4098",
-   "tau2_task_id": "80",
-   "ds_write_actions": [
-    [
-     [
-      "exchange_delivered_order_items",
-      "#W7209932"
-     ],
-     8
-    ]
-   ],
-   "score": {
-    "total": 1065,
-    "write_exact": 1,
-    "name_ovl": 1
-   }
-  },
-  "62": {
-   "user_id": "ethan_garcia_1261",
-   "tau2_task_id": "21",
-   "ds_write_actions": [
-    [
-     [
-      "modify_pending_order_items",
-      "#W9911714"
-     ],
-     8
-    ]
-   ],
-   "score": {
-    "total": 1058,
-    "write_exact": 1,
-    "name_ovl": 1
-   }
-  },
-  "63": {
-   "user_id": "yara_ito_8499",
-   "tau2_task_id": "107",
-   "ds_write_actions": [
-    [
-     [
-      "exchange_delivered_order_items",
-      "#W1304208"
-     ],
-     8
-    ],
-    [
-     [
-      "exchange_delivered_order_items",
-      "#W8353027"
-     ],
-     8
-    ]
-   ],
-   "score": {
-    "total": 2065,
-    "write_exact": 2,
-    "name_ovl": 1
-   }
-  },
-  "64": {
-   "user_id": "ivan_khan_7475",
-   "tau2_task_id": "72",
-   "ds_write_actions": [
-    [
-     [
-      "modify_pending_order_address",
-      "#W5270061"
-     ],
-     8
-    ],
-    [
-     [
-      "modify_pending_order_items",
-      "#W5270061"
-     ],
-     7
-    ],
-    [
-     [
-      "modify_user_address",
-      "None"
-     ],
-     2
-    ]
-   ],
-   "score": {
-    "total": 2130,
-    "write_exact": 2,
-    "name_ovl": 2
-   }
-  },
-  "65": {
-   "user_id": "ivan_johnson_6036",
-   "tau2_task_id": "77",
-   "ds_write_actions": [
-    [
-     [
-      "exchange_delivered_order_items",
-      "#W1671835"
-     ],
-     6
-    ]
-   ],
-   "score": {
-    "total": 1054,
-    "write_exact": 1,
-    "name_ovl": 1
-   }
-  },
-  "66": {
-   "user_id": "isabella_johansson_2152",
-   "tau2_task_id": "26",
-   "ds_write_actions": [
-    [
-     [
-      "return_delivered_order_items",
-      "#W5565470"
-     ],
-     6
-    ]
-   ],
-   "score": {
-    "total": 1060,
-    "write_exact": 1,
-    "name_ovl": 1
-   }
-  },
-  "67": {
-   "user_id": "daiki_sanchez_3253",
-   "tau2_task_id": "37",
-   "ds_write_actions": [
-    [
-     [
-      "modify_pending_order_items",
-      "#W9348897"
-     ],
-     9
-    ]
-   ],
-   "score": {
-    "total": 1069,
-    "write_exact": 1,
-    "name_ovl": 1
-   }
-  },
-  "68": {
-   "user_id": "james_kim_7213",
-   "tau2_task_id": "81",
-   "ds_write_actions": [
-    [
-     [
-      "cancel_pending_order",
-      "#W3289292"
-     ],
-     8
-    ],
-    [
-     [
-      "cancel_pending_order",
-      "#W9722559"
-     ],
-     8
-    ]
-   ],
-   "score": {
-    "total": 2067,
-    "write_exact": 2,
-    "name_ovl": 1
-   }
-  },
-  "69": {
-   "user_id": "liam_thomas_7882",
-   "tau2_task_id": "100",
-   "ds_write_actions": [
-    [
-     [
-      "return_delivered_order_items",
-      "#W8488728"
-     ],
-     8
-    ],
-    [
-     [
-      "modify_pending_order_items",
-      "#W3295833"
-     ],
-     8
-    ],
-    [
-     [
-      "modify_pending_order_payment",
-      "#W3295833"
-     ],
-     2
-    ]
-   ],
-   "score": {
-    "total": 2119,
-    "write_exact": 2,
-    "name_ovl": 2
-   }
-  },
-  "70": {
-   "user_id": "daiki_johnson_9523",
-   "tau2_task_id": "47",
-   "ds_write_actions": [
-    [
-     [
-      "return_delivered_order_items",
-      "#W9502127"
-     ],
-     8
-    ]
-   ],
-   "score": {
-    "total": 1065,
-    "write_exact": 1,
-    "name_ovl": 1
-   }
-  },
-  "71": {
-   "user_id": "yusuf_gonzalez_8900",
-   "tau2_task_id": "108",
-   "ds_write_actions": [
-    [
-     [
-      "return_delivered_order_items",
-      "#W1679211"
-     ],
-     8
-    ]
-   ],
-   "score": {
-    "total": 1057,
-    "write_exact": 1,
-    "name_ovl": 1
-   }
   }
- },
- "rl_eval": {
-  "uids": [
-   43,
-   3,
-   37,
-   65,
-   44,
-   56,
-   66,
-   69,
-   4,
-   13,
-   58,
-   54
-  ],
-  "uid_to_tau2_id": {
-   "43": "35",
-   "3": "102",
-   "37": "104",
-   "65": "77",
-   "44": "23",
-   "56": "49",
-   "66": "26",
-   "69": "100",
-   "4": "91",
-   "13": "99",
-   "58": "112",
-   "54": "19"
-  },
-  "tau2_ids": [
-   "19",
-   "23",
-   "26",
-   "35",
-   "49",
-   "77",
-   "91",
-   "99",
-   "100",
-   "102",
-   "104",
-   "112"
-  ],
-  "in_tau2_train_split": [
-   "19",
-   "23",
-   "35",
-   "91",
-   "99",
-   "104",
-   "112"
-  ],
-  "in_tau2_test_split": [
-   "26",
-   "49",
-   "77",
-   "100",
-   "102"
-  ],
-  "match_confidence": "high \u2014 every rl_eval uid has an exact write-action (name+order_id) match to its assigned task"
- },
- "contamination_analysis": {
-  "note": "'seen' = tau2 ids reached by act_prm_train \u222a act_prm_eval dataset uids (used in Stage-1 EM + Stage-2 SFT). rl_eval uids held out.",
-  "test_seen_contaminated": [
-   "9",
-   "17",
-   "18",
-   "32",
-   "38",
-   "40",
-   "42",
-   "45",
-   "53",
-   "55",
-   "56",
-   "60",
-   "61",
-   "62",
-   "74",
-   "79",
-   "86",
-   "97",
-   "108",
-   "111"
-  ],
-  "test_in_rl_eval_holdout": [
-   "26",
-   "49",
-   "77",
-   "100",
-   "102"
-  ],
-  "test_never_in_dataset_truly_unseen": [
-   "5",
-   "12",
-   "33",
-   "36",
-   "39",
-   "51",
-   "64",
-   "65",
-   "68",
-   "70",
-   "71",
-   "90",
-   "94",
-   "101"
-  ],
-  "recommended_clean_test_eval_set": [
-   "5",
-   "12",
-   "26",
-   "33",
-   "36",
-   "39",
-   "49",
-   "51",
-   "64",
-   "65",
-   "68",
-   "70",
-   "71",
-   "77",
-   "90",
-   "94",
-   "100",
-   "101",
-   "102"
-  ]
- }
 }
