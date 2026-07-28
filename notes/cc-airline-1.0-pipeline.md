@@ -74,3 +74,18 @@ full-context}:
 - Orchestrator: `nohup ./scripts/run_airline_sweep.sh > /tmp/aprm/airline_sweep/run.log 2>&1 &`
   (watch `/tmp/aprm/airline_sweep/orchestrator.log`). Resumable.
 - Kill: `pkill -f '[m]ain_pytorch.py'`. Snapshot: `./scripts/snapshot.sh` (per-host bundle).
+
+## Addendum — why only 21 train tasks + rl_eval design
+- Source dataset `mzio/aprm-tau2-airline-gpt5m_med-gs4-s0-train` has only **32 unique
+  tasks** (unique_data_sample_id 0–31), not tau2 airline's full 50 — a custom seed-0
+  subset. `make_split.py` keeps tasks with ≥1 successful rollout (done+reward>0, ≥2
+  actions): **31/32 usable** (1 never succeeded). 70/15/15 → **21 train / 4 eval / 6 rl_eval**.
+  So the 21 is dataset-limited, not a pipeline limit. (Finance is far bigger: 167 usable → 116 train.)
+- **Better rl_eval idea (open):** use tau2 airline tasks NOT in the source dataset as the
+  RL hold-out (purer: never-seen; also frees the 6 carved tasks back into train). Blocker:
+  our 32 tasks span BOTH canonical tau2 splits (train:30/test:20 — ~14 of each are in the
+  data by a noisy user_id match), so the tau2 "test" split is NOT clean-unseen. Needs the
+  precise dataset→tau2 map (match on unique reservation-id) to compute the ~11–18 unseen
+  complement — the same Stage-3 mapping TODO (cc-airline-2.0). Cleanest long-term: regen the
+  source dataset over a known task split (train-only) and reserve tau2 `test` (20) as rl_eval.
+  Tau2-specific — finance has no external task pool, so its rl_eval is carved from the dataset.
