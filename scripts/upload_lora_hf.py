@@ -23,6 +23,18 @@ ENVDIR = args.env.replace("/", "_")
 DOM = args.env.split("/")[-1].replace("tau2_", "")          # retail
 ROOT = f"checkpoints_lora/{ENVDIR}/{args.model_cfg}"
 LOGROOT = f"logs/{ENVDIR}/{args.model_cfg}"
+# Model-tagged destination so multiple models coexist in one repo without collision:
+# retail/ for the default 4B-instruct, retail-<short>/ (e.g. retail-8b) otherwise.
+_short = args.model_cfg.replace("hf_qwen3_", "").replace("_instruct", "")   # 4b / 8b / 4b_base
+DEST = DOM if args.model_cfg == "hf_qwen3_4b_instruct" else f"{DOM}-{_short}"
+# base model: read from the model config yaml if present (so 8B gets Qwen3-8B)
+try:
+    from omegaconf import OmegaConf
+    _mc = OmegaConf.load(f"configs/model/{args.model_cfg}.yaml")
+    args.base_model = _mc["model_config"]["pretrained_model_name_or_path"]
+except Exception:
+    pass
+FORCE = os.environ.get("UPLOAD_FORCE", "0") == "1"
 api = HfApi()
 
 def best_metrics(tag):
@@ -47,12 +59,19 @@ VARIANT_DESC = {
 }
 
 api.create_repo(args.repo, private=False, exist_ok=True)
+# already-on-hub set, so a watcher only pushes NEW finished checkpoints
+try:
+    existing = set(api.list_repo_files(args.repo))
+except Exception:
+    existing = set()
 uploaded = []
-for ck in sorted(glob.glob(f"{ROOT}/retail_s2_*/step_best" if DOM == "retail" else f"{ROOT}/{DOM}_s2_*/step_best")):
+for ck in sorted(glob.glob(f"{ROOT}/{DOM}_s2_*/step_best")):
     if not os.path.isfile(os.path.join(ck, "adapter_model.safetensors")):
         continue
     run = os.path.basename(os.path.dirname(ck))
     tag = re.sub(r"-act-prm.*", "", run).replace(f"{DOM}_s2_", "")   # e.g. thoughts_policy_heldout_fullctx
+    if not FORCE and f"{DEST}/{tag}/adapter_model.safetensors" in existing:
+        continue  # already uploaded (watcher skip)
     variant = tag.replace("_heldout_fullctx", "").replace("_heldout", "")
     regime = "full-context" if tag.endswith("_fullctx") else "hide-observations"
     m = best_metrics(f"{DOM}_s2_{tag}")
@@ -67,16 +86,16 @@ for ck in sorted(glob.glob(f"{ROOT}/retail_s2_*/step_best" if DOM == "retail" el
               f"- **Context regime:** {regime}\n{metric_md}\n"
               f"Load:\n```python\nfrom peft import PeftModel\nfrom transformers import AutoModelForCausalLM\n"
               f"m = AutoModelForCausalLM.from_pretrained('{args.base_model}')\n"
-              f"m = PeftModel.from_pretrained(m, '{args.repo}', subfolder='{DOM}/{tag}')\n```\n")
-    api.upload_file(path_or_fileobj=readme.encode(), path_in_repo=f"{DOM}/{tag}/README.md",
+              f"m = PeftModel.from_pretrained(m, '{args.repo}', subfolder='{DEST}/{tag}')\n```\n")
+    api.upload_file(path_or_fileobj=readme.encode(), path_in_repo=f"{DEST}/{tag}/README.md",
                     repo_id=args.repo, commit_message=f"readme {tag}")
     for fn in ("adapter_model.safetensors", "adapter_config.json"):
         p = os.path.join(ck, fn)
         if os.path.isfile(p):
-            api.upload_file(path_or_fileobj=p, path_in_repo=f"{DOM}/{tag}/{fn}",
+            api.upload_file(path_or_fileobj=p, path_in_repo=f"{DEST}/{tag}/{fn}",
                             repo_id=args.repo, commit_message=f"upload {tag}/{fn}")
     uploaded.append((tag, m))
-    print(f"  uploaded {DOM}/{tag}" + (f"  (action-PPL {m['action_ppl']:.3f})" if m else ""))
+    print(f"  uploaded {DEST}/{tag}" + (f"  (action-PPL {m['action_ppl']:.3f})" if m else ""))
 
 # top-level card with the results table
 _rl = []
@@ -89,10 +108,13 @@ card = (f"# Act-PRM SFT LoRA checkpoints — tau2 {DOM}\n\n"
         f"LoRA adapters (r8_a16, base `{args.base_model}`) from **Act-PRM** supervised fine-tuning on "
         f"tau2-bench {DOM}. Variants: `actions_only` (baseline), `expert_thoughts` (oracle), "
         f"`thoughts_{{policy,base}}[_last]` (Act-PRM inferred thoughts), each in hide-observations and "
-        f"full-context regimes. Adapters live under `{DOM}/<variant_regime>/`.\n\n"
+        f"full-context regimes. Adapters live under `{DEST}/<variant_regime>/`.\n\n"
         f"## Held-out action-only eval (lower PPL / higher acc = better next-action fit)\n"
         f"| variant_regime | action-only PPL | action-acc |\n|---|---|---|\n{rows}\n\n"
         f"See the project for methodology (Act-PRM: infer latent thoughts behind action-only demos via offline EM).\n")
-api.upload_file(path_or_fileobj=card.encode(), path_in_repo="README.md",
-                repo_id=args.repo, commit_message="update model card")
-print(f"\nDONE: {len(uploaded)} checkpoints -> https://huggingface.co/{args.repo}")
+# default 4B -> top-level model card; other models -> a per-model sub-card (avoids clobber)
+card_path = "README.md" if DEST == DOM else f"{DEST}/README.md"
+if uploaded or FORCE:
+    api.upload_file(path_or_fileobj=card.encode(), path_in_repo=card_path,
+                    repo_id=args.repo, commit_message=f"update {DEST} model card")
+print(f"\nDONE: {len(uploaded)} newly-uploaded checkpoints ({DEST}) -> https://huggingface.co/{args.repo}")
