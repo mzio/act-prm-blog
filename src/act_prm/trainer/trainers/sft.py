@@ -15,43 +15,9 @@ from typing import Any
 import torch
 from torch.nn import functional as F
 
-from act_prm.environments.act_prm_traces.data import extract_action
+from act_prm.environments.act_prm_traces.data import action_start_token
 
 from .rl import RLTrainer
-
-
-def _action_start_token(
-    tokenizer: Any, ids: list[int], state_len: int, target_content: str | None
-) -> int:
-    """First token index (into ``ids``) where the explicit action begins within the
-    target span ``ids[state_len:]``. The action (``<tool_call>…</tool_call>`` or a
-    ``Final Answer:`` suffix) is always a SUFFIX of the assistant content, so find the
-    largest ``k >= state_len`` whose decoded tail ``decode(ids[k:])`` still contains
-    the action string — that token is the action's first token. Operates in the
-    ALREADY-tokenized ids (no re-tokenize -> no whitespace/boundary misalignment).
-    Returns ``state_len`` when there is no separable reasoning prefix (whole target ==
-    action, e.g. the actions_only variant)."""
-    action_str = extract_action(target_content or "")
-    if not action_str:
-        return state_len
-
-    def _tail_has_action(k: int, needle: str) -> bool:
-        return needle in tokenizer.decode(ids[k:])
-
-    if not _tail_has_action(state_len, action_str):  # chat-template / whitespace artifacts
-        for marker in ("<tool_call>", "Final Answer:"):
-            if _tail_has_action(state_len, marker):
-                action_str = marker
-                break
-        else:
-            return state_len
-    a_start = state_len
-    for k in range(state_len, len(ids)):
-        if _tail_has_action(k, action_str):
-            a_start = k
-        else:
-            break
-    return a_start
 
 
 class SFTTrainer(RLTrainer):
@@ -141,7 +107,7 @@ class SFTTrainer(RLTrainer):
                 # (<|im_end|>…) — identical across variants, so cross-variant-neutral.
                 act = getattr(step, "action", None)
                 content = act.get("content") if isinstance(act, dict) else None
-                a_start = _action_start_token(self.hf_tokenizer, ids, state_len, content)
+                a_start = action_start_token(self.hf_tokenizer, ids, state_len, content)
                 a_off = max(0, a_start - 1) - start  # offset into the target span
                 if 0 <= a_off < int(tgt_labels.numel()):
                     a_logits = tgt_logits[a_off:]
@@ -166,6 +132,7 @@ class SFTTrainer(RLTrainer):
             # action fit independent of thought verbosity.
             out[f"{prefix}/eval_actiononly_ppl"] = math.exp(act_ce / act_tokens)
             out[f"{prefix}/eval_actiononly_accuracy"] = act_correct / act_tokens
+            out[f"{prefix}/eval_actiononly_loss"] = act_ce / act_tokens  # mean CE = log(ppl), for symmetry
         return out
 
     def compute_loss(
@@ -207,11 +174,21 @@ class SFTTrainer(RLTrainer):
         # Next-action-token accuracy on the supervised span: fraction of target
         # tokens whose greedy argmax matches the gold token (train-split analogue of
         # eval_action_accuracy). Detached — no grad needed for the metric.
+        act_ppl = act_acc = None
         with torch.no_grad():
-            token_accuracy = (
-                ((logits.argmax(dim=-1) == labels).to(new_logprobs.dtype) * label_mask).sum()
-                / num_label_tokens
-            ).item()
+            preds = logits.argmax(dim=-1)
+            correct = (preds == labels).to(new_logprobs.dtype)
+            token_accuracy = ((correct * label_mask).sum() / num_label_tokens).item()
+            # Action SUB-SPAN train metrics (train/actiononly_{ppl,accuracy}) — same
+            # forward, same definitions as eval_extra_metrics, using the identical
+            # action boundary (action_start_token) threaded in via ``action_mask``
+            # (⊆ label_mask). Makes the train side symmetric with eval.
+            action_mask = batch.get("action_mask")
+            if action_mask is not None:
+                action_mask = action_mask.to(device).to(new_logprobs.dtype)
+                num_action_tokens = action_mask.sum().clamp_min(1)
+                act_ppl = torch.exp(-(new_logprobs * action_mask).sum() / num_action_tokens).item()
+                act_acc = ((correct * action_mask).sum() / num_action_tokens).item()
         mean_advantage = (advantages.sum() / num_label_tokens).item()
         per_seq_gen_lens = label_mask.sum(dim=-1).tolist()
         num_gen_tokens = sum(per_seq_gen_lens) / len(per_seq_gen_lens) if per_seq_gen_lens else 0.0
@@ -219,13 +196,17 @@ class SFTTrainer(RLTrainer):
         del advantages, label_mask, model_inputs, logits, labels, num_label_tokens
         torch.cuda.empty_cache()
 
-        return {
+        out = {
             "loss": loss,
             "ppl": ppl,
-            "action_accuracy": token_accuracy,
+            "action_accuracy": token_accuracy,  # whole (thought+action) span, top-1
             "advantage": mean_advantage,
             "num_gen_tokens": num_gen_tokens,
         }
+        if act_ppl is not None:
+            out["actiononly_ppl"] = act_ppl            # -> train/actiononly_ppl
+            out["actiononly_accuracy"] = act_acc       # -> train/actiononly_accuracy
+        return out
 
 
 __all__ = ["SFTTrainer"]

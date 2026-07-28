@@ -25,6 +25,43 @@ def extract_action(content: str) -> str | None:
     return None
 
 
+def action_start_token(tokenizer: Any, ids: list[int], state_len: int, target_content: str | None) -> int:
+    """First token index (into ``ids``) where the explicit action begins within the
+    target span ``ids[state_len:]``. The action (``<tool_call>...</tool_call>`` block
+    or a ``Final Answer:`` suffix) is always a SUFFIX of the assistant content, so we
+    find the largest ``k >= state_len`` whose decoded tail ``decode(ids[k:])`` still
+    contains the action string — that token is the action's first token. Operates in
+    the ALREADY-tokenized ids (no re-tokenize -> no whitespace/BPE-boundary
+    misalignment). Returns ``state_len`` when there is no separable reasoning prefix
+    (whole target == action, e.g. the actions_only variant).
+
+    Shared by the offline eval (``sft.eval_extra_metrics``) and the train-side
+    action-subspan mask (``trainer.train.prepare_minibatch``) so the two use an
+    IDENTICAL action boundary — keep it here (no trainer deps) to avoid a circular
+    import (train <- pg_base <- rl <- sft)."""
+    action_str = extract_action(target_content or "")
+    if not action_str:
+        return state_len
+
+    def _tail_has_action(k: int, needle: str) -> bool:
+        return needle in tokenizer.decode(ids[k:])
+
+    if not _tail_has_action(state_len, action_str):  # chat-template / whitespace artifacts
+        for marker in ("<tool_call>", "Final Answer:"):
+            if _tail_has_action(state_len, marker):
+                action_str = marker
+                break
+        else:
+            return state_len
+    a_start = state_len
+    for k in range(state_len, len(ids)):
+        if _tail_has_action(k, action_str):
+            a_start = k
+        else:
+            break
+    return a_start
+
+
 def _traj_from_row(row: dict[str, Any], keep_expert_thoughts: bool = False) -> dict[str, Any] | None:
     """Convert one dataset row (state + action, with narration) into an
     action-only trajectory dict, or None if any action is unparseable / the

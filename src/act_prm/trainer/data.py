@@ -38,7 +38,7 @@ class DataCollatorForPolicyGradient(DataCollatorForLanguageModeling):
         batch = super().__call__(parent_features)
 
         # Then handle padding features
-        for key in ["logprobs", "advantages", "weights", "label_mask", "labels"]:
+        for key in ["logprobs", "advantages", "weights", "label_mask", "action_mask", "labels"]:
             if features[0].get(key, None):
                 if key == "logprobs":
                     dtype = torch.float
@@ -46,7 +46,7 @@ class DataCollatorForPolicyGradient(DataCollatorForLanguageModeling):
                 elif key == "labels":
                     dtype = torch.long
                     padding_value = -100
-                elif key == "label_mask":
+                elif key in ("label_mask", "action_mask"):
                     dtype = torch.bool
                     padding_value = False
                 else:  # key in ["advantages", "weights"]

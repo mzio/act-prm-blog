@@ -17,6 +17,7 @@ from tqdm import tqdm
 from transformers import PreTrainedTokenizerBase
 
 from ..environments import Environment
+from ..environments.act_prm_traces.data import action_start_token
 from ..generator.huggingface.base import HuggingFaceGenerator
 from ..llm_handlers.huggingface import HuggingFaceLLM
 from ..replay_buffer.types import Trajectory, TrajectoryGroup
@@ -445,6 +446,19 @@ def prepare_minibatch(
                 if sum(padded_logprobs) == 0:
                     padded_logprobs = None
 
+                # Action-only mask (parallel to label_mask): 1 ONLY on the explicit
+                # action sub-span (<tool_call>…/Final Answer:), so the SFT trainer can
+                # log train/actiononly_{ppl,accuracy} — using the SAME boundary as the
+                # offline eval (action_start_token). Subset of label_mask. Best-effort:
+                # never break training (fall back to the whole target span).
+                try:
+                    _content = episode_step.action.get("content") if isinstance(episode_step.action, dict) else None
+                    _a_start = action_start_token(hf_tokenizer, sa_input_ids, state_len, _content)
+                    _a_off = max(target_state_len, _a_start - 1)  # first action prediction position
+                    padded_action_mask = [0] * _a_off + [1] * (len(sa_input_ids) - 1 - _a_off)
+                except Exception:
+                    padded_action_mask = list(padded_mask)
+
                 data_dict.append(
                     {
                         "input_ids": sa_input_ids,
@@ -452,6 +466,7 @@ def prepare_minibatch(
                         "advantages": padded_advantages,  # Note that advantages and logprobs are already
                         "logprobs": padded_logprobs,  # shifted to account for next-token prediction
                         "label_mask": padded_mask,
+                        "action_mask": padded_action_mask,  # action sub-span (train-side action-only metrics)
                         "state_len": target_state_len,
                         "action_len": len(act_logprobs),
                         "labels": sa_labels,
