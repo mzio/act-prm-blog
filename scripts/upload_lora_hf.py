@@ -9,7 +9,7 @@ Usage:  MODEL_CFG=hf_qwen3_4b_instruct uv run --no-sync python scripts/upload_lo
           --env act_prm/tau2_retail --repo mzio/aprm-sft-tau2-retail
 Safe to run alongside training (read-only on checkpoints + network upload; no GPU).
 """
-import argparse, glob, json, os, re
+import argparse, glob, json, os, re, subprocess
 from huggingface_hub import HfApi
 
 ap = argparse.ArgumentParser()
@@ -37,6 +37,22 @@ except Exception:
 FORCE = os.environ.get("UPLOAD_FORCE", "0") == "1"
 api = HfApi()
 
+# Local upload marker: {run_tag: adapter_mtime}. Re-upload only when the checkpoint
+# CHANGES (so a run's FINAL step_best replaces any mid-run copy), and never upload a
+# run that's still training (avoids publishing a non-final early-stop checkpoint).
+MARKER = f"/tmp/aprm/uploaded_lora_{DEST}.json"
+marker = {}
+if os.path.exists(MARKER):
+    try: marker = json.load(open(MARKER))
+    except Exception: marker = {}
+
+def _is_training(run_tag: str) -> bool:
+    try:
+        out = subprocess.run(["pgrep", "-af", "main_pytorch.py"], capture_output=True, text=True).stdout
+        return any(f"run_tag {run_tag}" in ln for ln in out.splitlines())
+    except Exception:
+        return False
+
 def best_metrics(tag):
     runs = glob.glob(f"{LOGROOT}/{tag}-*/metrics.jsonl")
     if not runs: return {}
@@ -59,19 +75,19 @@ VARIANT_DESC = {
 }
 
 api.create_repo(args.repo, private=False, exist_ok=True)
-# already-on-hub set, so a watcher only pushes NEW finished checkpoints
-try:
-    existing = set(api.list_repo_files(args.repo))
-except Exception:
-    existing = set()
 uploaded = []
 for ck in sorted(glob.glob(f"{ROOT}/{DOM}_s2_*/step_best")):
-    if not os.path.isfile(os.path.join(ck, "adapter_model.safetensors")):
+    adapter = os.path.join(ck, "adapter_model.safetensors")
+    if not os.path.isfile(adapter):
         continue
     run = os.path.basename(os.path.dirname(ck))
     tag = re.sub(r"-act-prm.*", "", run).replace(f"{DOM}_s2_", "")   # e.g. thoughts_policy_heldout_fullctx
-    if not FORCE and f"{DEST}/{tag}/adapter_model.safetensors" in existing:
-        continue  # already uploaded (watcher skip)
+    run_tag = f"{DOM}_s2_{tag}"
+    if _is_training(run_tag):
+        continue  # still training — wait for the FINAL step_best before publishing
+    mt = f"{os.path.getmtime(adapter):.0f}"
+    if not FORCE and marker.get(tag) == mt:
+        continue  # already uploaded this exact (final) checkpoint
     variant = tag.replace("_heldout_fullctx", "").replace("_heldout", "")
     regime = "full-context" if tag.endswith("_fullctx") else "hide-observations"
     m = best_metrics(f"{DOM}_s2_{tag}")
@@ -95,7 +111,11 @@ for ck in sorted(glob.glob(f"{ROOT}/{DOM}_s2_*/step_best")):
             api.upload_file(path_or_fileobj=p, path_in_repo=f"{DEST}/{tag}/{fn}",
                             repo_id=args.repo, commit_message=f"upload {tag}/{fn}")
     uploaded.append((tag, m))
+    marker[tag] = mt
     print(f"  uploaded {DEST}/{tag}" + (f"  (action-PPL {m['action_ppl']:.3f})" if m else ""))
+
+os.makedirs("/tmp/aprm", exist_ok=True)
+json.dump(marker, open(MARKER, "w"))
 
 # top-level card with the results table
 _rl = []
