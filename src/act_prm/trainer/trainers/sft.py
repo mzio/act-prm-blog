@@ -15,7 +15,43 @@ from typing import Any
 import torch
 from torch.nn import functional as F
 
+from act_prm.environments.act_prm_traces.data import extract_action
+
 from .rl import RLTrainer
+
+
+def _action_start_token(
+    tokenizer: Any, ids: list[int], state_len: int, target_content: str | None
+) -> int:
+    """First token index (into ``ids``) where the explicit action begins within the
+    target span ``ids[state_len:]``. The action (``<tool_call>…</tool_call>`` or a
+    ``Final Answer:`` suffix) is always a SUFFIX of the assistant content, so find the
+    largest ``k >= state_len`` whose decoded tail ``decode(ids[k:])`` still contains
+    the action string — that token is the action's first token. Operates in the
+    ALREADY-tokenized ids (no re-tokenize -> no whitespace/boundary misalignment).
+    Returns ``state_len`` when there is no separable reasoning prefix (whole target ==
+    action, e.g. the actions_only variant)."""
+    action_str = extract_action(target_content or "")
+    if not action_str:
+        return state_len
+
+    def _tail_has_action(k: int, needle: str) -> bool:
+        return needle in tokenizer.decode(ids[k:])
+
+    if not _tail_has_action(state_len, action_str):  # chat-template / whitespace artifacts
+        for marker in ("<tool_call>", "Final Answer:"):
+            if _tail_has_action(state_len, marker):
+                action_str = marker
+                break
+        else:
+            return state_len
+    a_start = state_len
+    for k in range(state_len, len(ids)):
+        if _tail_has_action(k, action_str):
+            a_start = k
+        else:
+            break
+    return a_start
 
 
 class SFTTrainer(RLTrainer):
@@ -64,8 +100,6 @@ class SFTTrainer(RLTrainer):
         was_training = model.training
         model.eval()
 
-        from act_prm.environments.act_prm_traces.data import extract_action
-
         total_ce = 0.0
         total_correct = 0
         total_tokens = 0
@@ -97,19 +131,24 @@ class SFTTrainer(RLTrainer):
                 total_correct += int((tgt_logits.argmax(dim=-1) == tgt_labels).sum().item())
                 total_tokens += int(tgt_labels.numel())
 
-                # Action subspan = the trailing action tokens of the target span.
+                # ACTION SUBSPAN: score ONLY the logged action tokens (the
+                # <tool_call>…</tool_call> block, or a 'Final Answer:' suffix),
+                # excluding the reasoning prefix. The action is a SUFFIX of the
+                # assistant content, so we locate its first token directly in the
+                # already-tokenized ids (no re-tokenize -> no misalignment) and reuse
+                # the SAME shifted logits/labels (no second forward). NOTE: the span
+                # runs to the end, so it includes the assistant turn's template close
+                # (<|im_end|>…) — identical across variants, so cross-variant-neutral.
                 act = getattr(step, "action", None)
                 content = act.get("content") if isinstance(act, dict) else None
-                action_str = extract_action(content or "") if content else None
-                if action_str:
-                    n_act = len(self.hf_tokenizer(action_str, add_special_tokens=False)["input_ids"])
-                    n_act = min(n_act, int(tgt_labels.numel()))
-                    if n_act > 0:
-                        a_logits = tgt_logits[-n_act:]
-                        a_labels = tgt_labels[-n_act:]
-                        act_ce += F.cross_entropy(a_logits.float(), a_labels, reduction="sum").item()
-                        act_correct += int((a_logits.argmax(dim=-1) == a_labels).sum().item())
-                        act_tokens += n_act
+                a_start = _action_start_token(self.hf_tokenizer, ids, state_len, content)
+                a_off = max(0, a_start - 1) - start  # offset into the target span
+                if 0 <= a_off < int(tgt_labels.numel()):
+                    a_logits = tgt_logits[a_off:]
+                    a_labels = tgt_labels[a_off:]
+                    act_ce += F.cross_entropy(a_logits.float(), a_labels, reduction="sum").item()
+                    act_correct += int((a_logits.argmax(dim=-1) == a_labels).sum().item())
+                    act_tokens += int(a_labels.numel())
 
         if was_training:
             model.train()
