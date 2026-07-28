@@ -5,6 +5,9 @@ name: "tau2bench"
 data_path: "tau2-bench/data"
 domain: "airline"
 task_split: null
+# RL train/eval on the Act-PRM task partition: train on the 32 tasks present in the
+# logs, eval on the 18 never-seen tau2 tasks (pure hold-out). See scripts/map_dataset_to_tau2.py.
+task_id_map_file: "data/splits/tau2_airline_taskmap.json"
 is_async: true
 negative_rewards: true
 eval_splits: ["eval"]
