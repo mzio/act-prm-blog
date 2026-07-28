@@ -21,6 +21,14 @@ num_train_tasks: 90
 num_val_tasks: null
 num_test_tasks: 24
 
+# Explicit task-id selection (Stage-3 RL). When non-null, the train/eval splits
+# are EXACTLY these tau2 task ids, overriding the count-based split above. Null =>
+# count-based (unchanged). run_retail_stage3.sh fills these from
+# data/splits/tau2_retail_uid_to_tau2id.json: train = the 72 logged tasks
+# (coverage.covered_tau2_ids), eval = the 42 never-in-logs (never_in_logs.ids).
+train_task_ids: null
+eval_task_ids: null
+
 # State compaction (wrapper-level)
 hide_observations: false
 hidden_obs_content: "..."

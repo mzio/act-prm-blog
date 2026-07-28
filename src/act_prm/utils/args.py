@@ -379,6 +379,23 @@ def get_args() -> argparse.Namespace:
     parser.add_argument("--num_train_tasks", type=int, help="Number of samples to train on")
     parser.add_argument("--num_val_tasks", type=int, help="Number of samples to evaluate on")
     parser.add_argument("--num_test_tasks", type=int, help="Number of samples to test on")
+    # Explicit tau2 task-id selection (Stage-3 RL). Default None so the env yaml
+    # value wins unless passed; when passed, overrides train_task_ids/eval_task_ids
+    # in every config that has the key (override convention).
+    parser.add_argument(
+        "--train_task_ids",
+        type=int,
+        nargs="+",
+        default=None,
+        help="Explicit tau2 task ids for the train split (overrides count-based split)",
+    )
+    parser.add_argument(
+        "--eval_task_ids",
+        type=int,
+        nargs="+",
+        default=None,
+        help="Explicit tau2 task ids for the eval/test split (overrides count-based split)",
+    )
 
     ## Evaluation / Eval Environment
     parser.add_argument(
@@ -579,6 +596,8 @@ def get_args() -> argparse.Namespace:
         "project_name",
         "run_tag",  # prepended explicitly below; don't also auto-encode it
         "dataset_path",  # a long path; run_tag/env already identify the run (kept the name < 255)
+        "train_task_ids",  # explicit id lists can be 70+ ints; would blow up the run name
+        "eval_task_ids",
         "verbose",
         "streamer",
     ]

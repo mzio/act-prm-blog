@@ -24,7 +24,7 @@ from act_prm.llm_handlers import ActionFromLLM
 
 from ..base import Environment
 from ..types import EnvironmentState, EnvironmentStepResult
-from .utils import convert_tau2_tools, parse_observation
+from .utils import convert_tau2_tools, parse_observation, select_tasks_by_ids
 
 # --- tau2 load-time setup --------------------------------------------------
 # Runs at import time, before the LAZY ``import tau2…`` calls inside the methods
@@ -109,6 +109,12 @@ class Tau2BenchEnv(Environment):
         num_train_tasks: Number of tasks allocated to the train split.
         num_val_tasks: Number of tasks for the validation/eval split (None = use test).
         num_test_tasks: Number of tasks allocated to the test split.
+        train_task_ids: Explicit list of tau2 task ids for the train split. When
+            provided (non-null), the train split is EXACTLY these ids, overriding the
+            count-based split. None (default) keeps count-based behavior.
+        eval_task_ids: Explicit list of tau2 task ids for the eval/test split. Same
+            semantics as train_task_ids. Used for Stage-3 RL to train on the logged
+            tasks and eval on the never-in-logs hold-out.
         max_steps: Maximum steps per episode in tau2's orchestrator.
         max_turns: Maximum LLM turns before we truncate (our-level truncation).
         seed: Random seed.
@@ -132,6 +138,11 @@ class Tau2BenchEnv(Environment):
         num_train_tasks: int = 80,
         num_val_tasks: int | None = None,
         num_test_tasks: int = 50,
+        # Explicit task-id selection (Stage-3 RL). When either list is non-null,
+        # that split is EXACTLY the given tau2 task ids, overriding the count-based
+        # split above. Both null (default) => unchanged count-based behavior.
+        train_task_ids: list[int] | None = None,
+        eval_task_ids: list[int] | None = None,
         max_steps: int = 50,
         # Inherited arguments
         max_turns: int = 30,
@@ -251,6 +262,10 @@ class Tau2BenchEnv(Environment):
         self.num_train_tasks = num_train_tasks
         self.num_val_tasks = num_val_tasks
         self.num_test_tasks = num_test_tasks
+        # Normalize explicit id lists to plain python lists of ints (OmegaConf
+        # passes ListConfig objects); keep None when not provided.
+        self.train_task_ids = list(train_task_ids) if train_task_ids is not None else None
+        self.eval_task_ids = list(eval_task_ids) if eval_task_ids is not None else None
         self.max_steps = max_steps
         self.system_prompt = system_prompt
         self.eval_num_tries = eval_num_tries
@@ -312,6 +327,41 @@ class Tau2BenchEnv(Environment):
         from tau2 import registry
 
         all_tasks = registry.get_tasks_loader(self.domain)()
+
+        # --- Explicit task-id selection (Stage-3 RL) ---------------------------
+        # When train_task_ids / eval_task_ids are provided, the corresponding
+        # split is EXACTLY those tau2 task ids (by task.id, else positional
+        # index), overriding the count-based split below. This lets RL train on
+        # our 72 logged tasks and eval on the 42 never-in-logs hold-out. When
+        # both are null we fall through to the original count-based split, so
+        # existing configs/behavior are unchanged.
+        if self.train_task_ids is not None or self.eval_task_ids is not None:
+            train_tasks = (
+                select_tasks_by_ids(all_tasks, self.train_task_ids, domain=self.domain)
+                if self.train_task_ids is not None
+                else []
+            )
+            eval_tasks = (
+                select_tasks_by_ids(all_tasks, self.eval_task_ids, domain=self.domain)
+                if self.eval_task_ids is not None
+                else []
+            )
+            datasets = {
+                "train": train_tasks,
+                "train_eval": eval_tasks,
+                "train_all": train_tasks,
+                "eval": eval_tasks,
+                "test": eval_tasks,
+            }
+            for split_name, split_tasks in datasets.items():
+                logger.info(
+                    "tau2bench [%s] %s (explicit-ids): %d tasks",
+                    self.domain,
+                    split_name,
+                    len(split_tasks),
+                )
+            return datasets
+
         total_needed = self.num_train_tasks + self.num_test_tasks
         if self.num_val_tasks is not None:
             total_needed += self.num_val_tasks

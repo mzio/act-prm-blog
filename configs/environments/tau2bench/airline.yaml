@@ -21,6 +21,13 @@ num_train_tasks: 40
 num_val_tasks: null
 num_test_tasks: 10
 
+# Explicit task-id selection (Stage-3 RL). When non-null, the train/eval splits
+# are EXACTLY these tau2 task ids, overriding the count-based split above. Null =>
+# count-based (unchanged). Parity with retail: the airline box wires its own
+# logged / never-in-logs id lists here (via its Stage-3 script).
+train_task_ids: null
+eval_task_ids: null
+
 # State compaction (wrapper-level)
 hide_observations: false
 hidden_obs_content: "..."
