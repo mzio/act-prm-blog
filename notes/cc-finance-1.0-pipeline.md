@@ -34,9 +34,20 @@ tasks)**, `--gradient_checkpointing`:
   `reward = p(x|s,z) − 0.15·(|z|/96)` (`reward_method penalty`); M-step = REINFORCE on
   (thought+action) with group-normalized EM weights (`advantage_mode em`).
 - `best_metric = final_reward` (mean held-out `p(x|s,z)`); saves `step_best` +
-  `step_last` (rolling, `save_every 20`). **Observation:** eval reward plateaus early
-  (policy best≈step 5, base best≈step 10–15) — same early-plateau as airline → we
-  relabel from BOTH `step_best` and `step_last` and compare.
+  `step_last` (rolling, `save_every 20`). **Observation (corrected, live @ batch ~40):**
+  the scorers differ — **base plateaus early** (best stuck at step 15, reward 0.5776,
+  unchanged ~11h; airline-like) while **policy keeps improving into epoch 2** (best
+  climbed 5->35->40, reward 0.5752, still rising). So policy's 2-epoch EM earns its keep;
+  base would be fine at 1 epoch. We relabel from BOTH `step_best` and `step_last`.
+
+### Head start: base Act-PRM relabel from the current (plateaued) step_best
+Base's `step_best` is stable (batch 15, unchanged ~11h), so we relabel `thoughts_base`
+from it EARLY via `scripts/headstart_base_aprm.sh` (base-EM GPU lane, AFTER the head-start
+SFT queue, sequential): relabel(best) -> export `data/sft_corpus/.../base` -> SFT
+`thoughts_base` {hide, full}. Same run_tags/paths as the pipeline + finishes before the
+post-EM relabel, so the pipeline SKIPS it (no double-work/conflict). Only `thoughts_base`
+(best) is head-started; `base_last` + `policy`/`policy_last` wait for EM (policy's
+`step_best` is still moving, so an early policy relabel would use a weaker checkpoint).
 
 ### Stage 1.5 — relabel (best-of-G, TOP-1) + export corpus
 For each scorer × {best, last}: `train.sh --no_train --resume_from <ckpt>
