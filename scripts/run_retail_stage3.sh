@@ -39,8 +39,12 @@ log "=== Stage-3 driver start ==="
 SPLIT_JSON="data/splits/tau2_retail_uid_to_tau2id.json"
 TRAIN_IDS=$(python3 -c "import json;print(' '.join(json.load(open('$SPLIT_JSON'))['coverage']['covered_tau2_ids']))")
 EVAL_IDS=$(python3 -c "import json;print(' '.join(json.load(open('$SPLIT_JSON'))['never_in_logs']['ids']))")
-[ -n "$TRAIN_IDS" ] && [ -n "$EVAL_IDS" ] || { log "FATAL: could not read task-id split from $SPLIT_JSON"; exit 1; }
-log "task split: train=$(echo "$TRAIN_IDS" | wc -w) logged tasks, eval=$(echo "$EVAL_IDS" | wc -w) never-in-logs hold-out tasks"
+# Cheap-eval plan: during RL we eval on only the FIRST 12 never-in-logs tasks (fast
+# early-stop signal); the FULL 42 (EVAL_IDS) are reserved for a final eval-only pass
+# on each arm's step_best after the RL matrix finishes.
+EVAL_IDS_TRAIN=$(python3 -c "import json;print(' '.join(json.load(open('$SPLIT_JSON'))['never_in_logs']['ids'][:12]))")
+[ -n "$TRAIN_IDS" ] && [ -n "$EVAL_IDS" ] && [ -n "$EVAL_IDS_TRAIN" ] || { log "FATAL: could not read task-id split from $SPLIT_JSON"; exit 1; }
+log "task split: train=$(echo "$TRAIN_IDS" | wc -w) logged tasks, eval-during-RL=$(echo "$EVAL_IDS_TRAIN" | wc -w) subset, final-eval=$(echo "$EVAL_IDS" | wc -w) never-in-logs hold-out tasks"
 
 [ "$DRY" = 1 ] || wait_gpu_free   # SFT sweep (hide + full) must be done
 
@@ -98,16 +102,17 @@ run_one(){
   local tag="$1" init="$2"
   [ -z "$init" ] && { log "RL $tag: no SFT ckpt, skip"; return; }
   [ -n "$(newest "$S3ROOT/${tag}-*/step_best")" ] && { log "RL $tag: done, skip"; return; }
-  # $TRAIN_IDS / $EVAL_IDS UNQUOTED on purpose: word-split into one argv per id
-  # (argparse nargs="+"). Trains on the 72 logged, evals on the 42 never-in-logs.
+  # $TRAIN_IDS / $EVAL_IDS_TRAIN UNQUOTED on purpose: word-split into one argv per id
+  # (argparse nargs="+"). Trains on the 72 logged, evals (during RL) on the 12-task
+  # subset — the cheap early-stop signal. Full-42 eval happens after the matrix.
   if [ "$DRY" = 1 ]; then
-    echo "DRY $tag: ./scripts/train_rl_from_sft.sh retail $init --run_tag $tag --train_task_ids $TRAIN_IDS --eval_task_ids $EVAL_IDS"
+    echo "DRY $tag: ./scripts/train_rl_from_sft.sh retail $init --run_tag $tag --train_task_ids $TRAIN_IDS --eval_task_ids $EVAL_IDS_TRAIN"
     return
   fi
   log "RL $tag from $init ..."
   wait_gpu_free
   ./scripts/train_rl_from_sft.sh retail "$init" --run_tag "$tag" \
-    --train_task_ids $TRAIN_IDS --eval_task_ids $EVAL_IDS > "$MDIR/s3_${tag}.log" 2>&1 \
+    --train_task_ids $TRAIN_IDS --eval_task_ids $EVAL_IDS_TRAIN > "$MDIR/s3_${tag}.log" 2>&1 \
     && log "RL $tag: done" || log "RL $tag: FAILED (see $MDIR/s3_${tag}.log)"
   ./scripts/snapshot.sh "Stage-3 RL: $tag (retail) checkpoint" >/dev/null 2>&1 || true
 }
@@ -116,5 +121,34 @@ for tag in retail_rl_base retail_rl_actions_only retail_rl_expert_thoughts \
            retail_rl_thoughts_policy retail_rl_thoughts_base \
            retail_rl_thoughts_policy_last retail_rl_thoughts_base_last; do
   run_one "$tag" "${INIT[$tag]}"
+done
+
+# 5) FINAL FULL-42 EVAL — after the RL matrix, evaluate each arm's RL step_best on
+# ALL 42 never-in-logs hold-out tasks (the true hold-out reward). Eval-only:
+# --no_train + --num_batches 1 --eval_every 1 makes the single batch the last step,
+# which forces exactly one eval on the 42-task hold-out with the resumed step_best
+# (no PG, no training). Resumable: skip an arm whose eval42 metrics already exist.
+run_eval42(){
+  local tag="$1"
+  local ckpt; ckpt=$(newest "$S3ROOT/${tag}-*/step_best")
+  [ -z "$ckpt" ] && { log "EVAL42 $tag: no RL step_best, skip"; return; }
+  [ -n "$(newest "$S3LOGROOT/${tag}_eval42-*/metrics.jsonl")" ] && { log "EVAL42 $tag: done, skip"; return; }
+  if [ "$DRY" = 1 ]; then
+    echo "DRY $tag: ./scripts/train_rl_from_sft.sh retail $ckpt --run_tag ${tag}_eval42 --no_train --num_batches 1 --eval_every 1 --train_task_ids $TRAIN_IDS --eval_task_ids $EVAL_IDS"
+    return
+  fi
+  log "EVAL42 $tag from $ckpt (full 42-task hold-out) ..."
+  wait_gpu_free
+  ./scripts/train_rl_from_sft.sh retail "$ckpt" --run_tag "${tag}_eval42" \
+    --no_train --num_batches 1 --eval_every 1 \
+    --train_task_ids $TRAIN_IDS --eval_task_ids $EVAL_IDS > "$MDIR/s3_${tag}_eval42.log" 2>&1 \
+    && log "EVAL42 $tag: done" || log "EVAL42 $tag: FAILED (see $MDIR/s3_${tag}_eval42.log)"
+  ./scripts/snapshot.sh "Stage-3 RL: $tag full-42 eval (retail)" >/dev/null 2>&1 || true
+}
+
+for tag in retail_rl_base retail_rl_actions_only retail_rl_expert_thoughts \
+           retail_rl_thoughts_policy retail_rl_thoughts_base \
+           retail_rl_thoughts_policy_last retail_rl_thoughts_base_last; do
+  run_eval42 "$tag"
 done
 log "=== Stage-3 driver done ==="
