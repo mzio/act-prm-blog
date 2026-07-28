@@ -2,6 +2,7 @@
 Base class for generation / rollout sampling for Hugging Face Transformers models
 """
 
+import concurrent.futures
 import logging
 import sys
 from copy import copy, deepcopy
@@ -548,15 +549,44 @@ class HuggingFaceGenerator:
                 # Transition to next states
                 # -> Parse to consistent ActionFromLLM format
                 batch_parsed_actions = [get_actions(msgs) for msgs in batch_model_messages]
-                batch_env_step_results: list[EnvironmentStepResult] = [
-                    env.step(
+
+                def _run_env_step(_idx: int) -> EnvironmentStepResult:
+                    # NOTE: threaded-safe because each rollout has its own `state`
+                    # (a separate env.reset per gen_id) which is passed in, and
+                    # env.step is a user-sim network call + tau2 tool exec on CPU
+                    # (no GPU/CUDA touch). This mirrors AsyncTau2BenchEnv.step_async,
+                    # which is literally asyncio.to_thread(super().step).
+                    return env.step(
                         parsed_actions=batch_parsed_actions[_idx],
                         model_response=batch_model_messages[_idx],
-                        current_state=state,
+                        current_state=batch_states[_idx],
                         current_messages=batch_state_messages[_idx],
                     )
-                    for _idx, state in enumerate(batch_states)
-                ]
+
+                if len(batch_states) > 1:
+                    # Parallelize the independent, GPU-idle user-sim env.step calls
+                    # across the group rollouts (generation is already batched).
+                    batch_env_step_results: list[EnvironmentStepResult] = [None] * len(batch_states)  # type: ignore[list-item]
+                    with concurrent.futures.ThreadPoolExecutor(
+                        max_workers=min(len(batch_states), 16)
+                    ) as _executor:
+                        _future_to_idx = {
+                            _executor.submit(_run_env_step, _idx): _idx for _idx in range(len(batch_states))
+                        }
+                        for _future in concurrent.futures.as_completed(_future_to_idx):
+                            _idx = _future_to_idx[_future]
+                            try:
+                                batch_env_step_results[_idx] = _future.result()
+                            except Exception as _exc:  # noqa: BLE001
+                                logger.warning(
+                                    "Concurrent env.step failed for idx %d (%s); retrying inline",
+                                    _idx,
+                                    _exc,
+                                )
+                                # Fall back to an inline (serial) retry for this one rollout.
+                                batch_env_step_results[_idx] = _run_env_step(_idx)
+                else:
+                    batch_env_step_results = [_run_env_step(0)]
                 batch_next_states = [_result.state for _result in batch_env_step_results]
                 batch_rewards = [_result.reward for _result in batch_env_step_results]
                 batch_next_obs = [
