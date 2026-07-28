@@ -513,6 +513,7 @@ def get_args() -> argparse.Namespace:
 
     ## More Evaluation
     parser.add_argument("--eval_every", type=int, help="Iters to evaluate, 0 = disabled")
+    parser.add_argument("--early_stop_patience", type=int, help="Stop if eval best_metric doesn't improve for N consecutive evals (0=off)")
     parser.add_argument("--eval_gen_every", type=int, help="Iters to evaluate generation, 0 = disabled")
     parser.add_argument(
         "--eval_rollout_every",
@@ -633,8 +634,8 @@ def get_args() -> argparse.Namespace:
             except Exception as e:
                 _error_class = e.__class__.__name__
                 print(f"{_error_class}: {e}")
-                # setattr(args, argname, os.path.join(args.log_path, new_dir))
-                breakpoint()
+                # headless-safe: fall back to a log_path-relative dir instead of pdb
+                setattr(args, argname, os.path.join(args.log_path, new_dir))
             if not os.path.exists(getattr(args, argname)):
                 os.makedirs(getattr(args, argname), exist_ok=True)
                 created_dir = True

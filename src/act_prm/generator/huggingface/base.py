@@ -2,6 +2,7 @@
 Base class for generation / rollout sampling for Hugging Face Transformers models
 """
 
+import asyncio
 import logging
 import sys
 from copy import copy, deepcopy
@@ -548,8 +549,15 @@ class HuggingFaceGenerator:
                 # Transition to next states
                 # -> Parse to consistent ActionFromLLM format
                 batch_parsed_actions = [get_actions(msgs) for msgs in batch_model_messages]
-                batch_env_step_results: list[EnvironmentStepResult] = [
-                    env.step(
+                # The group's GPU generation is already batched above, but each
+                # env.step fires an I/O-bound user-sim round-trip (~30-74s via the
+                # Claude-CLI subprocess). Run the N steps CONCURRENTLY when the env
+                # supports it (AsyncTau2BenchEnv.step_async -> asyncio.to_thread),
+                # instead of serially — this is the per-turn wall-clock bottleneck.
+                # Each rollout has its own tau2 env instance (reset() per gen_id), so
+                # concurrent steps are race-free. asyncio.gather preserves order.
+                _step_kwargs = [
+                    dict(
                         parsed_actions=batch_parsed_actions[_idx],
                         model_response=batch_model_messages[_idx],
                         current_state=state,
@@ -557,6 +565,14 @@ class HuggingFaceGenerator:
                     )
                     for _idx, state in enumerate(batch_states)
                 ]
+                if hasattr(env, "step_async") and len(_step_kwargs) > 1:
+                    async def _run_all_steps(_kw: list[dict[str, Any]]) -> list[EnvironmentStepResult]:
+                        return await asyncio.gather(*[env.step_async(**k) for k in _kw])
+
+                    batch_env_step_results = asyncio.run(_run_all_steps(_step_kwargs))
+                else:
+                    batch_env_step_results = [env.step(**k) for k in _step_kwargs]
+                batch_env_step_results = list(batch_env_step_results)
                 batch_next_states = [_result.state for _result in batch_env_step_results]
                 batch_rewards = [_result.reward for _result in batch_env_step_results]
                 batch_next_obs = [
@@ -953,5 +969,4 @@ class HuggingFaceGenerator:
         ]
         logger.error("debug_cols: %s", DEBUG_COLS)
         logger.error("_df_debug: %s", _df_debug)
-        breakpoint()
         raise error

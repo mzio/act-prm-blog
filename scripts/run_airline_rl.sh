@@ -39,19 +39,18 @@ rl(){  # tag  gpu  resume_ckpt(or BASE)
   CUDA_VISIBLE_DEVICES="$gpu" uv run --no-sync python main_pytorch.py \
     --env_config tau2bench/airline --model_config $MODEL --lora_config r8_a16_linear \
     --generator_config hf_grpo --trainer_config pg --replay_buffer_config default "${resume[@]}" \
-    --group_size 4 --batch_size 2 --max_turns 8 --max_tokens 2048 \
-    --num_batches 25 --eval_every 5 --no_initial_eval --gradient_checkpointing \
-    --best_metric final_reward --run_tag "$tag" --verbose > "$MDIR/${tag}.log" 2>&1 \
+    --group_size 4 --batch_size 2 --max_turns 20 --max_tokens 2048 \
+    --num_batches 100 --eval_every 10 --no_initial_eval --gradient_checkpointing \
+    --best_metric final_reward --early_stop_patience 3 --run_tag "$tag" --verbose > "$MDIR/${tag}.log" 2>&1 \
     && log "RL $tag: done" || log "RL $tag: FAILED (see $MDIR/${tag}.log)"
 }
 # a serial stream of "tag|ckpt" jobs pinned to one GPU
 stream(){ local gpu=$1; shift; for j in "$@"; do IFS='|' read -r tag ckpt <<< "$j"; rl "$tag" "$gpu" "$ckpt"; done; }
 
-log "=== airline RL fleet: base + 4 SFT variants (hide regime), train=32 / eval=18 ==="
-# 2 streams per GPU (RL is LLM-gated -> co-locate ~2/GPU). 5 jobs across 4 streams.
-stream 0 "airline_rl_base|BASE"                     "airline_rl_thoughts_base|$(sft_best thoughts_base)"   & s0=$!
-stream 0 "airline_rl_actions_only|$(sft_best actions_only)"                                                & s1=$!
-stream 1 "airline_rl_expert_thoughts|$(sft_best expert_thoughts)"                                          & s2=$!
-stream 1 "airline_rl_thoughts_policy|$(sft_best thoughts_policy)"                                          & s3=$!
-wait $s0; wait $s1; wait $s2; wait $s3
+log "=== airline RL fleet: base + 4 SFT variants (hide regime), train=32 / eval=18, 1 run/GPU ==="
+# 1 run/GPU: a single RL rollout context can balloon to ~40GB (long tau2 tool chains at
+# max_turns 20), so 2/GPU OOMs. Two SERIAL streams, one per GPU (3 on GPU0, 2 on GPU1).
+stream 0 "airline_rl_base|BASE" "airline_rl_thoughts_policy|$(sft_best thoughts_policy)" "airline_rl_thoughts_base|$(sft_best thoughts_base)" & s0=$!
+stream 1 "airline_rl_actions_only|$(sft_best actions_only)" "airline_rl_expert_thoughts|$(sft_best expert_thoughts)"                          & s1=$!
+wait $s0; wait $s1
 log "=== airline RL fleet complete ==="
