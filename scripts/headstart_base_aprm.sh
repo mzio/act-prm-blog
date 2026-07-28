@@ -29,12 +29,12 @@ log(){ echo "[$(date '+%m-%d %H:%M:%S')] headstart-base: $*" | tee -a "$MDIR/hea
 newest(){ ls -dt $1 2>/dev/null | head -1; }
 done_ckpt(){ ls -d "$CKR/${1}"-*/step_best/adapter_model.safetensors >/dev/null 2>&1; }
 
-# 0) don't run two SFT/relabel jobs on GPU 1 at once: wait for the existing head-start
-#    sequential runner to finish its queue first.
-log "waiting for headstart_sft_seq.sh queue to finish..."
-while pgrep -f '[h]eadstart_sft_seq.sh' >/dev/null 2>&1; do sleep 60; done
-# also wait out any lingering SFT main_pytorch on this lane
-while pgrep -f 'run_tag snorkel_finance_split_s2_' >/dev/null 2>&1; do sleep 60; done
+# 0) base is PRIORITIZED ahead of expert_thoughts full-ctx: wait only for the
+#    currently-running actions_only full-ctx SFT to clear, then base runs NEXT.
+#    (headstart_sft_seq.sh is stopped so it won't launch expert_thoughts full;
+#    expert_thoughts full is appended at the END of this runner instead.)
+log "waiting for the running actions_only SFT to finish (base runs next, ahead of expert_thoughts full)..."
+while pgrep -f 'run_tag snorkel_finance_split_s2_actions_only' >/dev/null 2>&1; do sleep 60; done
 log "SFT lane free — starting base Act-PRM head start"
 
 BB="$(newest "$CKR/${ENVNAME}_s1_base-*/step_best")"
@@ -79,4 +79,15 @@ sft(){ local tag=$1 fullctx=$2
 }
 sft "${ENVNAME}_s2_thoughts_base_heldout"          0
 sft "${ENVNAME}_s2_thoughts_base_heldout_fullctx"  1
-log "=== base Act-PRM head start complete (relabel + thoughts_base hide+full) ==="
+log "base thoughts_base done; now the deprioritized expert_thoughts full-ctx head start"
+
+# expert_thoughts full-ctx (moved behind base; the hide variant is already done).
+ET="${ENVNAME}_s2_expert_thoughts_heldout_fullctx"
+if done_ckpt "$ET"; then log "$ET: skip (done)"; else
+  log "SFT $ET (GPU $GPU, fullctx=1, expert_thoughts)"
+  CUDA_VISIBLE_DEVICES=$GPU SFT_FULLCTX=1 ./scripts/train_sft.sh "$ENVC" expert_thoughts \
+    --model_config $MODEL --run_tag "$ET" --best_metric eval_action_ppl --gradient_checkpointing \
+    > "$MDIR/${ET}.log" 2>&1 && log "$ET: done" || log "$ET: FAILED ($MDIR/${ET}.log)"
+  ./scripts/backup_results.sh >/dev/null 2>&1 || true
+fi
+log "=== base Act-PRM + expert_thoughts full head starts complete ==="
