@@ -5,17 +5,18 @@ action-PPL on the 10-task `act_prm_eval`). Lower PPL / higher accuracy = better 
 
 | variant | regime | best eval action-PPL | eval loss (=ln ppl) | action-acc @ best | best step | final train loss |
 |---|---|---|---|---|---|---|
-| actions_only | hide | 3.8371 | 1.3447 | 0.7603 | 30 | 0.5078 |
-| actions_only | full | 3.3859 | 1.2196 | 0.7984 | 59 | 1.1904 |
-| expert_thoughts | hide | 4.7767 | 1.5638 | 0.6818 | 50 | 0.4767 |
-| expert_thoughts | full | 4.5177 | 1.5080 | 0.6974 | 50 | 1.1142 |
-| thoughts_policy | hide | 3.6769 | 1.3021 | 0.7466 | 50 | 1.6352 |
-| thoughts_policy | full | 3.3997 | 1.2237 | 0.7696 | 59 | 1.5612 |
-| thoughts_base | hide | 3.7115 | 1.3114 | 0.7460 | 20 | 1.3382 |
-| thoughts_base | full | 3.4101 | 1.2267 | 0.7727 | 59 | 1.8787 |
-| thoughts_base_last | hide | 3.6714 | 1.3006 | 0.7404 | 59 | 1.7614 |
-| thoughts_policy_last | hide | 3.7424 | 1.3197 | 0.7401 | 59 | 1.7519 |
-| thoughts_policy_last | full | 3.4359 | 1.2343 | 0.7641 | 40 | 1.1980 |
+| actions_only | hide | 3.8378 | 1.3449 | 0.7608 | 40 | 0.5056 |
+| actions_only | full | 3.3836 | 1.2189 | 0.7991 | 50 | 1.1851 |
+| expert_thoughts | hide | 4.7790 | 1.5642 | 0.6810 | 50 | 0.4874 |
+| expert_thoughts | full | 4.5180 | 1.5081 | 0.6969 | 40 | 1.1098 |
+| thoughts_policy | hide | 3.6754 | 1.3017 | 0.7462 | 50 | 1.6291 |
+| thoughts_policy | full | 3.4026 | 1.2245 | 0.7693 | 59 | 1.5733 |
+| thoughts_base | hide | 3.7088 | 1.3107 | 0.7449 | 40 | 1.3315 |
+| thoughts_base | full | 3.4113 | 1.2271 | 0.7723 | 40 | 1.8664 |
+| thoughts_base_last | hide | 3.6739 | 1.3013 | 0.7398 | 50 | 1.7691 |
+| thoughts_policy_last | hide | 3.7453 | 1.3205 | 0.7403 | 30 | 1.7412 |
+| thoughts_base_last | full | 3.4176 | 1.2289 | 0.7654 | 40 | 1.8529 |
+| thoughts_policy_last | full | 3.4350 | 1.2340 | 0.7630 | 40 | 0.7102 |
 
 CSV: `logs/act_prm_tau2_retail/hf_qwen3_4b_instruct/retail_sft_summary.csv`. Curves: `notebooks/cc-1.1-aprm_tau2_retail_results.ipynb`.
 
