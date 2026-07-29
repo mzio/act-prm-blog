@@ -117,9 +117,12 @@ run_one(){
   ./scripts/snapshot.sh "Stage-3 RL: $tag (retail) checkpoint" >/dev/null 2>&1 || true
 }
 
-for tag in retail_rl_base retail_rl_actions_only retail_rl_expert_thoughts \
+# Order: base + actions_only (done, skipped on relaunch) → the 4 corrected thoughts arms
+# → expert_thoughts LAST (per the requested ordering: redo thoughts before expert).
+for tag in retail_rl_base retail_rl_actions_only \
            retail_rl_thoughts_policy retail_rl_thoughts_base \
-           retail_rl_thoughts_policy_last retail_rl_thoughts_base_last; do
+           retail_rl_thoughts_policy_last retail_rl_thoughts_base_last \
+           retail_rl_expert_thoughts; do
   run_one "$tag" "${INIT[$tag]}"
 done
 

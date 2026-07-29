@@ -51,15 +51,16 @@ declare -A CORPUS=(
 log "=== retail thoughts redo: start ==="
 
 # ---------------------------------------------------------------------------
-# 1) WAIT for the clean RL arms to finish. expert_thoughts is the LAST clean arm
-#    before the (corrupted) thoughts arms, and base + actions_only complete before
-#    it — so its RL step_best existing means all clean arms are done.
+# 1) WAIT until the CURRENT arm (retail_rl_actions_only) is DONE, then take over BEFORE
+#    expert_thoughts starts — so we redo the 4 thoughts arms next, and expert_thoughts
+#    runs LAST (in the relaunch, whose arm order now puts it last). base is already done.
 # ---------------------------------------------------------------------------
-log "waiting for clean RL arms (retail_rl_expert_thoughts step_best) ..."
-until [ -n "$(newest "$S3ROOT/retail_rl_expert_thoughts-*/step_best/adapter_model.safetensors")" ]; do
+S3LOG=/tmp/aprm/stage3/stage3.log
+log "waiting for retail_rl_actions_only to finish (log line '... retail_rl_actions_only: done') ..."
+until grep -q "retail_rl_actions_only: done" "$S3LOG" 2>/dev/null; do
   sleep 120
 done
-log "clean RL arms done: $(newest "$S3ROOT/retail_rl_expert_thoughts-*/step_best/adapter_model.safetensors")"
+log "actions_only RL done -> stopping driver before expert_thoughts, then redo thoughts"
 
 # ---------------------------------------------------------------------------
 # 2) STOP the running stage3 driver so it cannot RL a corrupted thoughts init,
