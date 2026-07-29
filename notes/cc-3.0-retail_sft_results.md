@@ -9,14 +9,10 @@ action-PPL on the 10-task `act_prm_eval`). Lower PPL / higher accuracy = better 
 | actions_only | full | 3.3836 | 1.2189 | 0.7991 | 50 | 1.1851 |
 | expert_thoughts | hide | 4.7790 | 1.5642 | 0.6810 | 50 | 0.4874 |
 | expert_thoughts | full | 4.5180 | 1.5081 | 0.6969 | 40 | 1.1098 |
-| thoughts_policy | hide | 3.6754 | 1.3017 | 0.7462 | 50 | 1.6291 |
-| thoughts_policy | full | 3.4026 | 1.2245 | 0.7693 | 59 | 1.5733 |
-| thoughts_base | hide | 3.7088 | 1.3107 | 0.7449 | 40 | 1.3315 |
-| thoughts_base | full | 3.4113 | 1.2271 | 0.7723 | 40 | 1.8664 |
-| thoughts_base_last | hide | 3.6739 | 1.3013 | 0.7398 | 50 | 1.7691 |
-| thoughts_policy_last | hide | 3.7453 | 1.3205 | 0.7403 | 30 | 1.7412 |
-| thoughts_base_last | full | 3.4176 | 1.2289 | 0.7654 | 40 | 1.8529 |
-| thoughts_policy_last | full | 3.4350 | 1.2340 | 0.7630 | 40 | 0.7102 |
+| thoughts_policy | hide | 3.6747 | 1.3015 | 0.7465 | 30 | 1.0417 |
+| thoughts_policy | full | 3.4046 | 1.2251 | 0.7697 | 59 | 1.0355 |
+| thoughts_base | hide | 3.7098 | 1.3110 | 0.7454 | 59 | 0.9361 |
+| thoughts_base | full | 3.4093 | 1.2265 | 0.7717 | 59 | 0.6225 |
 
 CSV: `logs/act_prm_tau2_retail/hf_qwen3_4b_instruct/retail_sft_summary.csv`. Curves: `notebooks/cc-1.1-aprm_tau2_retail_results.ipynb`.
 
