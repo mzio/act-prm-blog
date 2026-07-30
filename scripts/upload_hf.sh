@@ -1,79 +1,97 @@
 #!/usr/bin/env bash
-# Upload the snorkel_finance Act-PRM SFT LoRA checkpoints (+ the relabel corpora) to
-# HuggingFace, mirroring https://huggingface.co/mzio/aprm-sft-tau2-airline.
-#
-# RUN FROM A SHELL WITH HF WRITE EGRESS + TOKEN (the agent's egress is CDN-blocked for
-# LFS uploads, so this must be run by you):
-#   export HF_TOKEN=<your write token>
-#   export https_proxy=http://fwdproxy:8080 http_proxy=http://fwdproxy:8080 HF_HUB_DISABLE_XET=1
-#   ./scripts/upload_hf.sh
-#
-# Re-runnable: stages whatever step_best checkpoints exist now (uploads partial today,
-# re-run later to add the rest). Override repo ids via env:
-#   MODEL_REPO=mzio/aprm-sft-snorkel-finance  DATASET_REPO=mzio/aprm-sft-corpus-snorkel-finance
+# Publish the snorkel_finance Act-PRM artifacts to HuggingFace (PUBLIC), mirroring the
+# airline repos:
+#   model:   mzio/aprm-sft-snorkel-finance
+#     <tag>/adapter_{config.json,model.safetensors}   # 12 SFT step_best LoRA adapters,
+#            one per-variant subfolder (variant_regime, e.g. thoughts_policy_heldout,
+#            actions_only_heldout_fullctx)
+#   dataset: mzio/aprm-thought-generations-snorkel-finance
+#     generations/{policy,base,policy_last,base_last}.jsonl   # PRIMARY: full candidate
+#            pool per logged action (thoughts[G], likelihoods p(x|s,z), rewards, advantages,
+#            thought_tokens, best index) -> consumers can take top-1 OR reweight
+#     sft_corpus_top1/<variant>/{train,eval,meta}.json        # baked top-1 SFT corpus
+#     README.md
+# Requires HF_TOKEN (write) in env. Idempotent.
 set -euo pipefail
 cd "$(dirname "$0")/.."
+: "${HF_TOKEN:?set HF_TOKEN=<write token>}"
+export https_proxy="${https_proxy:-http://fwdproxy:8080}" http_proxy="${http_proxy:-http://fwdproxy:8080}" HF_HUB_DISABLE_XET=1
 MODEL_REPO="${MODEL_REPO:-mzio/aprm-sft-snorkel-finance}"
-DATASET_REPO="${DATASET_REPO:-mzio/aprm-sft-corpus-snorkel-finance}"
+DS_REPO="${DS_REPO:-mzio/aprm-thought-generations-snorkel-finance}"
 CK=checkpoints_lora/act_prm_snorkel_finance_split/hf_qwen3_4b_instruct
-STAGE=/tmp/aprm/hf_upload/aprm-sft-snorkel-finance
-rm -rf "$STAGE"; mkdir -p "$STAGE"
+LG=logs/act_prm_snorkel_finance_split/hf_qwen3_4b_instruct
+HF=.venv/bin/hf
 
-# run_tag suffix : clean checkpoint name (variant-regime)
-MAP="
-actions_only_heldout:actions_only-hide
-actions_only_heldout_fullctx:actions_only-full
-expert_thoughts_heldout:expert_thoughts-hide
-expert_thoughts_heldout_fullctx:expert_thoughts-full
-thoughts_policy_heldout:aprm_policy_best-hide
-thoughts_policy_heldout_fullctx:aprm_policy_best-full
-thoughts_policy_last_heldout:aprm_policy_last-hide
-thoughts_policy_last_heldout_fullctx:aprm_policy_last-full
-thoughts_base_heldout:aprm_base_best-hide
-thoughts_base_heldout_fullctx:aprm_base_best-full
-thoughts_base_last_heldout:aprm_base_last-hide
-thoughts_base_last_heldout_fullctx:aprm_base_last-full
-"
+echo "===== 1) MODEL repo: $MODEL_REPO (12 SFT adapters) ====="
 n=0
-for row in $MAP; do
-  tag="${row%%:*}"; name="${row##*:}"
-  sb=$(ls -dt "$CK"/snorkel_finance_split_s2_${tag}-*/step_best 2>/dev/null | head -1)
-  if [ -n "$sb" ] && [ -f "$sb/adapter_model.safetensors" ]; then
-    mkdir -p "$STAGE/$name"; cp -f "$sb"/adapter_config.json "$sb"/adapter_model.safetensors "$STAGE/$name/" 2>/dev/null || true
-    echo "staged: $name"; n=$((n+1))
-  fi
+for d in $(ls -d $CK/snorkel_finance_split_s2_*/step_best 2>/dev/null); do
+  [ -f "$d/adapter_model.safetensors" ] || continue
+  tag=$(echo "$d" | grep -oE 'snorkel_finance_split_s2_[a-z_]+heldout(_fullctx)?' | head -1 | sed 's/snorkel_finance_split_s2_//')
+  echo "== $tag =="
+  $HF upload "$MODEL_REPO" "$d" "$tag" --repo-type model 2>&1 | tail -1
+  n=$((n+1))
 done
-echo "staged $n / 12 SFT checkpoints"
+echo "uploaded $n adapters"
 
+echo "===== 2) DATASET repo: $DS_REPO ====="
+STAGE=/tmp/aprm/hf_ds_stage; rm -rf "$STAGE"; mkdir -p "$STAGE/generations" "$STAGE/sft_corpus_top1"
+for v in policy base policy_last base_last; do
+  gen=$(ls -dt $LG/snorkel_finance_split_s1relabel_${v}-*/generations.jsonl 2>/dev/null | head -1)
+  [ -n "$gen" ] && cp "$gen" "$STAGE/generations/$v.jsonl" && echo "staged generations/$v.jsonl ($(wc -l <"$gen") rows)"
+  [ -d "data/sft_corpus/snorkel_finance_split/$v" ] && cp -r "data/sft_corpus/snorkel_finance_split/$v" "$STAGE/sft_corpus_top1/$v"
+done
 cat > "$STAGE/README.md" <<'EOF'
 ---
 license: apache-2.0
-base_model: Qwen/Qwen3-4B-Instruct-2507
-library_name: peft
-tags: [act-prm, lora, snorkel-finance, sft]
+task_categories: [question-answering]
+tags: [act-prm, thought-generation, snorkel-finance, agent, sft]
 ---
-# aprm-sft-snorkel-finance
+# aprm-thought-generations-snorkel-finance
 
-Act-PRM SFT LoRA adapters (Qwen3-4B-Instruct-2507) on the **snorkel_finance** agent
-traces. Each dir is a fresh SFT checkpoint (early-stopped on held-out action ppl):
+Act-PRM inferred-thought generations for **snorkel_finance** agent traces
+(Qwen3-4B-Instruct-2507). For each logged (state `s`, action `x`), an offline EM
+samples `G=4` candidate thoughts `z`, scores each by the length-penalized action
+likelihood, and commits the top-1.
 
-- `actions_only-{hide,full}` — expert action-only baseline
-- `expert_thoughts-{hide,full}` — expert reasoning+action ("oracle")
-- `aprm_{policy,base}_{best,last}-{hide,full}` — Act-PRM inferred thought+action,
-  thoughts relabeled TOP-1 (argmax length-penalized action likelihood) from the EM
-  policy/base scorer at step_best/step_last.
+## `generations/{policy,base,policy_last,base_last}.jsonl` (primary)
+One row per logged action step. Full candidate pool so you can take top-1 OR recompute
+any weighting:
+- `thoughts` (G): candidate thoughts z
+- `likelihoods` (G): p(x | s, z), policy per-action-token likelihood
+- `rewards` (G): length-penalized score = `p(x|s,z) - 0.15 * (|z| / 96)`
+- `advantages` (G): group-normalized EM weights
+- `thought_tokens` (G): |z| per candidate
+- `best`: index of the committed top-1 (argmax reward)
+- `target_action`, `sample_id`, `timestep`, `split`
 
-`hide` = observations hidden at SFT context (system + first user + last obs + model
-turns); `full` = full context. See the act-prm-blog repo (cc-finance-1.x) for the
-pipeline + the whole-span vs action-subspan analysis.
+Variants = EM scorer (`policy` = LoRA policy likelihood, `base` = frozen base model)
+× EM snapshot (`_last` = final step_last checkpoint; else step_best).
+
+## `sft_corpus_top1/<variant>/{train,eval,meta}.json` (convenience)
+The baked top-1 SFT corpus: assistant target = `thoughts[best] + "\n\n" + action`.
+
+## Result
+On next-action prediction (action-subspan ppl), all Act-PRM variants beat both the
+expert-reasoning oracle and the action-only baseline in hide-obs and full-context.
+See the act-prm-blog `cc-finance-1.x` notes/notebooks.
 EOF
+$HF upload "$DS_REPO" "$STAGE" . --repo-type dataset 2>&1 | tail -1
 
-echo "=== uploading $n checkpoints -> $MODEL_REPO (model) ==="
-hf upload "$MODEL_REPO" "$STAGE" . --repo-type model
-
-echo "=== uploading corpora -> $DATASET_REPO (dataset) ==="
-CORP=data/sft_corpus/snorkel_finance_split
-for c in base base_last policy policy_last; do
-  [ -f "$CORP/$c/train.json" ] && hf upload "$DATASET_REPO" "$CORP/$c" "$c" --repo-type dataset && echo "uploaded corpus $c"
-done
-echo "DONE. Model: https://huggingface.co/$MODEL_REPO  Dataset: https://huggingface.co/datasets/$DATASET_REPO"
+echo "===== 3) set PUBLIC + verify ====="
+.venv/bin/python - "$MODEL_REPO" "$DS_REPO" <<'PY'
+import os, sys
+from huggingface_hub import HfApi
+api = HfApi(token=os.environ["HF_TOKEN"])
+for repo, typ in [(sys.argv[1], "model"), (sys.argv[2], "dataset")]:
+    for fn in ("update_repo_settings", "update_repo_visibility"):
+        try:
+            getattr(api, fn)(repo_id=repo, private=False, repo_type=typ); break
+        except Exception as e:
+            last = e
+    info = api.model_info(repo) if typ == "model" else api.dataset_info(repo)
+    sib = len(info.siblings or [])
+    print(f"{typ:8s} {repo}: private={info.private}  siblings={sib}")
+PY
+echo "DONE:"
+echo "  https://huggingface.co/$MODEL_REPO"
+echo "  https://huggingface.co/datasets/$DS_REPO"
