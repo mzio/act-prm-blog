@@ -95,19 +95,35 @@ train/eval (ppl = exp(mean CE); accuracy = top-1 argmax==gold).
    Replaced with the `action_start_token` boundary (verified on tool_call / Final Answer
    / actions_only).
 
-## Preliminary results (4B, PARTIAL — head-start variants only; live)
-Best (min) eval **action-subspan** ppl / accuracy so far:
+## FINAL results (4B, all 12 variants; pipeline complete 07-29)
+Best (min) eval **action-subspan** ppl (↓) / accuracy (↑). All 4 corpora strict-verified
+clean (0 sample_id/action mismatches).
 
 | variant | regime | action-ppl ↓ | action-acc ↑ | whole-span ppl |
 |---|---|---|---|---|
-| actions_only | hide | 2.84 | 0.824 | 2.84 (== ; no thought) |
-| actions_only | full | 2.45 | 0.871 | 2.45 |
-| **expert_thoughts** | hide | **2.65** | **0.833** | 3.05 |
+| **thoughts_policy (Act-PRM)** | full | **2.040** | **0.885** | 2.68 |
+| thoughts_base_last | full | 2.043 | 0.885 | 2.71 |
+| thoughts_policy_last | full | 2.063 | 0.884 | 2.72 |
+| thoughts_base | full | 2.064 | 0.884 | 2.71 |
+| expert_thoughts (oracle) | full | 2.222 | 0.877 | 2.55 |
+| actions_only | full | 2.441 | 0.871 | 2.44 |
+| **thoughts_policy (Act-PRM)** | hide | **2.307** | **0.853** | 3.10 |
+| thoughts_base_last | hide | 2.335 | 0.850 | 3.11 |
+| thoughts_policy_last | hide | 2.342 | 0.852 | 3.11 |
+| thoughts_base | hide | 2.366 | 0.849 | 3.12 |
+| expert_thoughts (oracle) | hide | 2.652 | 0.833 | 3.05 |
+| actions_only | hide | 2.843 | 0.824 | 2.84 |
 
-**The airline flip reproduces:** `expert_thoughts` (hide) BEATS `actions_only` (hide)
-on action prediction (2.65 < 2.84), even though its whole-span ppl is *worse* (3.05 >
-2.84) — the thought inflates whole-span but *helps* the action. This is the whole point
-of the action-subspan metric. Act-PRM (thoughts_policy/base) variants pending Stage 1.5.
+**Headline:** in BOTH regimes, **all four Act-PRM variants (policy/base × best/last)
+beat the expert-reasoning oracle AND the actions_only baseline** on next-action
+prediction — Act-PRM roughly DOUBLES the improvement the expert thoughts give
+(hide: actions_only 2.84 → expert 2.65 → Act-PRM ~2.31). `thoughts_policy` (policy-
+scored) is best in both regimes; policy≈base, best≈last (tight cluster).
+
+**The action-subspan metric is essential (the flip):** the Act-PRM variants have the
+*worst* whole-span ppl (~2.7 full / ~3.1 hide) yet the *best* action-subspan — i.e. the
+whole-span metric would rank Act-PRM LAST while it actually predicts actions BEST. The
+verbose thought inflates whole-span but helps the action.
 
 ## Deliverables
 - notes: `cc-finance-1.0-pipeline.md` (this), `cc-finance-2.0-rl-design.md` (Stage 3).
