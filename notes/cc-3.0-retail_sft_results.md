@@ -13,6 +13,10 @@ action-PPL on the 10-task `act_prm_eval`). Lower PPL / higher accuracy = better 
 | thoughts_policy | full | 3.4046 | 1.2251 | 0.7697 | 59 | 1.0355 |
 | thoughts_base | hide | 3.7098 | 1.3110 | 0.7454 | 59 | 0.9361 |
 | thoughts_base | full | 3.4093 | 1.2265 | 0.7717 | 59 | 0.6225 |
+| thoughts_base_last | hide | 3.6738 | 1.3012 | 0.7401 | 59 | 0.9956 |
+| thoughts_policy_last | hide | 3.7470 | 1.3209 | 0.7390 | 10 | 1.5987 |
+| thoughts_base_last | full | 3.4170 | 1.2288 | 0.7653 | 59 | 1.0100 |
+| thoughts_policy_last | full | 3.4333 | 1.2335 | 0.7637 | 30 | 0.9191 |
 
 CSV: `logs/act_prm_tau2_retail/hf_qwen3_4b_instruct/retail_sft_summary.csv`. Curves: `notebooks/cc-1.1-aprm_tau2_retail_results.ipynb`.
 
