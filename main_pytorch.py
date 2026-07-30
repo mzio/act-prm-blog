@@ -36,6 +36,16 @@ import logging
 import sys
 from typing import Any
 
+import torch as _torch
+# Disable the flaky cuDNN SDPA backend: it intermittently raises
+# "mha_graph.execute(...).is_good() false" on the long agentic-RL sequences
+# (max_turns 20). PyTorch falls back to flash / mem-efficient / math SDPA
+# (well-tested, no correctness change). Guarded so it never breaks startup.
+try:
+    _torch.backends.cuda.enable_cudnn_sdp(False)
+except Exception:
+    pass
+
 from dotenv import load_dotenv
 from omegaconf import DictConfig, OmegaConf
 from rich import print as rich_print
