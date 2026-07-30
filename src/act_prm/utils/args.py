@@ -416,6 +416,11 @@ def get_args() -> argparse.Namespace:
         type=str,
         help="Metric to save best checkpoints on",
     )
+    parser.add_argument(
+        "--early_stop_patience",
+        type=int,
+        help="Early-stop if best_metric hasn't improved for this many eval checks (0 = off)",
+    )
 
     ## Tinker logging + checkpointing
     parser.add_argument("--base_url", type=str, help="Tinker base URL")
@@ -598,6 +603,7 @@ def get_args() -> argparse.Namespace:
         "dataset_path",  # a long path; run_tag/env already identify the run (kept the name < 255)
         "train_task_ids",  # explicit id lists can be 70+ ints; would blow up the run name
         "eval_task_ids",
+        "early_stop_patience",  # a stopping knob, not part of the run's identity
         "verbose",
         "streamer",
     ]

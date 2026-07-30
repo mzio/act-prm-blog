@@ -38,6 +38,8 @@ HIDE="${HIDE:-1}"
 NUM_BATCHES="${NUM_BATCHES:-100}"
 MAX_TURNS="${MAX_TURNS:-30}"
 GROUP_SIZE="${GROUP_SIZE:-8}"
+EVAL_EVERY="${EVAL_EVERY:-20}"     # eval on the 20-task hold-out subset every N batches
+PATIENCE="${PATIENCE:-3}"          # early-stop if eval success (final_reward) doesn't improve for N evals
 if [ "$HIDE" = 1 ]; then REG=hide; HIDE_ARGS=(--hide_observations); else REG=full; HIDE_ARGS=(); fi
 log(){ echo "[$(date '+%m-%d %H:%M:%S')] $*" | tee -a "$MDIR/rlvr.log"; }
 wait_gpu_free(){ while pgrep -f '[m]ain_pytorch.py' >/dev/null 2>&1; do sleep 60; done; sleep 10; }
@@ -47,10 +49,10 @@ newest(){ ls -dt $1 2>/dev/null | head -1; }
 # hardcoded --generator_config hf_grpo / --env_config tau2bench/retail / group/bs/turns).
 RLVR_ARGS=(--generator_config hf_rlvr --env_config tau2bench/retail_rlvr
            --group_size "$GROUP_SIZE" --batch_size 1 --max_turns "$MAX_TURNS" --max_tokens 2048
-           --num_batches "$NUM_BATCHES" --eval_every 20 --discount_factor 1.0 --gradient_checkpointing
-           "${HIDE_ARGS[@]}")
+           --num_batches "$NUM_BATCHES" --eval_every "$EVAL_EVERY" --early_stop_patience "$PATIENCE"
+           --discount_factor 1.0 --gradient_checkpointing "${HIDE_ARGS[@]}")
 
-log "=== RLVR strong Stage-3 start (regime=$REG group=$GROUP_SIZE turns=$MAX_TURNS batches=$NUM_BATCHES) ==="
+log "=== RLVR strong Stage-3 start (regime=$REG group=$GROUP_SIZE turns=$MAX_TURNS batches=$NUM_BATCHES eval_every=$EVAL_EVERY patience=$PATIENCE) ==="
 
 # --- task split (train 72 logged; eval-during-RL first 20 never-in-logs; final 42) ---
 SPLIT_JSON="data/splits/tau2_retail_uid_to_tau2id.json"
