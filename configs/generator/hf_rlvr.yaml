@@ -1,0 +1,17 @@
+# RLVR agentic-rollout generator: same as hf_grpo BUT mean_center: false.
+# RLVR (RL with Verifiable Rewards) uses the raw binary task reward as the
+# advantage — NO group-mean baseline. With the tau2 env's {+1 correct, 0 fail}
+# reward (negative_rewards: false) and discount_factor 1.0, every token in a
+# successful trajectory gets advantage 1 and every token in a failed one gets 0
+# (REINFORCE-on-successes / RFT-style). This gives signal on ~all groups except
+# all-fail ones (P≈0.7^group), unlike GRPO where all-SAME groups (fail OR
+# success) mean-center to zero advantage.
+name: "hf"
+
+enable_thinking: false
+mean_center: false          # RLVR: advantage = raw reward (no group-mean subtraction)
+verbose: false
+streamer: false
+
+ground_truth_generation: false
+ground_truth_incorrects: false
