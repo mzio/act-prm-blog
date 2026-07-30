@@ -17,10 +17,14 @@ export HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 HF_HUB_DISABLE_XET=1 UV_FROZEN=1
 export PYTORCH_CUDA_ALLOC_CONF="${PYTORCH_CUDA_ALLOC_CONF:-expandable_segments:True}"
 [ -f "$SFT/adapter_model.safetensors" ] || { echo "no adapter_model.safetensors under $SFT"; exit 1; }
 # CLAUDECODE cleared so the grader's Claude Agent SDK can spawn a (nested) claude subprocess.
+# RLVR (GRPO on the verifiable correct/incorrect judge reward). group_size 8 for more
+# signal on the sparse reward; max_turns 30 so finance multi-step episodes can finish
+# (was 8 -> 33% truncated); eval on the ~20-question eval split (config), less often
+# since eval is heavier now.
 CUDA_VISIBLE_DEVICES=$GPU CLAUDECODE= exec .venv/bin/python main_pytorch.py \
   --env_config act_prm/snorkel_finance_gym --model_config hf_qwen3_4b_instruct \
   --lora_config r8_a16_linear --generator_config hf_grpo --trainer_config pg \
   --replay_buffer_config default --resume_from "$SFT" \
-  --group_size 4 --batch_size 2 --max_turns 8 --max_tokens 2048 \
-  --num_batches 20 --eval_every 5 --no_initial_eval --hide_observations \
+  --group_size 8 --batch_size 2 --max_turns 30 --max_tokens 2048 \
+  --num_batches 50 --eval_every 10 --no_initial_eval --hide_observations \
   --gradient_checkpointing --run_tag "$TAG" --verbose "$@"
