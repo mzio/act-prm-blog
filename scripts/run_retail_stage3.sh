@@ -101,7 +101,9 @@ INIT[retail_rl_thoughts_base_last]="${CKPT[thoughts_base_last]:-}"
 run_one(){
   local tag="$1" init="$2"
   [ -z "$init" ] && { log "RL $tag: no SFT ckpt, skip"; return; }
-  [ -n "$(newest "$S3ROOT/${tag}-*/step_best")" ] && { log "RL $tag: done, skip"; return; }
+  # Require the adapter FILE, not just the step_best dir: a crashed/killed run can leave
+  # an empty step_best/ shell that would otherwise be mistaken for a completed arm.
+  [ -n "$(newest "$S3ROOT/${tag}-*/step_best/adapter_model.safetensors")" ] && { log "RL $tag: done, skip"; return; }
   # $TRAIN_IDS / $EVAL_IDS_TRAIN UNQUOTED on purpose: word-split into one argv per id
   # (argparse nargs="+"). Trains on the 72 logged, evals (during RL) on the 12-task
   # subset — the cheap early-stop signal. Full-42 eval happens after the matrix.
@@ -133,7 +135,7 @@ done
 # (no PG, no training). Resumable: skip an arm whose eval42 metrics already exist.
 run_eval42(){
   local tag="$1"
-  local ckpt; ckpt=$(newest "$S3ROOT/${tag}-*/step_best")
+  local ckpt; ckpt=$(newest "$S3ROOT/${tag}-*/step_best/adapter_model.safetensors"); ckpt=${ckpt%/adapter_model.safetensors}
   [ -z "$ckpt" ] && { log "EVAL42 $tag: no RL step_best, skip"; return; }
   [ -n "$(newest "$S3LOGROOT/${tag}_eval42-*/metrics.jsonl")" ] && { log "EVAL42 $tag: done, skip"; return; }
   if [ "$DRY" = 1 ]; then
