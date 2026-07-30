@@ -16,15 +16,30 @@ export HF_HOME="${HF_HOME:-/data/users/$USER/models/hf_cache}"
 export HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 HF_HUB_DISABLE_XET=1 UV_FROZEN=1
 export PYTORCH_CUDA_ALLOC_CONF="${PYTORCH_CUDA_ALLOC_CONF:-expandable_segments:True}"
 [ -f "$SFT/adapter_model.safetensors" ] || { echo "no adapter_model.safetensors under $SFT"; exit 1; }
+
+# GUARANTEE regime match: derive the RL context regime FROM the SFT checkpoint path so
+# hide-obs RL can ONLY start from a hide-obs SFT ckpt, and full-context RL ONLY from a
+# full-context SFT ckpt. (SFT full ckpts are tagged *_heldout_fullctx; hide are *_heldout.)
+case "$SFT" in
+  *_heldout_fullctx-*|*_heldout_fullctx/*) REGIME=full; OBS=() ;;
+  *_heldout-*|*_heldout/*)                 REGIME=hide; OBS=(--hide_observations) ;;
+  *) echo "ABORT: cannot infer hide/full regime from ckpt (need *_heldout or *_heldout_fullctx): $SFT"; exit 1 ;;
+esac
+# defense in depth: if the run_tag hints a regime, it must match the ckpt
+case "$TAG" in
+  *full*) [ "$REGIME" = full ] || { echo "ABORT: run_tag=$TAG (full) but ckpt is $REGIME"; exit 1; } ;;
+  *hide*) [ "$REGIME" = hide ] || { echo "ABORT: run_tag=$TAG (hide) but ckpt is $REGIME"; exit 1; } ;;
+esac
+echo "RL regime = $REGIME (matched to SFT ckpt: $(basename "$(dirname "$SFT")"))"
+
 # CLAUDECODE cleared so the grader's Claude Agent SDK can spawn a (nested) claude subprocess.
 # RLVR (GRPO on the verifiable correct/incorrect judge reward). group_size 8 for more
 # signal on the sparse reward; max_turns 30 so finance multi-step episodes can finish
-# (was 8 -> 33% truncated); eval on the ~20-question eval split (config), less often
-# since eval is heavier now.
+# (was 8 -> 33% truncated); eval on the ~20-question eval split (config), less often now.
 CUDA_VISIBLE_DEVICES=$GPU CLAUDECODE= exec .venv/bin/python main_pytorch.py \
   --env_config act_prm/snorkel_finance_gym --model_config hf_qwen3_4b_instruct \
   --lora_config r8_a16_linear --generator_config hf_grpo --trainer_config pg \
   --replay_buffer_config default --resume_from "$SFT" \
   --group_size 8 --batch_size 2 --max_turns 30 --max_tokens 2048 \
-  --num_batches 50 --eval_every 10 --no_initial_eval --hide_observations \
+  --num_batches 50 --eval_every 10 --no_initial_eval "${OBS[@]}" \
   --gradient_checkpointing --run_tag "$TAG" --verbose "$@"
