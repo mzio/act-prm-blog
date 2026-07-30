@@ -29,6 +29,16 @@ S3ROOT="checkpoints_lora/tau2bench_retail/$MODEL"      # RL checkpoints
 S3LOGROOT="logs/tau2bench_retail/$MODEL"               # RL logs (metrics.jsonl)
 MDIR=/tmp/aprm/rlvr; mkdir -p "$MDIR"
 DRY="${DRY:-0}"
+# HIDE=1 (default): hide-observations RL, warm-started ONLY from HIDE SFT checkpoints
+#   (retail_s2_<v>_heldout, no _fullctx), appends --hide_observations.
+# HIDE=0: full-context RL, warm-started ONLY from FULL-context SFT (_fullctx).
+# The regime is baked into the run_tag (_hide/_full) so the two never collide and
+# each RL arm starts from the MATCHING SFT regime (never cross regimes).
+HIDE="${HIDE:-1}"
+NUM_BATCHES="${NUM_BATCHES:-100}"
+MAX_TURNS="${MAX_TURNS:-30}"
+GROUP_SIZE="${GROUP_SIZE:-8}"
+if [ "$HIDE" = 1 ]; then REG=hide; HIDE_ARGS=(--hide_observations); else REG=full; HIDE_ARGS=(); fi
 log(){ echo "[$(date '+%m-%d %H:%M:%S')] $*" | tee -a "$MDIR/rlvr.log"; }
 wait_gpu_free(){ while pgrep -f '[m]ain_pytorch.py' >/dev/null 2>&1; do sleep 60; done; sleep 10; }
 newest(){ ls -dt $1 2>/dev/null | head -1; }
@@ -36,10 +46,11 @@ newest(){ ls -dt $1 2>/dev/null | head -1; }
 # Common RLVR overrides (appended last -> argparse last-wins beats train_rl_from_sft.sh's
 # hardcoded --generator_config hf_grpo / --env_config tau2bench/retail / group/bs/turns).
 RLVR_ARGS=(--generator_config hf_rlvr --env_config tau2bench/retail_rlvr
-           --group_size 8 --batch_size 1 --max_turns 30 --max_tokens 2048
-           --num_batches 100 --eval_every 20 --discount_factor 1.0 --gradient_checkpointing)
+           --group_size "$GROUP_SIZE" --batch_size 1 --max_turns "$MAX_TURNS" --max_tokens 2048
+           --num_batches "$NUM_BATCHES" --eval_every 20 --discount_factor 1.0 --gradient_checkpointing
+           "${HIDE_ARGS[@]}")
 
-log "=== RLVR strong Stage-3 start ==="
+log "=== RLVR strong Stage-3 start (regime=$REG group=$GROUP_SIZE turns=$MAX_TURNS batches=$NUM_BATCHES) ==="
 
 # --- task split (train 72 logged; eval-during-RL first 20 never-in-logs; final 42) ---
 SPLIT_JSON="data/splits/tau2_retail_uid_to_tau2id.json"
@@ -49,20 +60,25 @@ EVAL_IDS_TRAIN=$(python3 -c "import json;print(' '.join(json.load(open('$SPLIT_J
 [ -n "$TRAIN_IDS" ] && [ -n "$EVAL_IDS" ] && [ -n "$EVAL_IDS_TRAIN" ] || { log "FATAL: bad split json"; exit 1; }
 log "split: train=$(echo $TRAIN_IDS|wc -w) eval-during-RL=$(echo $EVAL_IDS_TRAIN|wc -w) final-eval=$(echo $EVAL_IDS|wc -w)"
 
-# --- resolve SFT inits (fullctx preferred, hide fallback) ---
+# --- resolve SFT inits STRICTLY within the regime (NO cross-regime fallback) ---
+#   hide RL  <- retail_s2_<v>_heldout-*         (exclude _fullctx)
+#   full RL  <- retail_s2_<v>_heldout_fullctx-*
 declare -A CKPT
 for v in actions_only thoughts_policy thoughts_base; do
-  c=$(newest "$CKROOT/retail_s2_${v}_heldout_fullctx-*/step_best/adapter_model.safetensors")
-  [ -z "$c" ] && c=$(newest "$CKROOT/retail_s2_${v}_heldout-*/step_best/adapter_model.safetensors")
+  if [ "$REG" = hide ]; then
+    c=$(ls -dt $CKROOT/retail_s2_${v}_heldout-*/step_best/adapter_model.safetensors 2>/dev/null | grep -v _fullctx | head -1)
+  else
+    c=$(newest "$CKROOT/retail_s2_${v}_heldout_fullctx-*/step_best/adapter_model.safetensors")
+  fi
   c=${c%/adapter_model.safetensors}
-  CKPT[$v]="$c"; log "  init[$v] = ${c:-<none>}"
+  CKPT[$v]="$c"; log "  init[$v,$REG] = ${c:-<none>}"
 done
 
 declare -A INIT
-INIT[retail_rlvr_base]="base"
-INIT[retail_rlvr_actions_only]="${CKPT[actions_only]:-}"
-INIT[retail_rlvr_thoughts_base]="${CKPT[thoughts_base]:-}"
-INIT[retail_rlvr_thoughts_policy]="${CKPT[thoughts_policy]:-}"
+INIT[retail_rlvr_base_${REG}]="base"
+INIT[retail_rlvr_actions_only_${REG}]="${CKPT[actions_only]:-}"
+INIT[retail_rlvr_thoughts_base_${REG}]="${CKPT[thoughts_base]:-}"
+INIT[retail_rlvr_thoughts_policy_${REG}]="${CKPT[thoughts_policy]:-}"
 
 # --- SMOKE: validate the RLVR path cheaply (1 batch, 1 task, few turns) ---
 if [ "$DRY" != 1 ]; then
@@ -70,12 +86,12 @@ if [ "$DRY" != 1 ]; then
   [ -z "$SMOKE_CK" ] && { log "no SFT ckpt for smoke — abort"; exit 1; }
   log "RLVR SMOKE (1 batch, 1 task, group 2, 4 turns) ..."
   wait_gpu_free
-  ./scripts/train_rl_from_sft.sh retail "$SMOKE_CK" --run_tag retail_rlvr_smoke \
+  ./scripts/train_rl_from_sft.sh retail "$SMOKE_CK" --run_tag "retail_rlvr_smoke_${REG}" \
     --generator_config hf_rlvr --env_config tau2bench/retail_rlvr \
     --num_batches 1 --batch_size 1 --group_size 2 --max_turns 4 --discount_factor 1.0 \
-    --num_test_tasks 1 --no_initial_eval > "$MDIR/smoke.log" 2>&1
+    "${HIDE_ARGS[@]}" --num_test_tasks 1 --no_initial_eval > "$MDIR/smoke.log" 2>&1
   SMOKE_RC=$?
-  SMOKE_M=$(newest "$S3LOGROOT/retail_rlvr_smoke-*/metrics.jsonl")
+  SMOKE_M=$(newest "$S3LOGROOT/retail_rlvr_smoke_${REG}-*/metrics.jsonl")
   if [ "$SMOKE_RC" -ne 0 ] || { [ -z "$SMOKE_M" ] && ! grep -q "Rewards:" "$MDIR/smoke.log" 2>/dev/null; }; then
     log "RLVR SMOKE FAILED (rc=$SMOKE_RC). Diagnose: $MDIR/smoke.log"; exit 1
   fi
@@ -100,7 +116,7 @@ run_one(){
   ./scripts/snapshot.sh "Stage-3 RLVR: $tag (retail) checkpoint" >/dev/null 2>&1 || true
 }
 
-for tag in retail_rlvr_base retail_rlvr_actions_only retail_rlvr_thoughts_base retail_rlvr_thoughts_policy; do
+for tag in retail_rlvr_base_${REG} retail_rlvr_actions_only_${REG} retail_rlvr_thoughts_base_${REG} retail_rlvr_thoughts_policy_${REG}; do
   run_one "$tag" "${INIT[$tag]}"
 done
 
@@ -115,11 +131,11 @@ run_eval42(){
   wait_gpu_free
   ./scripts/train_rl_from_sft.sh retail "$ckpt" --run_tag "${tag}_eval42" \
     --generator_config hf_rlvr --env_config tau2bench/retail_rlvr \
-    --no_train --num_batches 1 --eval_every 1 --max_turns 30 --discount_factor 1.0 \
-    --train_task_ids $TRAIN_IDS --eval_task_ids $EVAL_IDS > "$MDIR/${tag}_eval42.log" 2>&1 \
+    --no_train --num_batches 1 --eval_every 1 --max_turns "$MAX_TURNS" --discount_factor 1.0 \
+    "${HIDE_ARGS[@]}" --train_task_ids $TRAIN_IDS --eval_task_ids $EVAL_IDS > "$MDIR/${tag}_eval42.log" 2>&1 \
     && log "EVAL42 $tag: done" || log "EVAL42 $tag: FAILED (see $MDIR/${tag}_eval42.log)"
 }
-for tag in retail_rlvr_base retail_rlvr_actions_only retail_rlvr_thoughts_base retail_rlvr_thoughts_policy; do
+for tag in retail_rlvr_base_${REG} retail_rlvr_actions_only_${REG} retail_rlvr_thoughts_base_${REG} retail_rlvr_thoughts_policy_${REG}; do
   run_eval42 "$tag"
 done
 log "=== RLVR strong Stage-3 done ==="
