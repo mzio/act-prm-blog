@@ -520,12 +520,16 @@ class HuggingFaceGenerator:
                     all_act_logps = []
                     all_state_act_toks = []
                     for _s_idx in range(batch_state_action_inputs["input_ids"].shape[0]):
-                        _single_inputs = {k: v[_s_idx : _s_idx + 1] for k, v in batch_state_action_inputs.items()}
-                        _logits = llm.model(**_single_inputs.to(device), use_cache=False).logits
+                        # NB: slicing a BatchEncoding yields a plain dict (no .to()),
+                        # so move each tensor to device here and pass the dict directly.
+                        _single_inputs = {
+                            k: v[_s_idx : _s_idx + 1].to(device) for k, v in batch_state_action_inputs.items()
+                        }
+                        _logits = llm.model(**_single_inputs, use_cache=False).logits
                         _result = get_action_logprobs_and_state_action_tokens(
                             logits=_logits,
                             state_lens=[state_input_lens[_s_idx]],
-                            **_single_inputs.to(device),
+                            **_single_inputs,
                         )
                         all_act_logps.extend(_result[0])
                         all_state_act_toks.extend(_result[1])
