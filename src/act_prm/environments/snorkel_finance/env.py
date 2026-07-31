@@ -330,7 +330,7 @@ class SnorkelFinanceEnv(Environment):
                         }
                     )
                     metadata["correct"] = reward
-                    reward = reward * 2.0 - 1.0  # convert to [-1, 1] scale
+                    reward = (reward * 2.0 - 1.0) if self.negative_rewards else reward  # [-1,1] vs RLVR +1/0
                     continue
 
                 # Execute other tool calls
@@ -378,7 +378,7 @@ class SnorkelFinanceEnv(Environment):
                         }
                     )
                     metadata["correct"] = reward
-                    reward = reward * 2.0 - 1.0  # convert to [-1, 1] scale
+                    reward = (reward * 2.0 - 1.0) if self.negative_rewards else reward  # [-1,1] vs RLVR +1/0
 
         # Update timesteps
         timestep += 1
@@ -501,7 +501,7 @@ class SnorkelFinanceEnv(Environment):
                         }
                     )
                     metadata["correct"] = reward
-                    reward = reward * 2.0 - 1.0  # convert to [-1, 1] scale
+                    reward = (reward * 2.0 - 1.0) if self.negative_rewards else reward  # [-1,1] vs RLVR +1/0
                     continue
 
                 # Execute other tool calls
@@ -549,14 +549,14 @@ class SnorkelFinanceEnv(Environment):
                         }
                     )
                     metadata["correct"] = reward
-                    reward = reward * 2.0 - 1.0  # convert to [-1, 1] scale
+                    reward = (reward * 2.0 - 1.0) if self.negative_rewards else reward  # [-1,1] vs RLVR +1/0
 
         # Update timesteps
         timestep += 1
         if timestep >= self.max_turns and not done:
             truncated = True
             done = True
-            reward = -1.0
+            reward = -1.0 if self.negative_rewards else 0.0  # RLVR: truncation = failure = 0
             env_messages.append(
                 {
                     "role": "user",

@@ -10,6 +10,9 @@
 name: "snorkel_finance"
 is_async: true
 
+# RLVR reward: +1 for a correct answer, 0 for incorrect/truncation (not the [-1,+1] default).
+negative_rewards: false
+
 data_path: "src/act_prm/data/snorkel_finance/raw"
 benchmark_csv: "src/act_prm/data/snorkel_finance/benchmark/finqa_reasoning.csv"
 task: "finqa_reasoning"
