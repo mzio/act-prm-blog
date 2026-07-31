@@ -118,7 +118,7 @@ run_one(){
   ./scripts/snapshot.sh "Stage-3 RLVR: $tag (retail) checkpoint" >/dev/null 2>&1 || true
 }
 
-for tag in retail_rlvr_base_${REG} retail_rlvr_actions_only_${REG} retail_rlvr_thoughts_base_${REG} retail_rlvr_thoughts_policy_${REG}; do
+for tag in retail_rlvr_actions_only_${REG} retail_rlvr_thoughts_base_${REG} retail_rlvr_thoughts_policy_${REG} retail_rlvr_base_${REG}; do
   run_one "$tag" "${INIT[$tag]}"
 done
 
@@ -137,7 +137,7 @@ run_eval42(){
     "${HIDE_ARGS[@]}" --train_task_ids $TRAIN_IDS --eval_task_ids $EVAL_IDS > "$MDIR/${tag}_eval42.log" 2>&1 \
     && log "EVAL42 $tag: done" || log "EVAL42 $tag: FAILED (see $MDIR/${tag}_eval42.log)"
 }
-for tag in retail_rlvr_base_${REG} retail_rlvr_actions_only_${REG} retail_rlvr_thoughts_base_${REG} retail_rlvr_thoughts_policy_${REG}; do
+for tag in retail_rlvr_actions_only_${REG} retail_rlvr_thoughts_base_${REG} retail_rlvr_thoughts_policy_${REG} retail_rlvr_base_${REG}; do
   run_eval42 "$tag"
 done
 log "=== RLVR strong Stage-3 done ==="
