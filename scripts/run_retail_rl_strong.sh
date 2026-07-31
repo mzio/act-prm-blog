@@ -35,12 +35,15 @@ DRY="${DRY:-0}"
 # The regime is baked into the run_tag (_hide/_full) so the two never collide and
 # each RL arm starts from the MATCHING SFT regime (never cross regimes).
 HIDE="${HIDE:-1}"
-NUM_BATCHES="${NUM_BATCHES:-100}"
-MAX_TURNS="${MAX_TURNS:-30}"
-GROUP_SIZE="${GROUP_SIZE:-8}"
+NUM_BATCHES="${NUM_BATCHES:-40}"
+MAX_TURNS="${MAX_TURNS:-20}"
+GROUP_SIZE="${GROUP_SIZE:-4}"
+BATCH_SIZE="${BATCH_SIZE:-2}"      # unique tasks/step; group4*bs2=8 rollouts fits WITHOUT grad-ckpt
+GRAD_CKPT="${GRAD_CKPT:-0}"        # 0=off (fast). Only needed for group8 (VRAM); grad-ckpt ~2x slower.
 EVAL_EVERY="${EVAL_EVERY:-20}"     # eval on the 20-task hold-out subset every N batches
 PATIENCE="${PATIENCE:-3}"          # early-stop if eval success (final_reward) doesn't improve for N evals
 if [ "$HIDE" = 1 ]; then REG=hide; HIDE_ARGS=(--hide_observations); else REG=full; HIDE_ARGS=(); fi
+if [ "$GRAD_CKPT" = 1 ]; then CKPT_ARGS=(--gradient_checkpointing); else CKPT_ARGS=(); fi
 log(){ echo "[$(date '+%m-%d %H:%M:%S')] $*" | tee -a "$MDIR/rlvr.log"; }
 wait_gpu_free(){ while pgrep -f '[m]ain_pytorch.py' >/dev/null 2>&1; do sleep 60; done; sleep 10; }
 newest(){ ls -dt $1 2>/dev/null | head -1; }
@@ -48,11 +51,11 @@ newest(){ ls -dt $1 2>/dev/null | head -1; }
 # Common RLVR overrides (appended last -> argparse last-wins beats train_rl_from_sft.sh's
 # hardcoded --generator_config hf_grpo / --env_config tau2bench/retail / group/bs/turns).
 RLVR_ARGS=(--generator_config hf_rlvr --env_config tau2bench/retail_rlvr
-           --group_size "$GROUP_SIZE" --batch_size 1 --max_turns "$MAX_TURNS" --max_tokens 2048
+           --group_size "$GROUP_SIZE" --batch_size "$BATCH_SIZE" --max_turns "$MAX_TURNS" --max_tokens 2048
            --num_batches "$NUM_BATCHES" --eval_every "$EVAL_EVERY" --early_stop_patience "$PATIENCE"
-           --discount_factor 1.0 --gradient_checkpointing "${HIDE_ARGS[@]}")
+           --discount_factor 1.0 "${CKPT_ARGS[@]}" "${HIDE_ARGS[@]}")
 
-log "=== RLVR strong Stage-3 start (regime=$REG group=$GROUP_SIZE turns=$MAX_TURNS batches=$NUM_BATCHES eval_every=$EVAL_EVERY patience=$PATIENCE) ==="
+log "=== RLVR strong Stage-3 start (regime=$REG group=$GROUP_SIZE bs=$BATCH_SIZE turns=$MAX_TURNS batches=$NUM_BATCHES grad_ckpt=$GRAD_CKPT eval_every=$EVAL_EVERY patience=$PATIENCE) ==="
 
 # --- task split (train 72 logged; eval-during-RL first 20 never-in-logs; final 42) ---
 SPLIT_JSON="data/splits/tau2_retail_uid_to_tau2id.json"
