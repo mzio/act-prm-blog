@@ -26,11 +26,18 @@ num_test_tasks: 24
 train_task_ids: null
 eval_task_ids: null
 
-# State compaction (wrapper-level)
+# State compaction (wrapper-level). last_obs_to_show=1 keeps the MOST RECENT
+# tool/user observation visible (base.py:160 hides user/tool msgs with
+# first_obs_to_show <= idx < num_messages - last_obs_to_show). With 0 the policy
+# was BLIND to all tool results during rollouts (~4% success, flailing episodes);
+# 1 shows the last tool response so the agent can act, and matches the trainer's
+# loss-side default (pg_base.py:147) so generation and training stay consistent.
+# The env keeps system + initial user message visible via first_obs_to_show set
+# at reset (env.py:604 = len(initial messages)+1); this yaml key is a fallback.
 hide_observations: false
 hidden_obs_content: "..."
 first_obs_to_show: 1
-last_obs_to_show: 0
+last_obs_to_show: 1
 
 max_turns: 30               # stronger-RL default (override via --max_turns)
 num_tries: 1
