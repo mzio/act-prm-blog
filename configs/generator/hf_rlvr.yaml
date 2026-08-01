@@ -1,0 +1,28 @@
+# HuggingFace agentic-rollout generator for **RLVR** (verifiable-reward RL).
+#
+# Difference vs hf_grpo: NO mean-centering and NO discounting, so the per-step
+# advantage is exactly the verifiable terminal reward:
+#
+#   env (airline_rlvr / negative_rewards:false) gives final_reward = +1 on task
+#   success, 0 otherwise. With mean_center:false the group falls through to
+#   TrajectoryGroup.compute_advantages() -> trajectory.compute_returns(), and with
+#   discount_factor:1.0 that return is a plain sum of rewards, i.e. every step of a
+#   successful rollout gets advantage 1.0 and every step of a failed rollout gets 0.0.
+#
+# NB discount_factor MUST be 1.0 here. The generator default is 0.9, which would make
+# earlier steps 0.9^k * reward -- discounted credit assignment, not RLVR. There is no
+# --discount_factor CLI flag, so this file is the only place it gets set.
+#
+# Consequence to be aware of: with 0/1 advantages the loss only reinforces successful
+# rollouts (failures contribute exactly zero gradient) rather than also pushing down
+# failures the way GRPO's negative advantages do.
+name: "hf"
+
+enable_thinking: false
+mean_center: false          # RLVR: raw verifiable reward, no group baseline
+discount_factor: 1.0        # no discounting -> advantage == final_reward at every step
+verbose: false
+streamer: false
+
+ground_truth_generation: false
+ground_truth_incorrects: false
