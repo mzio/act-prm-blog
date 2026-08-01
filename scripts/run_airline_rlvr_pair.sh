@@ -62,10 +62,17 @@ rl(){  # tag  gpu  resume_ckpt
 }
 stream(){ local gpu=$1; shift; for j in "$@"; do IFS='|' read -r tag ckpt <<< "$j"; rl "$tag" "$gpu" "$ckpt"; done; }
 
-JOBS=(
-  "airline_rlvr_thoughts_policy|$(sft_best thoughts_policy)"
-  "airline_rlvr_actions_only|$(sft_best actions_only)"
-)
+# ARMS selects which arms to run (space/comma separated), so a second box can take one
+# arm while the first runs the other:
+#   ARMS=actions_only    ./scripts/run_airline_rlvr_pair.sh      # box B
+#   ARMS=thoughts_policy ./scripts/run_airline_rlvr_pair.sh      # box A
+# Default runs both, in order. Valid: thoughts_policy actions_only expert_thoughts thoughts_base
+ARMS="${ARMS:-thoughts_policy actions_only}"
+JOBS=()
+for a in ${ARMS//,/ }; do
+  ck="$(sft_best "$a")"
+  JOBS+=("airline_rlvr_${a}|$ck")
+done
 GPUS=(${GPU_LIST:-$(nvidia-smi --query-gpu=index --format=csv,noheader | tr -d ' ' | tr '\n' ' ')})
 NG=${#GPUS[@]}
 log "=== airline RLVR pair (hide-obs, gs8 mt30 nb100): ${#JOBS[@]} arms over $NG GPU(s): ${GPUS[*]} ==="
