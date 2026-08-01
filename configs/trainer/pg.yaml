@@ -28,7 +28,10 @@ num_return_sequences: null
 
 # Training (M-step policy updates)
 learning_rate: 4e-5
-discount_factor: 0.9      # unused: single-step episodes, advantages are EM weights
+discount_factor: 1.0      # no discounting. For Act-PRM EM this is unused (single-step
+                          # episodes; advantages are the precomputed EM weights). For RLVR
+                          # the generator config governs, but keep this 1.0 too so no 0.9
+                          # can leak into a multi-step credit assignment.
 loss_fn: "importance_sampling"
 num_substeps: 1
 mini_batch_size: null

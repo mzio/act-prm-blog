@@ -68,7 +68,7 @@ JOBS=(
 )
 GPUS=(${GPU_LIST:-$(nvidia-smi --query-gpu=index --format=csv,noheader | tr -d ' ' | tr '\n' ' ')})
 NG=${#GPUS[@]}
-log "=== airline RLVR pair (hide-obs, gs4 mt30 nb100): ${#JOBS[@]} arms over $NG GPU(s): ${GPUS[*]} ==="
+log "=== airline RLVR pair (hide-obs, gs8 mt30 nb100): ${#JOBS[@]} arms over $NG GPU(s): ${GPUS[*]} ==="
 pids=()
 for ((g=0; g<NG; g++)); do
   slice=(); for ((j=g; j<${#JOBS[@]}; j+=NG)); do slice+=("${JOBS[j]}"); done
