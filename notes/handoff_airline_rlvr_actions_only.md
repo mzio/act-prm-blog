@@ -1,53 +1,67 @@
-# Handoff — airline Stage-3 RLVR, `actions_only` arm (box B)
+# Handoff — airline Stage-3 RLVR on a 2-GPU box (`actions_only` + `base`)
 
-Created 2026-08-01. Box A (`devvm54227`) is running `thoughts_policy`; this hands the
-matched baseline arm `actions_only` to a second GPU box.
+Created 2026-08-01. Box A (`devvm54227`, 1 GPU) is running `thoughts_policy`. Box B has
+**2 GPUs**, so it takes the two reference arms in parallel — one per card:
+
+| GPU | arm | warm-start |
+|---|---|---|
+| 0 | `actions_only` | hide-obs SFT `airline_s2_actions_only_heldout/step_best` |
+| 1 | `base` | **none** — fresh LoRA on the base policy (tests whether SFT helps at all) |
+
+One gs8 run peaks ~60 GiB at the M-step, so **one run per 80 GiB card — never co-locate two**.
 
 ## Coordination
 
-- **Box B runs `actions_only` only.** Do not run `thoughts_policy` — box A has it (started
-  08-01 02:24, ~31 min/batch).
+- **Box B runs `actions_only` and `base` only.** Do not run `thoughts_policy` — box A has it
+  (started 08-01 02:24, ~31 min/batch).
 - Once box B is confirmed running, box A must **drop `actions_only` from its queue**,
   otherwise it launches a duplicate when `thoughts_policy` finishes.
-- Next most valuable arm if a third GPU appears: `expert_thoughts` (oracle upper bound) —
-  same prompt with `ARMS=expert_thoughts`.
-- `git push` from box A before box B pulls — box B needs the `ARMS` selector and the
-  `hf_rlvr` generator config.
+- Remaining unrun arms after this: `expert_thoughts` (oracle upper bound — highest value)
+  and `thoughts_base`. Same prompt, `ARMS=expert_thoughts`.
+- `git push` from box A before box B pulls — box B needs the `ARMS` selector, the `base`-arm
+  support, and the `hf_rlvr` generator config.
 
 ## The prompt to paste into Claude Code on box B
 
 ```
-You're picking up the Act-PRM airline Stage-3 RL work on a fresh devserver. Another box is
-already running the `thoughts_policy` arm — your job is the matched baseline arm,
-`actions_only`. Do NOT run thoughts_policy; it would duplicate 20h of compute.
+You're picking up the Act-PRM airline Stage-3 RL work on a fresh 2-GPU devserver. Another box
+is already running the `thoughts_policy` arm — your job is the two reference arms,
+`actions_only` (GPU 0) and `base` (GPU 1), in parallel. Do NOT run thoughts_policy; it would
+duplicate ~20h of compute.
 
 Repo: ~/projects/act-prm-blog, branch act-prm-pytorch. Read CLAUDE.md. FIRST: `git pull` —
-the arm-selection support and the corrected RLVR config landed today and you need them.
+arm selection, the `base` arm, and the corrected RLVR config all landed today.
 
 THE EXPERIMENT
 Act-PRM infers latent thoughts behind action-only expert demos (Stage 1 EM), SFTs on
 thought+action (Stage 2), then RLs online (Stage 3). Stage 3 tests whether the offline
-Act-PRM advantage transfers. The comparison is thoughts_policy vs actions_only, both in the
-hide-observations regime, both warm-started from their MATCHING hide-obs SFT checkpoint.
+Act-PRM advantage transfers. The comparison is thoughts_policy vs actions_only, all in the
+hide-observations regime, each warm-started from its MATCHING hide-obs SFT checkpoint.
+`base` is the no-SFT control: it shows whether any SFT init helps online at all.
 
 WHAT TO RUN (one command, after preflight below):
   cd ~/projects/act-prm-blog
   mkdir -p /tmp/aprm/airline_rlvr_pair
-  ARMS=actions_only setsid nohup ./scripts/run_airline_rlvr_pair.sh \
+  ARMS="actions_only base" setsid nohup ./scripts/run_airline_rlvr_pair.sh \
     > /tmp/aprm/airline_rlvr_pair/run.log 2>&1 &
 
-Config is baked into the script and must NOT be changed (it has to match the other arm
+Arms are round-robined across the GPUs nvidia-smi reports, so with 2 visible GPUs
+actions_only lands on GPU 0 and base on GPU 1, running concurrently. Confirm BOTH started
+(the orchestrator log prints one line per arm with its GPU). If only one GPU is visible they
+will run serially instead — that's still correct, just slower.
+
+Config is baked into the script and must NOT be changed (it has to match box A's arm
 exactly): env tau2bench/airline_rlvr (hide_observations:true, last_obs_to_show:1,
 negative_rewards:false), generator hf_rlvr (mean_center:false, discount_factor:1.0 -> the
 advantage is exactly +1 on success / 0 on failure, no baseline, no discounting),
 --group_size 8 --batch_size 1 --max_turns 30 --learning_rate 1e-4 --num_batches 100
 --gradient_checkpointing, eval every 10 on the 18 never-seen tau2 tasks, early-stop
-patience 3. No observation truncation.
+patience 3. No observation truncation. The `base` arm is identical except it passes no
+--resume_from.
 
 PREFLIGHT — verify these before launching. I hit every one of them on a fresh box today:
-1. GPU: `nvidia-smi -L`. One run needs a whole 80GB card (~60 GiB peak at the M-step).
-   Never co-locate two gs8 runs on one GPU. The runner reads GPU indices from nvidia-smi;
-   set GPU_LIST="0" to pin.
+1. GPUs: `nvidia-smi -L` — expect 2. One run needs a whole 80GB card (~60 GiB peak at the
+   M-step); never put two gs8 runs on one GPU. Pin explicitly with GPU_LIST="0 1" if needed.
 2. venv: the per-box .venv-tau2 may be an incomplete dotsync copy. Check:
      .venv-tau2/bin/python -c "from tau2.evaluator.evaluator import evaluate_simulation; \
        from tau2.gym.gym_agent import AgentGymEnv; print('ok')"
@@ -62,15 +76,15 @@ PREFLIGHT — verify these before launching. I hit every one of them on a fresh 
    models--Qwen--Qwen3-4B-Instruct-2507, else re-download via the proxy.
 5. tau2-bench/data must exist (github is unreachable from the devserver, so clone it from a
    github-capable shell if missing).
-6. Warm-start ckpt must exist:
+6. Warm-start ckpt for actions_only must exist:
      checkpoints_lora/act_prm_tau2_airline/hf_qwen3_4b_instruct/airline_s2_actions_only_heldout-*/step_best
    It MUST be the `_heldout` (hide-obs) one, never `_heldout_fullctx` — the script's glob
-   already enforces this. Do not relax it.
+   already enforces this. Do not relax it. (`base` needs no checkpoint.)
 7. STALE-CHECKPOINT TRAP: the runner skips an arm if checkpoints_lora/tau2bench_airline_rlvr/
-   <model>/airline_rlvr_actions_only-*/step_best already exists. Old `gc=hf_grpo` (mean-
-   centered, superseded) checkpoints can arrive via dotsync and cause a silent skip. If you
-   see "skip (already has step_best)", move the gc=hf_grpo dirs into a _stale_hf_grpo/
-   subfolder and relaunch. Verify the arm actually started.
+   <model>/airline_rlvr_<arm>-*/step_best already exists. Old `gc=hf_grpo` (mean-centered,
+   superseded) checkpoints can arrive via dotsync and cause a silent skip — this bit us for
+   both thoughts_policy and base. If you see "skip (already has step_best)", move the
+   gc=hf_grpo dirs into a _stale_hf_grpo/ subfolder and relaunch. Verify each arm started.
 
 DURABILITY — do this before the long run, we already lost a full fleet to a reimage:
   logs/ and checkpoints_lora/ are GITIGNORED, so results exist only on local disk.
@@ -82,14 +96,15 @@ DURABILITY — do this before the long run, we already lost a full fleet to a re
 
 REPORTING
 eval/try_0/final_reward is now the held-out SUCCESS FRACTION directly (0-1 over 18 tasks;
-multiply by 18 for the count). Report the eval trend per batch, the best and its step, and
-the train reward trend. Reference points from the other box's thoughts_policy run:
-eval 11/18 @b10, 10/18 @b20, train reward 0.113 -> 0.375 by b26. Superseded mean-centered
-GRPO runs gave actions_only best 13/18 @b30 and base 13/18 @b10 — do not compare those as
+multiply by 18 for the count). Report, per arm: the eval trend by batch, the best and its
+step, and the train reward trend. Reference points from box A's thoughts_policy run:
+eval 11/18 @b10, 10/18 @b20; train reward 0.113 -> 0.375 by b26. Superseded mean-centered
+GRPO runs gave actions_only best 13/18 @b30 and base 13/18 @b10 — do NOT cite those as
 final numbers; they used a different advantage.
 
-Expect ~31 min/batch, so ~20h if early-stop fires near b40. Launch, verify the first batch
-starts cleanly, then report status and wait — don't start additional arms without asking.
+Expect ~31 min/batch, so ~20h per arm if early-stop fires near b40; both arms run
+concurrently so wall-clock is ~20h total. Launch, verify the first batch of BOTH arms starts
+cleanly, then report status and wait — don't start additional arms without asking.
 ```
 
 ## Why the config is what it is (don't "fix" these)
@@ -102,16 +117,20 @@ starts cleanly, then report status and wait — don't start additional arms with
 | `hide_observations` | `true` | must match the Stage-2 SFT regime |
 | `last_obs_to_show` | `1` | keeps the latest tool result actionable; older obs → `"..."` |
 | warm-start | `*_heldout` | hide-obs RL must start from hide-obs SFT, never `_fullctx` |
+| `base` arm | no `--resume_from` | control: no SFT init at all |
 
 Consequence of RLVR with no baseline: **only successful rollouts produce gradient**;
 failures contribute exactly zero (rather than being pushed down as GRPO would).
 
 ## Status at handoff (box A, 08-01 15:51)
 
-| arm | generator | batches | eval (n/18) | best |
-|---|---|---|---|---|
-| thoughts_policy | `hf_rlvr` | 26/100 | 10→11/18, 20→10/18 | 0.611 @10 |
-| actions_only | `hf_rlvr` | — | — | **this handoff** |
+| arm | generator | batches | eval (n/18) | best | where |
+|---|---|---|---|---|---|
+| thoughts_policy | `hf_rlvr` | 26/100 | 10→11/18, 20→10/18 | 0.611 @10 | box A |
+| actions_only | `hf_rlvr` | — | — | — | **box B GPU 0** |
+| base | `hf_rlvr` | — | — | — | **box B GPU 1** |
+| expert_thoughts | `hf_rlvr` | — | — | — | unrun (next priority) |
+| thoughts_base | `hf_rlvr` | — | — | — | unrun |
 
 Superseded (mean-centered GRPO, do not cite): base 13/18 @b40 stop, actions_only 13/18
 @b30 (crashed b42), thoughts_policy 8/18 @b13, expert_thoughts 7/18 @b13.

@@ -43,17 +43,23 @@ log(){ echo "[$(date '+%m-%d %H:%M:%S')] $*" | tee -a "$MDIR/orchestrator.log"; 
 newest(){ ls -dt $1 2>/dev/null | head -1; }
 sft_best(){ newest "$SFTR/airline_s2_${1}_heldout-*/step_best"; }   # hide-obs only, never _fullctx
 
-rl(){  # tag  gpu  resume_ckpt
+rl(){  # tag  gpu  resume_ckpt (or the literal BASE for a no-SFT run)
   local tag=$1 gpu=$2 ckpt=$3
   if [ -n "$(newest "$CKR/${tag}-*/step_best")" ]; then log "RL $tag: skip (already has step_best)"; return 0; fi
-  if [ -z "$ckpt" ] || [ ! -f "$ckpt/adapter_model.safetensors" ]; then
-    log "RL $tag: FAILED -- no hide-obs SFT ckpt ($ckpt)"; return 1
+  local resume=()
+  if [ "$ckpt" = BASE ]; then
+    log "RL $tag (GPU $gpu) no SFT warm-start (base policy + fresh LoRA)"
+  else
+    if [ -z "$ckpt" ] || [ ! -f "$ckpt/adapter_model.safetensors" ]; then
+      log "RL $tag: FAILED -- no hide-obs SFT ckpt ($ckpt)"; return 1
+    fi
+    resume=(--resume_from "$ckpt")
+    log "RL $tag (GPU $gpu) warm-start <- $(basename "$(dirname "$ckpt")" | cut -c1-46)"
   fi
-  log "RL $tag (GPU $gpu) warm-start <- $(basename "$(dirname "$ckpt")" | cut -c1-46)"
   CUDA_VISIBLE_DEVICES="$gpu" "${PY[@]}" main_pytorch.py \
     --env_config tau2bench/airline_rlvr --model_config $MODEL --lora_config r8_a16_linear \
     --generator_config hf_rlvr --trainer_config pg --replay_buffer_config default \
-    --resume_from "$ckpt" \
+    "${resume[@]}" \
     --group_size 8 --batch_size 1 --max_turns 30 --max_tokens 2048 --learning_rate 1e-4 \
     --num_batches 100 --eval_every 10 --no_initial_eval --gradient_checkpointing \
     --best_metric final_reward --early_stop_patience 3 --run_tag "$tag" --verbose \
@@ -66,11 +72,15 @@ stream(){ local gpu=$1; shift; for j in "$@"; do IFS='|' read -r tag ckpt <<< "$
 # arm while the first runs the other:
 #   ARMS=actions_only    ./scripts/run_airline_rlvr_pair.sh      # box B
 #   ARMS=thoughts_policy ./scripts/run_airline_rlvr_pair.sh      # box A
-# Default runs both, in order. Valid: thoughts_policy actions_only expert_thoughts thoughts_base
+#   ARMS="actions_only base" ./scripts/run_airline_rlvr_pair.sh  # 2-GPU box: one arm per card
+# Default runs both, in order. Valid: thoughts_policy actions_only expert_thoughts
+# thoughts_base base. `base` means no SFT warm-start (fresh LoRA on the base policy).
+# Arms are round-robined across the visible GPUs, so with N GPUs the first N arms run
+# in parallel and the rest queue behind them on the same card.
 ARMS="${ARMS:-thoughts_policy actions_only}"
 JOBS=()
 for a in ${ARMS//,/ }; do
-  ck="$(sft_best "$a")"
+  if [ "$a" = base ]; then ck=BASE; else ck="$(sft_best "$a")"; fi
   JOBS+=("airline_rlvr_${a}|$ck")
 done
 GPUS=(${GPU_LIST:-$(nvidia-smi --query-gpu=index --format=csv,noheader | tr -d ' ' | tr '\n' ' ')})
