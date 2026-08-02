@@ -1,3 +1,6 @@
+> **SUPERSEDED** by `handoff_airline_rlvr_boxB.md` (batch_size 4 + max_seq_len 32768).
+> Kept for history; do not run from this file.
+
 # Handoff — airline Stage-3 RLVR on a 2-GPU box (`actions_only` + `base`)
 
 Created 2026-08-01. Box A (`devvm54227`, 1 GPU) is running `thoughts_policy`. Box B has
