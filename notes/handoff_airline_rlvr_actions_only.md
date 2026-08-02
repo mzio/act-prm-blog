@@ -1,3 +1,6 @@
+> **SUPERSEDED** by `handoff_airline_rlvr_boxB.md` (batch_size 4 + max_seq_len 32768).
+> Kept for history; do not run from this file.
+
 # Handoff — airline Stage-3 RLVR on a 2-GPU box (`actions_only` + `base`)
 
 Created 2026-08-01. Box A (`devvm54227`, 1 GPU) is running `thoughts_policy`. Box B has
@@ -86,6 +89,27 @@ PREFLIGHT — verify these before launching. I hit every one of them on a fresh 
    both thoughts_policy and base. If you see "skip (already has step_best)", move the
    gc=hf_grpo dirs into a _stale_hf_grpo/ subfolder and relaunch. Verify each arm started.
 
+USER SIMULATOR / JUDGE — it is litellm AND claude_agent_sdk, don't "fix" it:
+tau2 calls litellm.completion() internally for its user simulator, NL-assertions judge, and
+env-interface LLM. We register a litellm CUSTOM PROVIDER named `claude_agent_sdk` (see
+src/act_prm/environments/tau2bench/litellm_claude_agent_sdk.py), so the model string
+`claude_agent_sdk/claude-haiku-4-5` routes to the Claude Agent SDK and authenticates with
+the AMBIENT CLAUDE CODE LOGIN on the devserver (it shells out to the bundled Claude Code
+CLI). There is NO ANTHROPIC_API_KEY and NO LLAMA_API_KEY. If the box has no ambient login,
+set CLAUDE_CODE_OAUTH_TOKEN in .env. Registration is lazy/idempotent and fires from env.py
+only because user_llm / nl_assertions_llm / env_interface_llm all start with
+`claude_agent_sdk/` in airline_rlvr.yaml — do not change those values.
+Two details that look odd but are deliberate: the provider registers a 0-priced model entry
+(litellm has no pricing map for custom providers and tau2 computes per-call cost), and
+_complete() runs in a worker thread when already inside an event loop (else asyncio.run
+raises). env.py also monkey-patches tau2.config because tau2 hardcodes gpt-4.1 as the
+default judge/env-interface model, which would otherwise be used silently and fail.
+VERIFY AUTH before the long run: after launching, confirm the log shows rollout turns
+advancing (e.g. "Generating rollout 0: 4/4"). Turns only advance if the user simulator
+replied, so that alone proves auth works; "Using bundled Claude Code CLI" confirms the path.
+Do NOT switch to the metagen/<model> (Llama-API) backend unless OAuth is truly unavailable —
+it changes the user simulator and results stop being comparable to box A.
+
 DURABILITY — do this before the long run, we already lost a full fleet to a reimage:
   logs/ and checkpoints_lora/ are GITIGNORED, so results exist only on local disk.
   setsid nohup ./scripts/backup_results_daemon.sh > /tmp/backup_results.daemon.log 2>&1 &
@@ -106,6 +130,41 @@ Expect ~31 min/batch, so ~20h per arm if early-stop fires near b40; both arms ru
 concurrently so wall-clock is ~20h total. Launch, verify the first batch of BOTH arms starts
 cleanly, then report status and wait — don't start additional arms without asking.
 ```
+
+## How the tau2 user simulator / judge is wired (read before debugging LLM errors)
+
+It is **litellm AND claude_agent_sdk** — not one or the other:
+
+- tau2 internally calls `litellm.completion(model=...)` for its **user simulator**,
+  **NL-assertions judge**, and **env-interface** LLM (`tau2/utils/llm_utils.py`). We never
+  patch those call sites.
+- `src/act_prm/environments/tau2bench/litellm_claude_agent_sdk.py` registers a litellm
+  **custom provider** (`CustomLLM`) named `claude_agent_sdk`. So the model string
+  `claude_agent_sdk/claude-haiku-4-5` routes into `ClaudeAgentSDKLLM._complete()` →
+  `ClaudeQueryLLM.sample()` → Claude Agent SDK → **Claude Code OAuth**.
+- Auth is the **ambient Claude Code login on the devserver** (it shells out to the bundled
+  Claude Code CLI). **No `ANTHROPIC_API_KEY` and no `LLAMA_API_KEY` are needed.** For a
+  headless box with no ambient login, set `CLAUDE_CODE_OAUTH_TOKEN` in `.env`.
+- Registration is lazy + idempotent, triggered in `env.py` only when one of
+  `user_llm` / `nl_assertions_llm` / `env_interface_llm` starts with `claude_agent_sdk/`.
+  All three are set to `claude_agent_sdk/claude-haiku-4-5` in `airline_rlvr.yaml`.
+- Two implementation details that exist for a reason — don't "simplify" them:
+  - it registers a **0-priced model entry**, because litellm has no pricing map for a
+    custom provider and tau2 computes cost per call;
+  - `_complete()` dispatches to a **worker thread** when already inside a running event
+    loop, else `asyncio.run()` raises "cannot be called from a running event loop".
+- `env.py` also **monkey-patches `tau2.config`**, because tau2 hardcodes `gpt-4.1` as the
+  default NL-assertions / env-interface model — without the patch the judge silently uses
+  gpt-4.1 (and fails with no OpenAI key).
+- Alternative backend if OAuth is unavailable: `metagen/<model>` →
+  `litellm_metagen.py` (Llama-API passthrough, needs `LLAMA_API_KEY=LLM|<id>|<secret>`).
+  Only switch if you must — it changes the user simulator, so results stop being
+  comparable to box A.
+
+Verify it works on box B **before** the long run: launch, then confirm the log shows
+rollouts advancing turns (e.g. `Generating rollout 0: 4/4`). Turns only advance if the user
+simulator actually replied, so that is sufficient proof of auth. A line like
+`Using bundled Claude Code CLI: ...` confirms the SDK path.
 
 ## Why the config is what it is (don't "fix" these)
 

@@ -4,10 +4,14 @@
 # both hide-obs, both warm-started from their MATCHING hide-obs SFT checkpoint.
 #
 # Config (as specified):
-#   --group_size 8 --batch_size 1        8 rollouts/group (~60 GiB peak at the M-step on an
-#                                        80 GiB card, so ONE run per GPU -- do not co-locate)
+#   --group_size 8 --batch_size 4        4 TASKS x 8 rollouts per policy update. batch_size does NOT
+#                                        raise VRAM: rollouts are generated sequentially per task
+#                                        (run_rollouts is a per-sample loop) and the backward runs one
+#                                        sequence at a time with grad accumulation. It costs WALL-CLOCK
+#                                        (~4x/update). Rationale: at batch_size 1, 72% of updates had
+#                                        zero successes -> all-zero advantage -> NO GRADIENT.
 #   --max_turns 30                       long rollouts
-#   --num_batches 100                    100 RL updates ("max_steps 100")
+#   --num_batches 50                     50 RL updates (each worth ~4x a bs1 update)
 #   hide-obs                             env airline_rlvr (hide_observations:true, last_obs_to_show:1)
 #   RLVR                                 generator hf_rlvr (mean_center:false, discount_factor:1.0)
 #                                        + env negative_rewards:false -> advantage == +1 success / 0 fail
@@ -60,8 +64,8 @@ rl(){  # tag  gpu  resume_ckpt (or the literal BASE for a no-SFT run)
     --env_config tau2bench/airline_rlvr --model_config $MODEL --lora_config r8_a16_linear \
     --generator_config hf_rlvr --trainer_config pg --replay_buffer_config default \
     "${resume[@]}" \
-    --group_size 8 --batch_size 1 --max_turns 30 --max_tokens 2048 --learning_rate 1e-4 \
-    --num_batches 100 --eval_every 10 --no_initial_eval --gradient_checkpointing \
+    --group_size 8 --batch_size 4 --max_turns 30 --max_tokens 2048 --learning_rate 1e-4 \
+    --num_batches 50 --eval_every 10 --no_initial_eval --gradient_checkpointing \
     --best_metric final_reward --early_stop_patience 3 --run_tag "$tag" --verbose \
     > "$MDIR/${tag}.log" 2>&1 \
     && log "RL $tag: done" || log "RL $tag: FAILED (see $MDIR/${tag}.log)"
@@ -85,7 +89,7 @@ for a in ${ARMS//,/ }; do
 done
 GPUS=(${GPU_LIST:-$(nvidia-smi --query-gpu=index --format=csv,noheader | tr -d ' ' | tr '\n' ' ')})
 NG=${#GPUS[@]}
-log "=== airline RLVR pair (hide-obs, gs8 mt30 nb100): ${#JOBS[@]} arms over $NG GPU(s): ${GPUS[*]} ==="
+log "=== airline RLVR pair (hide-obs, gs8 bs4 mt30 nb50): ${#JOBS[@]} arms over $NG GPU(s): ${GPUS[*]} ==="
 pids=()
 for ((g=0; g<NG; g++)); do
   slice=(); for ((j=g; j<${#JOBS[@]}; j+=NG)); do slice+=("${JOBS[j]}"); done
