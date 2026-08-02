@@ -23,6 +23,67 @@ from ..replay_buffer.types import Trajectory, TrajectoryGroup
 from .data import DataCollatorForPolicyGradient
 
 
+def _dump_per_task_records(
+    cfg: DictConfig,
+    env: Environment,
+    group_dict: dict[str, list[TrajectoryGroup]],
+    sample_id: int,
+    split: str,
+    batch_id: int,
+    try_idx: int,
+    checkpoint_name: str | None = None,
+) -> None:
+    """Append one jsonl line per trajectory to ``<log_path>/rollouts_per_task.jsonl``.
+
+    Best-effort: never raises, so a dump failure can't kill a rollout. Records the
+    resolved env task id (tau2 ``task.id``) alongside ``sample_id`` -- the two differ
+    whenever an explicit ``{train,eval}_task_ids`` list is in play.
+    """
+    try:
+        log_path = cfg.get("log_path", None)
+        if not log_path:
+            return
+        task_id = None
+        try:
+            _tasks = env.datasets[env.split]
+            _task = _tasks[sample_id % len(_tasks)]
+            task_id = getattr(_task, "id", None)
+        except Exception:  # noqa: BLE001
+            pass
+
+        key = "policy" if "policy" in group_dict else next(iter(group_dict), None)
+        if key is None:
+            return
+        rows = []
+        for _tg in group_dict.get(key, []) or []:
+            for gen_id, _traj in enumerate(getattr(_tg, "trajectories", []) or []):
+                row = {
+                    "split": split,
+                    "batch": batch_id,
+                    "try": try_idx,
+                    "sample_id": sample_id,
+                    "task_id": task_id,
+                    "gen_id": gen_id,
+                    "final_reward": float(getattr(_traj, "final_reward", 0.0) or 0.0),
+                    "correct": int(getattr(_traj, "correct", 0) or 0),
+                    "match_rate": float(getattr(_traj, "match_rate", 0.0) or 0.0),
+                    "timesteps": int(getattr(_traj, "timesteps", 0) or 0),
+                }
+                if checkpoint_name is not None:
+                    row["checkpoint_name"] = checkpoint_name
+                for _mk, _mv in (getattr(_traj, "metrics", {}) or {}).items():
+                    row[f"env/{_mk}"] = _mv
+                rows.append(row)
+        if not rows:
+            return
+        os.makedirs(log_path, exist_ok=True)
+        with open(os.path.join(log_path, "rollouts_per_task.jsonl"), "a") as f:
+            for row in rows:
+                f.write(json.dumps(row) + "\n")
+    except Exception:  # noqa: BLE001
+        pass  # per-task dumping is diagnostics only -- never break a run
+
+
 def run_rollouts(
     llm: HuggingFaceLLM,
     hf_tokenizer: PreTrainedTokenizerBase,
@@ -127,6 +188,19 @@ def run_rollouts(
                 pbar_desc = f"Generating {num_return_sequences} rollouts for sample {start_idx + 1} / {start_idx + batch_size}"
                 sample_pbar.set_description(pbar_desc)
                 sample_pbar.set_postfix(success=f"{n_success_so_far}/{n_total_so_far}")
+                # Per-task rollout record (one line per trajectory). Lets us slice a
+                # run's eval by task subset, bootstrap CIs, and diff arms task-by-task
+                # -- the aggregate metrics below throw all of that away.
+                _dump_per_task_records(
+                    cfg=cfg,
+                    env=env,
+                    group_dict=group_dict,
+                    sample_id=sample_id,
+                    split=split,
+                    batch_id=batch_id,
+                    try_idx=try_idx,
+                    checkpoint_name=checkpoint_name,
+                )
             # End-of-try checkpoint: push the running rollouts buffer
             # to the hub (covers every rollout collected for try_idx).
             try:
