@@ -203,8 +203,14 @@ recover.
   0.7602 → 0.7609 and the whole four-LR panel spans 0.13pp. The model gets better
   calibrated on action tokens without changing its argmax. If next-action accuracy is the
   quantity the Act-PRM story rests on, nothing has moved it yet.
-- **Train loss is not a usable signal here.** It is pixel-identical across a 25× LR range
-  (same spikes at b20/b36/b47) — it reads out per-batch difficulty, not learning.
+- **Train loss was uninformative at 4e-5 but IS informative at 3e-3.** At 4e-5 the train
+  curves are pixel-identical across a 25× LR range (same spikes at b20/b36/b47) — with the
+  model barely moving, the loss just reads out per-batch difficulty. At 3e-3 the train
+  action-only PPL trends down by nearly as much as eval: `actions_only` first-half 3.135 ->
+  second-half 2.007 (−36.0%, slope −0.0107/batch) against eval's −38.0%; `expert_thoughts`
+  −19.1% against eval's −27.0%. The trend is invisible point-to-point because per-batch
+  noise is huge (stdev 2.69 on a mean of ~2.5, range 1.0–22.4, ~8× the mean) — it needs
+  half-means or a regression to see. Eval by comparison has stdev 0.495 and is monotonic.
 - **Step- or LR-limited?** 1e-3 was still descending at b150. The `thoughts_base` probe
   (1e-4 / 1e-3 / 3e-3, 30 batches) is intended to separate these.
 
