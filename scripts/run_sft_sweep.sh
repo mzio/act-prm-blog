@@ -66,14 +66,17 @@ run_one(){  # $1=sft_variant  $2=label(run_tag)  $3=regime(hide|full)  $4..=extr
   local variant=$1 label=$2 regime=$3; shift 3
   if [ -n "$ONLY" ] && [[ " $ONLY " != *" $label "* ]]; then return 0; fi
   local tag="${DOM}_s2_${label}${AOTAG}${LRTAG}_heldout"; [ "$regime" = full ] && tag="${tag}_fullctx"
-  if [ -n "$(newest "$CKROOT/${tag}-*/step_best")" ]; then log "$tag: done, skip"; return 0; fi
+  # Completion is marked by an explicit .done file, NOT by step_best: step_best is
+  # written at the FIRST eval (batch 10), so an interrupted run would otherwise look
+  # finished and be skipped forever, silently leaving a half-trained arm in the matrix.
+  if [ -f "$MDIR/${tag}.done" ]; then log "$tag: done, skip"; return 0; fi
   local fc=(); [ "$regime" = full ] && fc=(SFT_FULLCTX=1)
   log "$tag: SFT ($regime-obs, lr=${LR:-default}) $*"
   wait_gpu_free
   env "${fc[@]}" ./scripts/train_sft.sh "$ENVCFG" "$variant" \
       --run_tag "$tag" --best_metric eval_action_ppl \
       "${LR_ARGS[@]}" "${EXTRA[@]}" "$@" > "$MDIR/${tag}.log" 2>&1 \
-    && log "$tag: done" || log "$tag: FAILED (see $MDIR/${tag}.log)"
+    && { touch "$MDIR/${tag}.done"; log "$tag: done"; } || log "$tag: FAILED (see $MDIR/${tag}.log)"
 }
 
 # Thought corpora come from two EM relabel checkpoints: "" = step_best (early-peaked),

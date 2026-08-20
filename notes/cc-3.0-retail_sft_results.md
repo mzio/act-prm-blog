@@ -19,6 +19,7 @@ for wordiness rather than for mispredicting the action, which inverts the rankin
 | thoughts_policy | full | 3.0003 | 0.8038 | 59 | 3.4046 | 0.7697 | 59 | 1.0355 |
 | thoughts_base | hide | 3.1735 | 0.7819 | 59 | 3.7098 | 0.7454 | 59 | 0.9361 |
 | thoughts_base | full | 2.9999 | 0.8035 | 30 | 3.4093 | 0.7717 | 59 | 0.6225 |
+| actions_only_lr1e_4 | hide | 3.8429 | 0.7603 | 20 | 3.8429 | 0.7603 | 20 | 0.0000 |
 | thoughts_base_last | hide | 3.1928 | 0.7784 | 59 | 3.6738 | 0.7401 | 59 | 0.9956 |
 | thoughts_policy_last | hide | 3.2078 | 0.7825 | 40 | 3.7470 | 0.7390 | 10 | 1.5987 |
 | thoughts_base_last | full | 2.9816 | 0.8027 | 59 | 3.4170 | 0.7653 | 59 | 1.0100 |
@@ -40,6 +41,7 @@ that saved step:
 | thoughts_policy | full | 3.0003 | 0.8038 |
 | thoughts_base | hide | 3.1735 | 0.7819 |
 | thoughts_base | full | 3.0008 | 0.8030 |
+| actions_only_lr1e_4 | hide | 3.8429 | 0.7603 |
 | thoughts_base_last | hide | 3.1928 | 0.7784 |
 | thoughts_policy_last | hide | 3.2100 | 0.7810 |
 | thoughts_base_last | full | 2.9816 | 0.8027 |
