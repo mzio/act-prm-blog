@@ -115,6 +115,31 @@ be redone end-to-end at a working LR, which is what the sweep is doing.
 Note also the curve never flattened at 150 batches and early stopping never fired, so
 150 is still short of convergence — the arms may be step-limited even now.
 
+## LR probe on a thought arm — why 3e-3
+
+`actions_only` alone would have selected 1e-3. Probing `thoughts_base` (retail, hide, 30
+batches, held-out action-subspan PPL) shows that is the wrong choice:
+
+| lr | b10 | b20 | b29 | Δ | accuracy |
+|---|---|---|---|---|---|
+| 1e-4 | 3.1756 | 3.1773 | 3.1772 | **−0.05%** | 0.7819 → 0.7822 |
+| 1e-3 | 3.1673 | 3.1515 | 3.1297 | +1.19% | 0.7824 → 0.7819 |
+| **3e-3** | 3.1281 | 3.0277 | **2.9112** | **+6.94%** | 0.7824 → **0.7838** |
+
+3e-3 is ~6× faster than 1e-3 over the same 29 batches, monotonic, with no instability, and
+it is the first setting to move **accuracy** at a visible rate. By b29 it reaches 2.911 —
+already past the old `expert_thoughts` "oracle" number (2.9165), which came from the
+untrained regime.
+
+1e-4 is dead on the thought arm too, exactly as on `actions_only`. That is the "just to be
+safe" check, now done on both arm types.
+
+The sweep therefore runs at **3e-3**, 150-batch cap, early stopping patience 3.
+
+*(Correction to an earlier read: `thoughts_base` at 1e-3 is not improving at half the rate
+of `actions_only` — that came from comparing b27 against b30. At matched b29/b30 they are
++1.19% vs +1.23%.)*
+
 ## Open questions
 
 - **Accuracy does not move.** At 1e-3, PPL improves 4.31% while held-out accuracy goes
