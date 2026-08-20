@@ -21,11 +21,14 @@ set -uo pipefail
 cd "$(dirname "$0")/.."
 export PATH="$HOME/.local/bin:$HOME/.cargo/bin:/usr/local/bin:$PATH"
 
-# 1e-3 FIRST. Measured: at lr 1e-4 and batch 30, max|(alpha/r)B@A| is 4.6e-5 vs 3.7e-5
-# for the ENTIRE 60-batch lr=4e-5 run -- so 1e-4 finishes around 9e-5, ~2.5x the runs we
-# already know produce dead-flat eval curves. 1e-3 is the tier with a real chance of
-# moving the model, so it runs first; 1e-4 still runs, just after.
-LRS="${LRS:-1e-3}"
+# 3e-3, chosen by probe on a THOUGHT arm (retail thoughts_base, 30 batches):
+#   lr 1e-4  b29  3.1756 -> 3.1772   -0.05%   dead (matches actions_only)
+#   lr 1e-3  b29  3.1673 -> 3.1297   +1.19%
+#   lr 3e-3  b29  3.1281 -> 2.9112   +6.94%   <- ~6x faster, monotonic, no instability
+# 3e-3 also moves accuracy (0.7824 -> 0.7838) faster than any LR tried, and reaches 2.911
+# by b29 -- already past the old expert_thoughts "oracle" number (2.9165) from the
+# untrained regime. Early stopping (PATIENCE=3) guards against late instability.
+LRS="${LRS:-3e-3}"
 # TRAIN on the full thought+action span (Act-PRM and expert_thoughts must learn to
 # produce the thought). REPORTING is action-only on both splits: eval_actiononly_* on
 # eval, train/actiononly_* on train. ACTION_ONLY=1 is the loss-masking ablation only.
