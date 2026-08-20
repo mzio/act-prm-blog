@@ -167,6 +167,36 @@ The trained baseline at 2.342 sits far below every arm in the original table
 the thought arms do at 3e-3, this is the number they have to beat — and the old
 "thoughts win" ordering is not a valid prior for it.
 
+## First valid thoughts-vs-no-thoughts comparison (retail, hide, 3e-3, 150 batches)
+
+Both arms trained to convergence at a working LR:
+
+| arm | PPL curve (b10..b149) | final PPL | Δ | final acc |
+|---|---|---|---|---|
+| actions_only | 3.780 … 2.355 2.342 | **2.3422** | −38.03% | 0.7726 |
+| expert_thoughts | 2.886 … 2.126 2.115 | **2.1149** | −26.71% | **0.7964** |
+
+**Thoughts still win** — 9.7% lower action-token PPL and +2.4pp accuracy.
+
+But the margin is roughly **half** what the broken runs implied:
+
+| | actions_only | expert_thoughts | gap |
+|---|---|---|---|
+| old (4e-5, untrained) | 3.8378 | 2.9165 | **24.0%** PPL, +2.9pp |
+| new (3e-3, converged) | 2.3422 | 2.1149 | **9.7%** PPL, +2.4pp |
+
+The baseline gained far more from proper training (−38.0%) than the thought arm did
+(−26.7%), so most of the apparent advantage in the original table was the untrained
+baseline being bad, not the thoughts being good. The effect is real and survives; it is
+just considerably smaller than reported.
+
+The accuracy advantage is the more stable of the two (2.9pp → 2.4pp), which matters
+because accuracy is the quantity closest to "does the agent pick the right action".
+
+Still to come: `thoughts_policy` and `thoughts_base` — the actual Act-PRM arms. The
+question they answer is how much of this 9.7% / 2.4pp oracle gap the *inferred* thoughts
+recover.
+
 ## Open questions
 
 - **Accuracy does not move.** At 1e-3, PPL improves 4.31% while held-out accuracy goes
