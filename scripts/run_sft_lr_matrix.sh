@@ -73,4 +73,6 @@ for lr in $LRS; do
     uv run --no-project python scripts/analyze_sft.py "$env" >/dev/null 2>&1 || true
   done
 done
+# Marker so watch_sft_sweep.sh stops relaunching a no-op matrix every 5 min and exits.
+touch "$MDIR/DONE"
 log "=== LR matrix done ==="

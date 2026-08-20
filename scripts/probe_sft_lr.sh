@@ -18,9 +18,19 @@ export PATH="$HOME/.local/bin:$HOME/.cargo/bin:/usr/local/bin:$PATH"
 
 ENVCFG="${ENVCFG:-act_prm/tau2_retail}"
 DOM="${ENVCFG##*/}"; DOM="${DOM#tau2_}"
-VARIANT="${VARIANT:-actions_only}"     # no corpus needed -> cheapest arm
+VARIANT="${VARIANT:-actions_only}"     # actions_only needs no corpus -> cheapest arm
 BATCHES="${BATCHES:-8}"
 LRS="${LRS:-4e-5 1e-4 1e-3}"           # 4e-5 is the control (current default)
+# Thought variants SFT on a fixed Stage-1.5 corpus; without --dataset_path they would
+# regenerate thoughts on the fly, which is a different (and much slower) experiment.
+# thoughts_policy -> policy corpus, thoughts_base -> base corpus.
+ENVNAME="${ENVCFG##*/}"
+DS_ARGS=()
+case "$VARIANT" in
+  thoughts_policy) DS_ARGS=(--dataset_path "data/sft_corpus/$ENVNAME/policy") ;;
+  thoughts_base)   DS_ARGS=(--dataset_path "data/sft_corpus/$ENVNAME/base") ;;
+esac
+[ ${#DS_ARGS[@]} -gt 0 ] && { [ -s "${DS_ARGS[1]}/train.json" ] || { echo "FATAL: missing corpus ${DS_ARGS[1]}"; exit 1; }; }
 MDIR=/tmp/aprm/lrprobe; mkdir -p "$MDIR"
 log(){ echo "[$(date '+%m-%d %H:%M:%S')] $*" | tee -a "$MDIR/probe.log"; }
 wait_gpu_free(){ while pgrep -f '[m]ain_pytorch.py' >/dev/null 2>&1; do sleep 30; done; sleep 5; }
@@ -32,7 +42,8 @@ for lr in $LRS; do
   wait_gpu_free
   ./scripts/train_sft.sh "$ENVCFG" "$VARIANT" \
       --run_tag "$tag" --best_metric eval_action_ppl \
-      --learning_rate "$lr" --num_batches "$BATCHES" --eval_every 2 \
+      --learning_rate "$lr" --num_batches "$BATCHES" --eval_every "${EVAL_EVERY:-10}" \
+      "${DS_ARGS[@]}" \
       > "$MDIR/${tag}.log" 2>&1 \
     && log "$tag: done" || log "$tag: FAILED (see $MDIR/${tag}.log)"
 done
