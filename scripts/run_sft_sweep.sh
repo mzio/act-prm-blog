@@ -37,6 +37,7 @@ EVAL_EVERY="${EVAL_EVERY:-}"
 # flat to 0.1%; at a working LR the run should bend then overfit (49 train tasks at
 # bs 4 => 60 batches ~= 5 epochs), so this is what keeps the sweep affordable.
 PATIENCE="${PATIENCE:-3}"
+NBTAG=""; [ -n "$NUM_BATCHES" ] && NBTAG="_nb${NUM_BATCHES}"
 EXTRA=(); [ -n "$NUM_BATCHES" ] && EXTRA+=(--num_batches "$NUM_BATCHES")
 [ -n "$EVAL_EVERY" ] && EXTRA+=(--eval_every "$EVAL_EVERY")
 [ "$PATIENCE" != "0" ] && EXTRA+=(--early_stop_patience "$PATIENCE")
@@ -65,7 +66,7 @@ corpus_ok(){ [ -s "$1/train.json" ] && [ "$(python3 -c "import json;print(len(js
 run_one(){  # $1=sft_variant  $2=label(run_tag)  $3=regime(hide|full)  $4..=extra flags
   local variant=$1 label=$2 regime=$3; shift 3
   if [ -n "$ONLY" ] && [[ " $ONLY " != *" $label "* ]]; then return 0; fi
-  local tag="${DOM}_s2_${label}${AOTAG}${LRTAG}_heldout"; [ "$regime" = full ] && tag="${tag}_fullctx"
+  local tag="${DOM}_s2_${label}${AOTAG}${LRTAG}${NBTAG}_heldout"; [ "$regime" = full ] && tag="${tag}_fullctx"
   # Completion is marked by an explicit .done file, NOT by step_best: step_best is
   # written at the FIRST eval (batch 10), so an interrupted run would otherwise look
   # finished and be skipped forever, silently leaving a half-trained arm in the matrix.

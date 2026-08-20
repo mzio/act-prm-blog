@@ -25,11 +25,18 @@ export PATH="$HOME/.local/bin:$HOME/.cargo/bin:/usr/local/bin:$PATH"
 # for the ENTIRE 60-batch lr=4e-5 run -- so 1e-4 finishes around 9e-5, ~2.5x the runs we
 # already know produce dead-flat eval curves. 1e-3 is the tier with a real chance of
 # moving the model, so it runs first; 1e-4 still runs, just after.
-LRS="${LRS:-1e-3 1e-4}"
+LRS="${LRS:-1e-3}"
 # TRAIN on the full thought+action span (Act-PRM and expert_thoughts must learn to
 # produce the thought). REPORTING is action-only on both splits: eval_actiononly_* on
 # eval, train/actiononly_* on train. ACTION_ONLY=1 is the loss-masking ablation only.
 export ACTION_ONLY="${ACTION_ONLY:-0}"
+# 150-batch cap (was 60). The completed retail actions_only lr1e-3 arm was still
+# descending at b59 -- b10..b59 = 3.8355 3.8099 3.7839 3.7576 3.7112 3.6702, monotonic,
+# -4.31%, largest drop in the LAST interval -- so at 60 batches every arm would be
+# compared at an arbitrary under-trained point. Early stopping (PATIENCE=3 on held-out
+# action PPL) makes a generous cap cheap: arms that plateau stop themselves; only arms
+# that are genuinely still learning spend the extra time.
+export NUM_BATCHES="${NUM_BATCHES:-150}"
 # Best-checkpoint thought corpora only. The _last flavours (relabelled from the EM
 # step_last rather than step_best) were within noise of their best counterparts in the
 # lr=4e-5 results (retail hide subspan: thoughts_base 3.173 vs _last 3.193;
