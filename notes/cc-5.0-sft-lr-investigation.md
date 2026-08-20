@@ -140,6 +140,33 @@ The sweep therefore runs at **3e-3**, 150-batch cap, early stopping patience 3.
 of `actions_only` — that came from comparing b27 against b30. At matched b29/b30 they are
 +1.19% vs +1.23%.)*
 
+## Reference point: a fully trained baseline
+
+`retail actions_only, hide, lr 3e-3, 150 batches` — complete, 15 eval points:
+
+```
+3.780 3.673 3.492 3.297 3.072 2.861 2.696 2.587 2.511 2.459 2.422 2.395 2.371 2.355 2.342
+Δ -38.03%   accuracy 0.7607 -> 0.7726 (+1.19pp)
+```
+
+The tail deltas shrink (0.027, 0.024, 0.016, 0.013), so this is near convergence — 150
+batches is about right at 3e-3, unlike at 1e-3 where the curve was still accelerating at
+b149.
+
+Same arm, all LRs:
+
+| lr | batches | final PPL | Δ | Δ accuracy |
+|---|---|---|---|---|
+| 4e-5 (shipped) | 60 | 3.8455 | −0.11% | +0.04pp |
+| 1e-4 | 60 | 3.8449 | −0.14% (non-monotonic) | +0.00pp |
+| 1e-3 | 150 | 3.0719 | +19.81% | +0.53pp |
+| **3e-3** | 150 | **2.3418** | **+38.03%** | **+1.19pp** |
+
+The trained baseline at 2.342 sits far below every arm in the original table
+(`expert_thoughts` 2.9165, `thoughts_base` 3.1735, `thoughts_policy` 3.1824). Whatever
+the thought arms do at 3e-3, this is the number they have to beat — and the old
+"thoughts win" ordering is not a valid prior for it.
+
 ## Open questions
 
 - **Accuracy does not move.** At 1e-3, PPL improves 4.31% while held-out accuracy goes
