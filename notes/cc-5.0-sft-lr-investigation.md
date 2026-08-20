@@ -81,6 +81,40 @@ other box's. They differ by exactly 2 tokens on 469/469 steps — ours includes 
 ~1–3% low on PPL. It is a constant offset applied to every arm within a dataset, so
 within-dataset rankings are unaffected. The re-run uses one definition throughout.
 
+## The result that reframes everything
+
+The first properly-trained arm — retail `actions_only`, hide, lr 1e-3, 150 batches:
+
+```
+PPL  3.8307 -> 3.0719   (-19.81%, monotonic across all 15 eval points, never plateaued)
+acc  0.7599 -> 0.7652   (+0.53pp)
+```
+
+Against the same arm at 4e-5: **-0.11% PPL, +0.04pp accuracy**.
+
+Now put that next to the *old* (4e-5, i.e. untrained) hide-regime numbers:
+
+| arm | old best PPL @4e-5 | |
+|---|---|---|
+| actions_only | 3.8378 | ← trains to **3.0719** |
+| thoughts_base | 3.1735 | not yet retrained |
+| thoughts_policy | 3.1824 | not yet retrained |
+| expert_thoughts | 2.9165 | not yet retrained |
+
+A properly trained `actions_only` (3.07) already **beats both Act-PRM thought arms as we
+previously reported them** (3.17 / 3.18) and closes most of the gap to the expert-thought
+oracle (2.92). Those old thought-arm numbers were never a training result — they were the
+base model being scored with a thought in its context. Once the baseline actually trains,
+it passes them.
+
+This does **not** say thoughts don't help: the thought arms have not been retrained yet,
+and they start from a lower PPL so they may go lower still. What it does say is that
+**no previously reported Stage-2 ranking can be carried forward**. The comparison has to
+be redone end-to-end at a working LR, which is what the sweep is doing.
+
+Note also the curve never flattened at 150 batches and early stopping never fired, so
+150 is still short of convergence — the arms may be step-limited even now.
+
 ## Open questions
 
 - **Accuracy does not move.** At 1e-3, PPL improves 4.31% while held-out accuracy goes
