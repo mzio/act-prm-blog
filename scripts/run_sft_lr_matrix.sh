@@ -1,0 +1,55 @@
+#!/usr/bin/env bash
+# Stage-2 SFT re-run at higher learning rates, across every reported config.
+#
+# WHY: the entire PyTorch path ran at lr=4e-5 (configs/trainer/{sft,pg}.yaml, never
+# tuned since the initial commit 88d1068) and every stage produced a near-null LoRA:
+# max|(alpha/r)*B@A| ~ 1e-6..4e-5 against base weights of order 1e-2, with lora_A
+# still pinned at its seeded init (two runs on DIFFERENT corpora agree to 1.5e-6).
+# Held-out PPL/accuracy consequently moved 0.03-0.26% over 60 batches on all 36 runs.
+# So the shipped Stage-2 checkpoints are ~the base model, and the Stage-3 RL arms all
+# warm-started from the same place -- which is why they were indistinguishable.
+#
+# Matrix: {3 datasets} x {6 variants} x {hide,full} x {LRS} runs, serial on one GPU,
+# resumable (a run whose step_best exists is skipped). At ~70 min/run the default
+# 2-LR sweep is 72 runs ~= 84 GPU-hours. Run ./scripts/probe_sft_lr.sh first.
+#
+# Usage:
+#   CUDA_VISIBLE_DEVICES=0 nohup ./scripts/run_sft_lr_matrix.sh > /tmp/aprm/lrmatrix.log 2>&1 &
+#   LRS="1e-4" ENVS="act_prm/tau2_retail" ./scripts/run_sft_lr_matrix.sh   # narrow it
+#   DRY=1 ./scripts/run_sft_lr_matrix.sh                                   # plan only
+set -uo pipefail
+cd "$(dirname "$0")/.."
+export PATH="$HOME/.local/bin:$HOME/.cargo/bin:/usr/local/bin:$PATH"
+
+LRS="${LRS:-1e-4 1e-3}"
+ENVS="${ENVS:-act_prm/tau2_retail act_prm/tau2_airline act_prm/snorkel_finance_split}"
+DRY="${DRY:-0}"
+MDIR=/tmp/aprm/lrmatrix; mkdir -p "$MDIR"
+log(){ echo "[$(date '+%m-%d %H:%M:%S')] $*" | tee -a "$MDIR/matrix.log"; }
+
+log "=== Stage-2 SFT LR matrix: lrs='$LRS' envs='$ENVS' ==="
+for env in $ENVS; do
+  corpus="data/sft_corpus/${env##*/}"
+  [ -d "$corpus" ] || { log "WARN: no corpus at $corpus — thought arms for $env will be skipped"; }
+done
+
+# LR-major so a full LR tier finishes across all datasets before the next starts:
+# if 1e-3 turns out to diverge, the 1e-4 tier is already complete and usable.
+for lr in $LRS; do
+  for env in $ENVS; do
+    log "--- lr=$lr env=$env"
+    if [ "$DRY" = 1 ]; then
+      LR="$lr" SFT_DRY_RUN=1 ./scripts/run_sft_sweep.sh "$env" 2>&1 | sed 's/^/    /'
+      continue
+    fi
+    LR="$lr" ./scripts/run_sft_sweep.sh "$env" >> "$MDIR/lr${lr}_${env##*/}.log" 2>&1 \
+      && log "lr=$lr $env: sweep done" || log "lr=$lr $env: sweep FAILED (see $MDIR/lr${lr}_${env##*/}.log)"
+  done
+  log "=== LR tier $lr complete across all datasets ==="
+  # Refresh the per-dataset SFT notes/CSVs as each tier lands, so results are
+  # readable without waiting for the whole matrix.
+  for env in $ENVS; do
+    uv run --no-project python scripts/analyze_sft.py "$env" >/dev/null 2>&1 || true
+  done
+done
+log "=== LR matrix done ==="

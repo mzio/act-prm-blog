@@ -15,6 +15,28 @@ export PATH="$HOME/.local/bin:$HOME/.cargo/bin:/usr/local/bin:$PATH"
 ENVCFG="${1:?env config, e.g. act_prm/tau2_retail}"
 ENVNAME="${ENVCFG##*/}"                     # tau2_retail
 DOM="${ENVNAME#tau2_}"                      # retail / airline (matches existing run_tags)
+# LR sweep: unset (default) reproduces the original lr=4e-5 runs with their original
+# run_tags. Set LR=1e-4 to append --learning_rate and tag the runs
+# <dom>_s2_<variant>_lr1e-4_heldout[_fullctx], so they neither collide with nor are
+# mistaken for the 4e-5 runs -- and so analyze_sft.py still parses them (the glob is
+# <dom>_s2_*, the regime is still the _fullctx suffix, and the lr rides in the
+# variant column). NB the 4e-5 runs left an adapter that barely moved off its
+# init (max|B@A| ~ 4e-5 vs base weights ~1e-2), which is why this knob exists.
+LR="${LR:-}"
+LR_ARGS=(); LRTAG=""
+if [ -n "$LR" ]; then LR_ARGS=(--learning_rate "$LR"); LRTAG="_lr${LR}"; fi
+# Short-probe knobs: cheap validation that the adapter actually moves before
+# committing the full matrix (NUM_BATCHES=8 EVAL_EVERY=2 VARIANTS=actions_only).
+NUM_BATCHES="${NUM_BATCHES:-}"
+EVAL_EVERY="${EVAL_EVERY:-}"
+# Early-stop on held-out action PPL. Never fired at lr=4e-5 because the curve was
+# flat to 0.1%; at a working LR the run should bend then overfit (49 train tasks at
+# bs 4 => 60 batches ~= 5 epochs), so this is what keeps the sweep affordable.
+PATIENCE="${PATIENCE:-3}"
+EXTRA=(); [ -n "$NUM_BATCHES" ] && EXTRA+=(--num_batches "$NUM_BATCHES")
+[ -n "$EVAL_EVERY" ] && EXTRA+=(--eval_every "$EVAL_EVERY")
+[ "$PATIENCE" != "0" ] && EXTRA+=(--early_stop_patience "$PATIENCE")
+ONLY="${VARIANTS:-}"   # space-separated variant labels to restrict to (default: all)
 # Model is parametrized: MODEL_CFG selects both the <MODEL> path dir AND (exported for the
 # train_sft.sh children) their --model_config. Default keeps 4B behavior.
 MODEL="${MODEL_CFG:-hf_qwen3_4b_instruct}"; export MODEL_CFG="$MODEL"
@@ -30,13 +52,15 @@ corpus_ok(){ [ -s "$1/train.json" ] && [ "$(python3 -c "import json;print(len(js
 
 run_one(){  # $1=sft_variant  $2=label(run_tag)  $3=regime(hide|full)  $4..=extra flags
   local variant=$1 label=$2 regime=$3; shift 3
-  local tag="${DOM}_s2_${label}_heldout"; [ "$regime" = full ] && tag="${tag}_fullctx"
+  if [ -n "$ONLY" ] && [[ " $ONLY " != *" $label "* ]]; then return 0; fi
+  local tag="${DOM}_s2_${label}${LRTAG}_heldout"; [ "$regime" = full ] && tag="${tag}_fullctx"
   if [ -n "$(newest "$CKROOT/${tag}-*/step_best")" ]; then log "$tag: done, skip"; return 0; fi
   local fc=(); [ "$regime" = full ] && fc=(SFT_FULLCTX=1)
-  log "$tag: SFT ($regime-obs) $*"
+  log "$tag: SFT ($regime-obs, lr=${LR:-default}) $*"
   wait_gpu_free
   env "${fc[@]}" ./scripts/train_sft.sh "$ENVCFG" "$variant" \
-      --run_tag "$tag" --best_metric eval_action_ppl "$@" > "$MDIR/${tag}.log" 2>&1 \
+      --run_tag "$tag" --best_metric eval_action_ppl \
+      "${LR_ARGS[@]}" "${EXTRA[@]}" "$@" > "$MDIR/${tag}.log" 2>&1 \
     && log "$tag: done" || log "$tag: FAILED (see $MDIR/${tag}.log)"
 }
 
