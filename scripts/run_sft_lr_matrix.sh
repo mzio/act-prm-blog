@@ -22,8 +22,10 @@ cd "$(dirname "$0")/.."
 export PATH="$HOME/.local/bin:$HOME/.cargo/bin:/usr/local/bin:$PATH"
 
 LRS="${LRS:-1e-4 1e-3}"
-# Action-only supervision on by default for this sweep: train the span we score.
-export ACTION_ONLY="${ACTION_ONLY:-1}"
+# TRAIN on the full thought+action span (Act-PRM and expert_thoughts must learn to
+# produce the thought). REPORTING is action-only on both splits: eval_actiononly_* on
+# eval, train/actiononly_* on train. ACTION_ONLY=1 is the loss-masking ablation only.
+export ACTION_ONLY="${ACTION_ONLY:-0}"
 # Best-checkpoint thought corpora only. The _last flavours (relabelled from the EM
 # step_last rather than step_best) were within noise of their best counterparts in the
 # lr=4e-5 results (retail hide subspan: thoughts_base 3.173 vs _last 3.193;

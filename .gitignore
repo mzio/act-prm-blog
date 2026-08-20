@@ -232,3 +232,4 @@ docs/
 
 # tau2-bench upstream clone (package + data); installed into .venv-tau2, not committed
 /tau2-bench/
+_quarantine_action_only_training/

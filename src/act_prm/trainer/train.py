@@ -509,35 +509,38 @@ def prepare_minibatch(
                 # Add labels to double-check
                 sa_labels = [-100] * state_len + sa_input_ids[state_len:]
 
-                # Action-only supervision: zero the mask/advantage over the reasoning
-                # prefix so gradient flows ONLY through action tokens. The thought
-                # remains in the input (it still conditions the prediction) — we just
-                # don't train on producing it. Same boundary the eval uses.
+                # Action span boundary. Used for TWO different things:
+                #   * action_mask (always) — metrics only. Lets compute_loss report
+                #     action-only PPL/accuracy on the train split, matching what
+                #     eval_actiononly_* reports on the eval split. Does NOT touch the loss.
+                #   * the loss mask (only when train_action_only) — an ablation that
+                #     supervises the action alone.
+                # Default: TRAIN on the full thought+action span, REPORT on the action span.
+                _action_msg = getattr(episode_step, "action", None)
+                _target_content = (
+                    _action_msg.get("content") if isinstance(_action_msg, dict) else None
+                )
+                a_start = action_start_token(
+                    hf_tokenizer, sa_input_ids, state_len, _target_content
+                )
+                a_pos = max(0, a_start - 1)  # first action-token prediction position
+                action_mask = list(padded_mask)
+                for _i in range(target_state_len, min(a_pos, len(action_mask))):
+                    action_mask[_i] = 0
+                n_action_tokens_total += sum(action_mask)
+                n_prefix_masked += max(0, min(a_pos, len(action_mask)) - target_state_len)
+                if sum(action_mask) == 0:
+                    n_no_action_tokens += 1
+
                 if train_action_only:
-                    _action_msg = getattr(episode_step, "action", None)
-                    _target_content = (
-                        _action_msg.get("content") if isinstance(_action_msg, dict) else None
-                    )
-                    a_start = action_start_token(
-                        hf_tokenizer, sa_input_ids, state_len, _target_content
-                    )
-                    a_pos = max(0, a_start - 1)  # first action-token prediction position
-                    if a_pos > target_state_len:
-                        n_prefix = min(a_pos, len(padded_mask))
-                        for _i in range(target_state_len, n_prefix):
-                            padded_mask[_i] = 0
-                            padded_advantages[_i] = 0.0
-                        for _i in range(state_len, min(a_start, len(sa_labels))):
-                            sa_labels[_i] = -100
-                        n_prefix_masked += n_prefix - target_state_len
-                    n_action_tokens_total += sum(padded_mask)
-                    # A step whose action span masked away entirely carries no gradient
-                    # but would still inflate len(train_loader) -> gradient_accumulation_steps,
-                    # diluting the update on the steps that do (same reasoning as
-                    # drop_zero_advantage). Drop it.
+                    # Ablation: supervise ONLY the action tokens.
+                    padded_mask = list(action_mask)
+                    for _i in range(target_state_len, min(a_pos, len(padded_advantages))):
+                        padded_advantages[_i] = 0.0
+                    for _i in range(state_len, min(a_start, len(sa_labels))):
+                        sa_labels[_i] = -100
                     if sum(padded_mask) == 0:
-                        n_no_action_tokens += 1
-                        continue
+                        continue  # no gradient; would only dilute grad-accum
                 # sa_labels = [-100] * target_state_len + sa_input_ids[target_state_len:]
 
                 # print(f"batch_idx: {batch_idx}")
@@ -571,6 +574,11 @@ def prepare_minibatch(
                         "advantages": padded_advantages,  # Note that advantages and logprobs are already
                         "logprobs": padded_logprobs,  # shifted to account for next-token prediction
                         "label_mask": padded_mask,
+                        # Metrics-only: the action sub-span within the supervised span.
+                        # compute_loss reports action-only PPL/accuracy from this, so the
+                        # TRAIN curves are on the same span as eval_actiononly_*, while the
+                        # loss itself still uses the full label_mask (thought + action).
+                        "action_mask": action_mask,
                         "state_len": target_state_len,
                         "action_len": len(act_logprobs),
                         "labels": sa_labels,

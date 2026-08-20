@@ -193,16 +193,39 @@ class SFTTrainer(RLTrainer):
                 ((logits.argmax(dim=-1) == labels).to(new_logprobs.dtype) * label_mask).sum()
                 / num_label_tokens
             ).item()
+        # Action-only TRAIN metrics. The loss above is over the full label_mask
+        # (thought + action); these report the same span eval_actiononly_* reports on
+        # the eval split, so train and eval curves are directly comparable. action_mask
+        # is metrics-only and never enters the loss. Falls back to label_mask when the
+        # collator didn't supply one (older replay buffers / non-SFT callers).
+        _amask = batch.get("action_mask")
+        if _amask is not None:
+            _amask = _amask.to(device)
+            _n_act = _amask.sum().clamp_min(1)
+            with torch.no_grad():
+                actiononly_ppl = torch.exp(-(new_logprobs * _amask).sum() / _n_act).item()
+                actiononly_accuracy = (
+                    ((logits.argmax(dim=-1) == labels).to(new_logprobs.dtype) * _amask).sum() / _n_act
+                ).item()
+                action_token_frac = (_amask.sum() / label_mask.sum().clamp_min(1)).item()
+        else:
+            actiononly_ppl = ppl
+            actiononly_accuracy = token_accuracy
+            action_token_frac = 1.0
+
         mean_advantage = (advantages.sum() / num_label_tokens).item()
         per_seq_gen_lens = label_mask.sum(dim=-1).tolist()
         num_gen_tokens = sum(per_seq_gen_lens) / len(per_seq_gen_lens) if per_seq_gen_lens else 0.0
 
-        del advantages, label_mask, model_inputs, logits, labels, num_label_tokens
+        del advantages, label_mask, model_inputs, logits, labels, num_label_tokens, _amask
         torch.cuda.empty_cache()
 
         return {
             "loss": loss,
             "ppl": ppl,
+            "actiononly_ppl": actiononly_ppl,
+            "actiononly_accuracy": actiononly_accuracy,
+            "action_token_frac": action_token_frac,
             "action_accuracy": token_accuracy,
             "advantage": mean_advantage,
             "num_gen_tokens": num_gen_tokens,
