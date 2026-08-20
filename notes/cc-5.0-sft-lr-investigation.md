@@ -99,11 +99,11 @@ within-dataset rankings are unaffected. The re-run uses one definition throughou
 arm                                                  reg     b   eval ppl first->last      Δ%     acc  train ao ppl
 ----------------------------------------------------------------------------------------------------------------------
 retail/actions_only_lr1e_3                           hide   59     3.8355 ->   3.6702   4.31%  0.7609        1.6094
-retail/actions_only_lr1e_3_nb150                     hide  122     3.8307 ->   3.2979  13.91%  0.7625        1.7500  <running>
+retail/actions_only_lr1e_3_nb150                     hide  136     3.8307 ->   3.2207  15.92%  0.7631        5.9375  <running>
 
 1/2 arms complete   (Δ% = held-out action-subspan PPL improvement, higher is better)
 ```
-_last refreshed: 2026-08-20 01:20_
+_last refreshed: 2026-08-20 01:40_
 <!--/RESULTS-->
 
 ## Infrastructure
