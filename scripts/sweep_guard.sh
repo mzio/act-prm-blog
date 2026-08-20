@@ -1,0 +1,45 @@
+#!/usr/bin/env bash
+# Cron-driven guard for the Stage-2 SFT sweep. Idempotent and safe to run every 5 min.
+#
+# Why cron: backgrounded shells launched from the agent session kept getting killed with
+# their process group, which silently stalled the queue. Cron re-checks independently of
+# any shell, so the sweep survives.
+#
+# Order of business each tick:
+#   1. If a trainer is already running, do nothing.
+#   2. If the thoughts_base LR probe hasn't run yet, run it (it informs the LR for every
+#      remaining arm, so it goes before the rest of the matrix).
+#   3. Otherwise keep the LR matrix moving. Both are resumable and skip finished work.
+# Cron entry: */5 * * * * /home/mzio/projects/act-prm-blog/scripts/sweep_guard.sh
+set -uo pipefail
+cd "$(dirname "$0")/.." || exit 0
+export PATH="$HOME/.local/bin:$HOME/.cargo/bin:/usr/local/bin:/usr/bin:/bin:$PATH"
+export HF_HUB_OFFLINE=${HF_HUB_OFFLINE:-0}
+G=/tmp/aprm; mkdir -p "$G"
+LOCK="$G/guard.lock"
+log(){ echo "[$(date '+%m-%d %H:%M:%S')] $*" >> "$G/guard.log"; }
+
+# single-instance
+exec 9>"$LOCK" || exit 0
+flock -n 9 || exit 0
+
+# 1. a trainer is live -> nothing to do
+if pgrep -f '[m]ain_pytorch.py' >/dev/null 2>&1; then exit 0; fi
+# a driver shell is mid-launch -> let it be
+if ps -eo args | grep -qE 'bash \./scripts/(run_sft_lr_matrix|run_sft_sweep|probe_sft_lr)\.sh'; then exit 0; fi
+
+# 2. thoughts_base LR probe (once)
+if [ ! -f "$G/lrprobe/thoughts_base.done" ]; then
+  log "starting thoughts_base LR probe (1e-4 / 1e-3 / 3e-3, 30 batches)"
+  mkdir -p "$G/lrprobe"
+  VARIANT=thoughts_base BATCHES=30 EVAL_EVERY=10 LRS="1e-4 1e-3 3e-3" \
+    ./scripts/probe_sft_lr.sh >> "$G/lrprobe/driver.log" 2>&1
+  touch "$G/lrprobe/thoughts_base.done"
+  log "thoughts_base probe finished"
+  exit 0
+fi
+
+# 3. keep the matrix moving
+if [ -f "$G/lrmatrix/DONE" ]; then exit 0; fi
+log "matrix idle -> advancing it"
+./scripts/run_sft_lr_matrix.sh >> "$G/lrmatrix_driver.log" 2>&1

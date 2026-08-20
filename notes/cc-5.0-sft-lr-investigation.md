@@ -1,0 +1,121 @@
+# cc-5.0 — Stage-2 SFT never trained: diagnosis, fix, and the re-run
+
+Running log. The results table near the bottom is refreshed automatically every 20 min
+by `scripts/snapshot_results.sh` (cron).
+
+## The finding
+
+Every Stage-2 SFT run we have ever reported was trained at `learning_rate: 4e-5`
+(`configs/trainer/{sft,pg}.yaml`, untouched since the initial commit `88d1068`) and
+**barely moved the model**. This is measured on the weights, not inferred from curves:
+
+| stage | max &#124;(α/r)·B·A&#124; |
+|---|---|
+| Stage-1 EM (retail) | 1.3e-06 |
+| Stage-1 relabel (retail) | 1.3e-06 |
+| Stage-2 SFT (retail) | 4.5e-05 |
+| Stage-2 SFT (finance) | 2.4e-06 |
+| Stage-3 RLVR (retail) | 2.4e-05 |
+
+Base weights are order 1e-2, so the largest single-layer perturbation was ~0.4% and the
+median ~0.01%. `lora_A` was still at its seeded init — two SFT runs trained on
+**different corpora** had `A` matrices agreeing to 1.5e-6. `B` is zero-initialised and
+`dL/dA ∝ Bᵀ`, so the runs never escaped the LoRA cold start.
+
+It is not an SFT-specific bug and not an advantage-weighting artifact
+(`train/advantage ≡ 1.0`, `advantage_mode: uniform`, `loss_fn: cross_entropy`, train loss
+a normal ~0.9). The optimizer is healthy: adapter movement scales **exactly linearly**
+with LR (25× LR → 25× movement, to three significant figures). The LR was simply ~25×
+too small.
+
+### What this invalidates
+
+1. **All 36 shipped SFT arms are ≈ the base model** (retail, airline, finance × both
+   context regimes).
+2. **It explains the Stage-3 RL null result.** All four retail RLVR arms "warm-started"
+   from adapters numerically indistinguishable from base — so they *were* the same model.
+   The 5/20, 5/20, 6/20, 5/20 spread was not noise swamping an effect; there was no
+   difference to detect.
+3. **The Stage-2 comparison measures something real but differently framed.** Since the
+   model never changed, the stable 20–35% gaps between arms are *context* effects on the
+   base model: having a thought in the prompt makes the action tokens easier to predict.
+   That replicates across three datasets and is a legitimate result — but it is not
+   "SFT on Act-PRM thoughts yields a better policy."
+
+### The tell we already had
+
+First-vs-last on the old runs would have exposed this immediately. Across all 18
+hide-regime arms at 4e-5, held-out action-subspan PPL moved between **−0.12% and +0.14%**
+and got *worse* in 5 of 18; accuracy moved at most **0.08pp** (finance `thoughts_policy`
+and `thoughts_base`: exactly +0.00pp). `analyze_sft.py` reported *best* PPL, and the min
+of a noisy flat line always looks like a result.
+
+## The fix and the re-run
+
+- **lr 1e-3 trains.** Retail `actions_only`, hide: `3.8355 3.8099 3.7839 3.7576 3.7112
+  3.6702` over b10..b59 — monotonic, −4.31%, largest drop in the final interval. At 150
+  batches the same arm reaches −7.4% by b80 and is still descending.
+- **lr 1e-4 is dead**, confirmed with a completed arm: `3.8446 3.8429 3.8395 3.8449`
+  (0.14%, non-monotonic), final adapter 9.2e-5. Tier dropped rather than re-confirmed
+  across two more datasets (~25 GPU-hours saved).
+- **Batch cap raised 60 → 150** with `--early_stop_patience 3`, so arms that plateau stop
+  themselves and only arms still learning spend the budget.
+
+### Training vs reporting spans
+
+Training is on the **full thought+action span** — Act-PRM and `expert_thoughts` must
+learn to produce the thought. Reporting is **action-only on both splits**:
+`eval_actiononly_{ppl,accuracy}` on eval and `train/actiononly_{ppl,accuracy}` on train
+(the latter added here; it previously existed only on finance). Both use the same
+`action_start_token` boundary, so trained and scored spans cannot drift.
+`--train_action_only` remains available as a loss-masking ablation, off by default.
+
+`extract_action` resolves 100% of assistant steps on all three datasets (retail 92/92,
+airline 37/37, finance 340/340).
+
+### A caveat on the old cross-domain table
+
+Retail's subspan numbers came from our implementation, airline's and finance's from the
+other box's. They differ by exactly 2 tokens on 469/469 steps — ours includes the opening
+`<tool_call>\n`, theirs starts after it — so ours reads ~0.3pp optimistic on accuracy and
+~1–3% low on PPL. It is a constant offset applied to every arm within a dataset, so
+within-dataset rankings are unaffected. The re-run uses one definition throughout.
+
+## Open questions
+
+- **Accuracy does not move.** At 1e-3, PPL improves 4.31% while held-out accuracy goes
+  0.7602 → 0.7609 and the whole four-LR panel spans 0.13pp. The model gets better
+  calibrated on action tokens without changing its argmax. If next-action accuracy is the
+  quantity the Act-PRM story rests on, nothing has moved it yet.
+- **Train loss is not a usable signal here.** It is pixel-identical across a 25× LR range
+  (same spikes at b20/b36/b47) — it reads out per-batch difficulty, not learning.
+- **Step- or LR-limited?** 1e-3 was still descending at b150. The `thoughts_base` probe
+  (1e-4 / 1e-3 / 3e-3, 30 batches) is intended to separate these.
+
+## Live results — 1e-3 arms
+
+<!--RESULTS-->
+```
+arm                                                  reg     b   eval ppl first->last      Δ%     acc  train ao ppl
+----------------------------------------------------------------------------------------------------------------------
+retail/actions_only_lr1e_3                           hide   59     3.8355 ->   3.6702   4.31%  0.7609        1.6094
+retail/actions_only_lr1e_3_nb150                     hide   90     3.8307 ->   3.4977   8.69%  0.7619        2.2188  <running>
+retail/expert_thoughts_lr1e_3                        hide    2         (no evals yet)
+
+1/2 arms complete   (Δ% = held-out action-subspan PPL improvement, higher is better)
+```
+_last refreshed: 2026-08-20 00:35_
+<!--/RESULTS-->
+
+## Infrastructure
+
+Two cron entries keep this moving without supervision (agent-launched background shells
+kept being killed with their process group):
+- `*/5 sweep_guard.sh` — runs the `thoughts_base` probe once, then keeps the LR matrix
+  advancing. Idempotent, `flock`-guarded, no-ops while a trainer is live.
+- `*/20 snapshot_results.sh` — refreshes notes/CSVs/figures, updates the table above,
+  backs `metrics.jsonl` into dotsync, and commits.
+
+Resume correctness: completion is an explicit `.done` marker, **not** `step_best` —
+`step_best` is written at the first eval, so an interrupted arm used to look finished and
+be skipped forever. `NUM_BATCHES` rides in the run tag so a budget change re-runs.
