@@ -100,6 +100,7 @@ class RLTrainer(BaseTrainer):
         # (e.g. best_metric: eval_action_ppl for SFT early-stop), else higher-is-better.
         self.best_metric = float("inf") if _lower_is_better(self.best_metric_name) else float("-inf")
         self.best_metric_step = -1
+        self._no_improve_evals = 0  # consecutive evals w/o best_metric improvement (early stop)
 
     def compute_loss(
         self,
@@ -144,7 +145,7 @@ class RLTrainer(BaseTrainer):
             print(f"{e.__class__.__name__}: {e}")
             print(f"new_logprobs: {new_logprobs.shape}")
             print(f"old_logprobs: {old_logprobs.shape}")
-            breakpoint()
+            ratio = 1.0  # headless-safe fallback: skip importance weight this step
         num_label_tokens = label_mask.sum().clamp_min(1)
         loss = -(ratio * new_logprobs * advantages).sum() / num_label_tokens
 
@@ -318,6 +319,15 @@ class RLTrainer(BaseTrainer):
                             self.best_replay_buffer_path,
                         )
 
+                # Track consecutive non-improving evals for early stopping.
+                _patience = int(cfg.get("early_stop_patience", 0) or 0)
+                if _patience > 0:
+                    if self.best_metric_step == batch_idx:
+                        self._no_improve_evals = 0
+                    else:
+                        self._no_improve_evals += 1
+                    metrics["eval/no_improve_evals"] = self._no_improve_evals
+
                 # Early flush: persist eval metrics now so a crash later in
                 # this batch doesn't lose the eval snapshot. The end-of-batch
                 # log_metrics call appends a second row with train/loss + timing
@@ -332,20 +342,14 @@ class RLTrainer(BaseTrainer):
                         _flush_exc,
                     )
 
-                # Patience early-stop on the eval metric: halt if best_metric hasn't
-                # improved for `early_stop_patience` eval checks (0/absent = off). Safe
-                # to break here — step_best is already saved whenever the best improved.
-                _pat = cfg.get("early_stop_patience", 0)
-                if (
-                    _pat
-                    and _pat > 0
-                    and self.best_metric_step >= 0
-                    and (batch_idx - self.best_metric_step) >= _pat * eval_every
-                ):
+                # Early stop: eval best_metric hasn't improved for `early_stop_patience`
+                # evals. step_best is already saved above, so we lose nothing by stopping.
+                if _patience > 0 and self._no_improve_evals >= _patience and not _is_last:
                     logger.info(
-                        f"[early-stop] no {self.best_metric_name} improvement for "
-                        f"{_pat} evals (best step {self.best_metric_step}) — "
-                        f"stopping at {batch_idx}"
+                        "EARLY STOP at step %d: eval %s not improved for %d evals "
+                        "(best=%.4f @ step %d).",
+                        batch_idx, self.best_metric_name, self._no_improve_evals,
+                        float(self.best_metric), self.best_metric_step,
                     )
                     break
 
@@ -362,13 +366,23 @@ class RLTrainer(BaseTrainer):
                     **generate_and_save_trajectories_kwargs,
                 )
 
+            # NOTE: no_train (relabel / rollout-only) is handled AFTER the train-set
+            # rollouts are generated + saved below — otherwise `continue` here would
+            # skip train-set generation and the relabel would export ONLY eval
+            # trajectories (corpus train:0). See the split-coverage fix.
             # 1. Sample rollouts for training
             # (no_train is handled AFTER generation below, so relabel/rollout-only mode
             #  still generates + saves TRAIN rollouts to generations.jsonl — it must not
             #  skip this, or the exported corpus would contain only eval trajectories.)
             env.split = "train"
             rl_start_idx = batch_idx * cfg.batch_size
-            if rl_start_idx + cfg.batch_size > wen_shuffle:
+            # Do NOT shuffle in no_train (relabel/export) mode: export_sft_corpus maps
+            # each generation back via pool[sample_id % n] on the UNSHUFFLED pool, so a
+            # mid-run shuffle would graft thoughts onto the wrong task's observations.
+            # Keeping order aligned lets any num_batches produce a correct corpus
+            # (wrap-around across tasks just yields clean augmentation). Training runs
+            # (no_train=False) still shuffle as before.
+            if not cfg.get("no_train", False) and rl_start_idx + cfg.batch_size > wen_shuffle:
                 env.shuffle(split="train")
                 wen_shuffle += len(env.datasets["train"])
 
@@ -396,8 +410,9 @@ class RLTrainer(BaseTrainer):
 
             self.replay_buffer.save_hf_dataset_to_disk(self.last_replay_buffer_path)
 
-            # Relabel / rollout-only mode: train rollouts have now been generated AND saved
-            # (generations.jsonl) with this fixed checkpoint — skip only the optimizer step.
+            # Relabel / rollout-only mode: TRAIN rollouts are now generated AND saved
+            # to generations.jsonl with this fixed checkpoint — skip only the optimizer
+            # step (so the exported SFT corpus covers train + eval, not eval-only).
             if cfg.get("no_train", False):
                 continue
 
@@ -468,7 +483,7 @@ class RLTrainer(BaseTrainer):
                 rich_print(f"[red]Error logging metrics: {_error_class}: {_error_message}[/red]")
                 for k, v in metrics.items():
                     print(k, type(v))
-                breakpoint()
+                # headless-safe: a metric-logging failure must not kill training
             torch.cuda.empty_cache()
 
         # Load best model checkpoint
@@ -571,7 +586,9 @@ class RLTrainer(BaseTrainer):
         except Exception as e:
             _error_text = f"({type(e).__name__}: {e})"
             logger.error("Failed to save trajectories to HF Dataset: %s", _error_text)
-            breakpoint()
+            # Don't breakpoint() in automated/offline runs (background jobs have no
+            # stdin -> hangs forever). The per-step generations.jsonl is the offline
+            # SFT source anyway; a failed Hub push must not stall the relabel pass.
 
         if was_training:
             llm.model.train()

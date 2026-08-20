@@ -1,0 +1,50 @@
+# tau2-bench airline domain — RLVR + hide-obs variant (v2 RL fleet).
+# Differs from airline.yaml in two ways:
+#   negative_rewards: false  -> RLVR: +1 on task success (tau2 reward >= 1.0), 0 otherwise.
+#                               eval/final_reward then reads directly as the held-out
+#                               SUCCESS FRACTION (0-1). GRPO mean-centering supplies the
+#                               advantage sign.
+#   hide_observations: true  -> matches the Stage-2 SFT regime (see below).
+name: "tau2bench"
+data_path: "tau2-bench/data"
+domain: "airline"
+task_split: null
+# RL train/eval on the Act-PRM task partition: train on the 32 tasks present in the
+# logs, eval on the 18 never-seen tau2 tasks (pure hold-out). See scripts/map_dataset_to_tau2.py.
+task_id_map_file: "data/splits/tau2_airline_taskmap.json"
+is_async: true
+negative_rewards: false      # RLVR: +1 success / 0 else
+eval_splits: ["eval"]
+
+# User simulator + judge (claude_agent_sdk / Claude Haiku 4.5 via ambient OAuth).
+user_llm: "claude_agent_sdk/claude-haiku-4-5"
+user_llm_args: {temperature: 0.0, max_tokens: 512}
+nl_assertions_llm: "claude_agent_sdk/claude-haiku-4-5"
+env_interface_llm: "claude_agent_sdk/claude-haiku-4-5"
+
+max_steps: 50               # tau2 AgentGymEnv step cap
+num_train_tasks: 40
+num_val_tasks: null
+num_test_tasks: 10
+
+# State compaction (wrapper-level) — HIDE-OBS regime, matches Stage-2 SFT
+# (the act_prm env used hide_observations + first_obs_to_show:1 / last_obs_to_show:1).
+# Effective context = system prompt + first user message + ALL model responses +
+# the most recent observation; older observations are compacted to "...". So the policy
+# must rely on its running thoughts to carry earlier state forward.
+# NOTE: first_obs_to_show is overridden dynamically at reset (keeps system+initial user).
+# RL warm-starts MUST be the hide-obs SFT ckpts (airline_s2_*_heldout, NOT *_fullctx).
+hide_observations: true
+hidden_obs_content: "..."
+first_obs_to_show: 1
+last_obs_to_show: 1
+
+max_turns: 30
+num_tries: 1
+eval_num_tries: 1
+seed: 0
+data_seed: 0
+split: "train"
+system_prompt: "You are a helpful customer service agent."
+truncation_message: "Sorry, you have reached the maximum number of steps. Please try again."
+verbose: false

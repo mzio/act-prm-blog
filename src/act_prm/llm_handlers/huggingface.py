@@ -35,8 +35,9 @@ def load_hf_model_and_tokenizer(
     """
     model = AutoModelForCausalLM.from_pretrained(pretrained_model_name_or_path, **kwargs)
 
-    if pretrained_model_name_or_path == "Qwen/Qwen3-8B":  # hack but get Qwen2.5 tokenizer
-        pretrained_model_name_or_path = "Qwen/Qwen2.5-3B-Instruct"
+    # NOTE: use the model's OWN tokenizer. (A prior hack swapped Qwen/Qwen3-8B's
+    # tokenizer for Qwen/Qwen2.5-3B-Instruct — that's a different vocab, so it both
+    # breaks offline (Qwen2.5 isn't cached) and mismatches the model's token ids.)
     tokenizer = AutoTokenizer.from_pretrained(pretrained_model_name_or_path, **kwargs)
 
     # Override chat template if provided

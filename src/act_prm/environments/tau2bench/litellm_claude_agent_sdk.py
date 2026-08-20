@@ -29,6 +29,19 @@ logger = logging.getLogger(__name__)
 
 PROVIDER = "claude_agent_sdk"
 
+# Agent-loop turn budget for the user-sim / NL-assertion-judge calls. See _get_handler.
+_JUDGE_MAX_TURNS = 4
+
+
+class ClaudeAgentSDKError(RuntimeError):
+    """The Claude Agent SDK call failed and produced no text.
+
+    Raised instead of silently returning "" so that a transport/turn-limit failure is
+    distinguishable from a judge that genuinely answered with an empty string. tau2
+    catches it the same way it catches a JSON error, but the message now names the
+    real cause and callers can retry.
+    """
+
 # Cache one handler per concrete model name (handler construction is cheap but
 # this avoids re-creating it on every turn).
 _HANDLERS: dict[str, Any] = {}
@@ -39,7 +52,17 @@ def _get_handler(model: str) -> Any:
     if model not in _HANDLERS:
         from act_prm.llm_handlers.claude_agent_sdk import ClaudeQueryLLM
 
-        _HANDLERS[model] = ClaudeQueryLLM(model=model, max_turns=1)
+        # max_turns MUST be > 1. At max_turns=1 the SDK raises "Reached maximum
+        # number of turns (1)" whenever the model's first turn is not a final text
+        # answer (e.g. it emits a tool_use). ClaudeQueryLLM._query swallows that,
+        # returns None -> the reply text is "" -> tau2's json.loads("") raises
+        # JSONDecodeError("Expecting value: line 1 column 1") -> the tau2 evaluator
+        # is downgraded to reward=0.0. Net effect: a judge that never ran scored
+        # identically to a failed episode, on ~10% of airline episodes (concentrated
+        # on gift-card tasks 14/23, which ask the judge to verify a numeric total).
+        # Extra turns are free on the happy path: verified identical output shape
+        # and length at max_turns 1 vs 4.
+        _HANDLERS[model] = ClaudeQueryLLM(model=model, max_turns=_JUDGE_MAX_TURNS)
     return _HANDLERS[model]
 
 
@@ -82,6 +105,15 @@ def _complete(model: str, messages: list[dict[str, Any]], max_new_tokens: int | 
             num_return_sequences=1,
         )
         resp = responses[0] if responses else None
+        # ClaudeQueryLLM._query returns None on ANY exception (it prints
+        # "ClaudeQueryLLM query error: ..." and swallows it). Previously that became
+        # an empty reply string, which the NL-assertion judge turned into a silent
+        # reward=0.0. Surface it instead so the caller can retry / mark unscored.
+        if resp is None:
+            raise ClaudeAgentSDKError(
+                f"Claude Agent SDK returned no response for model={real_model!r} "
+                "(see the preceding 'ClaudeQueryLLM query error' line for the cause)"
+            )
         return _reply_text(handler, resp), (getattr(resp, "usage", None) or {})
 
     try:

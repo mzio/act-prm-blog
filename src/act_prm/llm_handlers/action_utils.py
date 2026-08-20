@@ -83,8 +83,11 @@ def get_actions(
             **tool_call_parse_kwargs,
         )
     except Exception as e:
+        # A parse failure must NOT kill the rollout (a stray breakpoint() here used to
+        # drop headless RL runs into pdb -> EOF -> process death). Fall back to treating
+        # the raw model text as a plain assistant message so the episode continues.
         rich_print(f"[red]Error in get_messages_from_text: {e}[/red]")
-        breakpoint()
+        response = [{"role": "assistant", "content": str(response[0].get("content", ""))}]
 
     for message in response:
         if message.get("tool_calls", None) is not None:
@@ -197,7 +200,11 @@ def get_messages_from_text(
             parse_error = f"JSONDecodeError: {e}"
 
     if valid_tool_call:
-        if isinstance(tool_call, str):
+        if not isinstance(tool_call, dict):
+            # JSON parsed to a non-object (int/float/list/bool/None) -- e.g.
+            # `<tool_call>3</tool_call>`. It's not a tool call; route to
+            # invalid_tool_call instead of calling .get() on it (which raised
+            # "'int' object has no attribute 'get'" and killed the rollout).
             valid_tool_call = False
         else:
             try:

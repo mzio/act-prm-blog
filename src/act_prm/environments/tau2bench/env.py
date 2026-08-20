@@ -122,6 +122,15 @@ class Tau2BenchEnv(Environment):
         system_prompt: Base system prompt for the agent.
     """
 
+    # Raw text of the most recent judge response that failed to parse, stashed by the
+    # tolerant-JSON shim so _patched_get_reward can persist it to the audit log.
+    _last_bad_judge_output: str | None = None
+
+    # How many times to re-run tau2's evaluator when it raises. Judge failures are
+    # stochastic (observed ~4-6 of a task's 8 rollouts, not all 8), so a retry
+    # recovers most of them instead of manufacturing a false reward=0.0.
+    JUDGE_MAX_ATTEMPTS: int = 3
+
     def __init__(
         self,
         data_path: str | None = None,
@@ -138,11 +147,15 @@ class Tau2BenchEnv(Environment):
         num_train_tasks: int = 80,
         num_val_tasks: int | None = None,
         num_test_tasks: int = 50,
-        # Explicit task-id selection (Stage-3 RL). When either list is non-null,
-        # that split is EXACTLY the given tau2 task ids, overriding the count-based
-        # split above. Both null (default) => unchanged count-based behavior.
+        # Explicit task-id selection (Stage-3 RL). When both lists are non-null,
+        # those splits are EXACTLY the given tau2 task ids, overriding the count-based
+        # split below: train on the tasks present in the Act-PRM logs, eval on the
+        # never-seen complement. Either pass the lists directly, or a task-map json
+        # (scripts/map_dataset_to_tau2.py) whose covered_tau2_ids -> train and
+        # unseen_tau2_ids -> eval. All null (default) => unchanged count-based split.
         train_task_ids: list[int] | None = None,
         eval_task_ids: list[int] | None = None,
+        task_id_map_file: str | None = None,
         max_steps: int = 50,
         # Inherited arguments
         max_turns: int = 30,
@@ -245,7 +258,15 @@ class Tau2BenchEnv(Environment):
                         m = _re_mod.search(r"[{\[].*[}\]]", s2, _re_mod.DOTALL)
                         if m:
                             s2 = m.group(0)
-                    return _orig_loads(s2, *args, **kwargs)
+                    try:
+                        return _orig_loads(s2, *args, **kwargs)
+                    except Exception:
+                        # Stash the raw judge output so the reward path can persist it.
+                        # The audit log previously recorded only the exception type,
+                        # which made it impossible to tell an empty response (SDK
+                        # failure) from genuinely malformed JSON without re-deriving it.
+                        Tau2BenchEnv._last_bad_judge_output = s
+                        raise
 
                 # IMPORTANT: replace the module's `json` reference with a small
                 # shim, NOT json.loads itself. Mutating json.loads on the shared
@@ -262,10 +283,11 @@ class Tau2BenchEnv(Environment):
         self.num_train_tasks = num_train_tasks
         self.num_val_tasks = num_val_tasks
         self.num_test_tasks = num_test_tasks
-        # Normalize explicit id lists to plain python lists of ints (OmegaConf
-        # passes ListConfig objects); keep None when not provided.
+        # Normalize explicit id lists to plain python lists (OmegaConf passes
+        # ListConfig objects); keep None when not provided.
         self.train_task_ids = list(train_task_ids) if train_task_ids is not None else None
         self.eval_task_ids = list(eval_task_ids) if eval_task_ids is not None else None
+        self.task_id_map_file = task_id_map_file
         self.max_steps = max_steps
         self.system_prompt = system_prompt
         self.eval_num_tries = eval_num_tries
@@ -328,38 +350,35 @@ class Tau2BenchEnv(Environment):
 
         all_tasks = registry.get_tasks_loader(self.domain)()
 
-        # --- Explicit task-id selection (Stage-3 RL) ---------------------------
-        # When train_task_ids / eval_task_ids are provided, the corresponding
-        # split is EXACTLY those tau2 task ids (by task.id, else positional
-        # index), overriding the count-based split below. This lets RL train on
-        # our 72 logged tasks and eval on the 42 never-in-logs hold-out. When
-        # both are null we fall through to the original count-based split, so
-        # existing configs/behavior are unchanged.
-        if self.train_task_ids is not None or self.eval_task_ids is not None:
-            train_tasks = (
-                select_tasks_by_ids(all_tasks, self.train_task_ids, domain=self.domain)
-                if self.train_task_ids is not None
-                else []
-            )
-            eval_tasks = (
-                select_tasks_by_ids(all_tasks, self.eval_task_ids, domain=self.domain)
-                if self.eval_task_ids is not None
-                else []
-            )
+        # --- Explicit task-id selection (RL: train on logged tasks, eval on never-seen) ---
+        # Overrides the shuffle-split-by-count below. task.id is round-trippable through
+        # AgentGymEnv(task_id=task.id), so we just filter the canonical list by id.
+        train_ids, eval_ids = self.train_task_ids, self.eval_task_ids
+        if (train_ids is None or eval_ids is None) and self.task_id_map_file:
+            import json as _json
+            _m = _json.loads(open(self.task_id_map_file).read())
+            train_ids = train_ids if train_ids is not None else _m.get("covered_tau2_ids")
+            eval_ids = eval_ids if eval_ids is not None else _m.get("unseen_tau2_ids")
+        if train_ids is not None and eval_ids is not None:
+            by_id = {str(t.id): t for t in all_tasks}
+            train_ids = [str(i) for i in train_ids]
+            eval_ids = [str(i) for i in eval_ids]
+            missing = [i for i in (train_ids + eval_ids) if i not in by_id]
+            if missing:
+                logger.warning("tau2bench %s: %d task ids not found: %s", self.domain, len(missing), missing[:10])
+            all_train_tasks = [by_id[i] for i in train_ids if i in by_id]
+            eval_tasks = [by_id[i] for i in eval_ids if i in by_id]
+            n_te = (self.num_val_tasks if self.num_val_tasks
+                    else max(1, len(all_train_tasks) // 5)) if len(all_train_tasks) > 1 else 0
             datasets = {
-                "train": train_tasks,
-                "train_eval": eval_tasks,
-                "train_all": train_tasks,
+                "train": all_train_tasks[: len(all_train_tasks) - n_te],
+                "train_eval": all_train_tasks[len(all_train_tasks) - n_te:],
+                "train_all": all_train_tasks,
                 "eval": eval_tasks,
                 "test": eval_tasks,
             }
-            for split_name, split_tasks in datasets.items():
-                logger.info(
-                    "tau2bench [%s] %s (explicit-ids): %d tasks",
-                    self.domain,
-                    split_name,
-                    len(split_tasks),
-                )
+            for k, v in datasets.items():
+                logger.info("tau2bench [%s] %s (explicit ids): %d tasks", self.domain, k, len(v))
             return datasets
 
         total_needed = self.num_train_tasks + self.num_test_tasks
@@ -537,40 +556,63 @@ class Tau2BenchEnv(Environment):
 
             if tau2_env._simulation_run is None:
                 return 0.0, _json.dumps({}, indent=2)
-            try:
-                evaluation_result = evaluate_simulation(
-                    simulation=tau2_env._simulation_run,
-                    task=tau2_env._get_task(),
-                    evaluation_type=EvaluationType.ALL_WITH_NL_ASSERTIONS,
-                    solo_mode=tau2_env.solo_mode,
-                    domain=tau2_env.domain,
-                )
-                return evaluation_result.reward, evaluation_result.model_dump_json(indent=2)
-            except Exception as _exc:  # noqa: BLE001
-                # An evaluator crash (e.g. judge emitted unparseable JSON, OpenAI
-                # transient 5xx) used to propagate up and kill the whole training
-                # run after 25min of generation. Now we log + downgrade to a
-                # zero-reward outcome so the rollout terminates cleanly.
-                logger.warning(
-                    "tau2 evaluator failed (%s: %s); returning reward=0.0",
-                    type(_exc).__name__, _exc,
-                )
-                # Persist the offending judge output so we can audit the failure
-                # shape and tighten the JSON shim if a new pattern appears.
+
+            # Retry before giving up: the judge fails stochastically (SDK turn-limit
+            # errors / malformed JSON), so most failures clear on a second attempt.
+            _attempts = max(1, int(getattr(type(self), "JUDGE_MAX_ATTEMPTS", 3)))
+            _exc: Exception | None = None
+            for _attempt in range(_attempts):
+                type(self)._last_bad_judge_output = None
                 try:
-                    _failures_log = _os.path.join("logs", "tau2_judge_failures.jsonl")
-                    _os.makedirs("logs", exist_ok=True)
-                    with open(_failures_log, "a") as _fh:
-                        _fh.write(_json.dumps({
-                            "ts": _time.time(),
-                            "domain": tau2_env.domain,
-                            "task_id": getattr(tau2_env._get_task(), "id", None),
-                            "exc_type": type(_exc).__name__,
-                            "exc_msg": str(_exc),
-                        }) + "\n")
-                except Exception:  # noqa: BLE001 -- diagnostic only
-                    pass
-                return 0.0, _json.dumps({"error": f"{type(_exc).__name__}: {_exc}"}, indent=2)
+                    evaluation_result = evaluate_simulation(
+                        simulation=tau2_env._simulation_run,
+                        task=tau2_env._get_task(),
+                        evaluation_type=EvaluationType.ALL_WITH_NL_ASSERTIONS,
+                        solo_mode=tau2_env.solo_mode,
+                        domain=tau2_env.domain,
+                    )
+                except Exception as _e:  # noqa: BLE001
+                    _exc = _e
+                    logger.warning(
+                        "tau2 evaluator attempt %d/%d failed (%s: %s)",
+                        _attempt + 1, _attempts, type(_e).__name__, _e,
+                    )
+                    continue
+                if _attempt:
+                    logger.info("tau2 evaluator recovered on attempt %d", _attempt + 1)
+                return evaluation_result.reward, evaluation_result.model_dump_json(indent=2)
+
+            # Every attempt failed. Do NOT fabricate reward=0.0: an unscored episode
+            # is not a failed one, and under RLVR (advantage = +1 success / 0 fail, no
+            # baseline) a false zero silently removes the episode's gradient while
+            # still counting against the reported success rate. Mark it unscored via
+            # `judge_failed` in the info payload so the caller can drop the episode.
+            logger.warning(
+                "tau2 evaluator failed after %d attempts (%s: %s); marking episode UNSCORED",
+                _attempts, type(_exc).__name__, _exc,
+            )
+            try:
+                _failures_log = _os.path.join("logs", "tau2_judge_failures.jsonl")
+                _os.makedirs("logs", exist_ok=True)
+                _bad = type(self)._last_bad_judge_output
+                with open(_failures_log, "a") as _fh:
+                    _fh.write(_json.dumps({
+                        "ts": _time.time(),
+                        "domain": tau2_env.domain,
+                        "task_id": getattr(tau2_env._get_task(), "id", None),
+                        "exc_type": type(_exc).__name__,
+                        "exc_msg": str(_exc),
+                        "attempts": _attempts,
+                        # The actual judge text, so a new failure shape is diagnosable
+                        # from the log alone instead of by re-deriving it.
+                        "judge_output": (_bad[:4000] if isinstance(_bad, str) else None),
+                        "judge_output_empty": (not _bad) if _bad is not None else None,
+                    }) + "\n")
+            except Exception:  # noqa: BLE001 -- diagnostic only
+                pass
+            return 0.0, _json.dumps(
+                {"error": f"{type(_exc).__name__}: {_exc}", "judge_failed": True}, indent=2
+            )
 
         tau2_env._get_reward = _patched_get_reward
         self._current_tau2_env = tau2_env  # track for cleanup on next reset
