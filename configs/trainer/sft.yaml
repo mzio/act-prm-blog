@@ -70,3 +70,11 @@ checkpoint_path: "./checkpoints"
 push_to_hub: false
 wandb_project: null
 wandb_name: null
+
+# Supervise ONLY the action tokens (<tool_call>...</tool_call> or a "Final Answer:"
+# suffix), masking the reasoning prefix out of the loss. The thought stays in the
+# INPUT and still conditions the prediction — we just take no gradient on producing
+# it. This makes the trained span identical to the span eval_actiononly_* scores, so
+# the variants are comparable on a same-span basis; otherwise the thought arms spend
+# most of their gradient on tokens the metric never looks at. No-op for actions_only.
+train_action_only: false

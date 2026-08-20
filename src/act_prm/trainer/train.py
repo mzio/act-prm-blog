@@ -21,6 +21,7 @@ from ..generator.huggingface.base import HuggingFaceGenerator
 from ..llm_handlers.huggingface import HuggingFaceLLM
 from ..replay_buffer.types import Trajectory, TrajectoryGroup
 from .data import DataCollatorForPolicyGradient
+from .utils import action_start_token
 
 
 def _dump_per_task_records(
@@ -435,6 +436,7 @@ def prepare_minibatch(
     batch_idx: int = 0,  # for debugging
     max_seq_len: int = 32768,
     drop_zero_advantage: bool = False,
+    train_action_only: bool = False,
     **dataloader_kwargs: Any,
 ) -> tuple[DataLoader, dict[str, Any]]:
     """
@@ -447,10 +449,23 @@ def prepare_minibatch(
     ``len(train_loader)`` → ``gradient_accumulation_steps``, diluting the update
     on the samples that actually carry signal. Kept off by default (uniform / em /
     grpo want all samples).
+
+    ``train_action_only``: restrict the supervised span to the explicit action
+    (the ``<tool_call>…</tool_call>`` block or ``Final Answer:`` suffix), masking
+    out the reasoning prefix. The thought still conditions the prediction — it
+    stays in the input — but no gradient is taken on thought tokens. This makes
+    the trained span identical to the scored span (``eval_actiononly_*``), so the
+    variants are comparable on a same-span basis: without it, the thought arms
+    spend most of their gradient on tokens the metric never looks at. Uses the
+    same ``action_start_token`` boundary as the eval, so train/eval cannot drift.
+    No-op for ``actions_only`` targets, where the action IS the whole target.
     """
     metrics = {}
     n_skipped = 0
     n_zero_adv = 0
+    n_action_tokens_total = 0
+    n_prefix_masked = 0
+    n_no_action_tokens = 0
     # Optional correctness dump: when STRL_VERIFY_DUMP=<path> is set, record, for the first
     # few trainable steps, the exact tokens/logprobs that become the supervised target so the
     # alignment (supervised tokens == action tokens; old_logprobs match them) can be checked
@@ -493,6 +508,36 @@ def prepare_minibatch(
                 padded_mask = [0] * target_state_len + [1] * len(act_logprobs)
                 # Add labels to double-check
                 sa_labels = [-100] * state_len + sa_input_ids[state_len:]
+
+                # Action-only supervision: zero the mask/advantage over the reasoning
+                # prefix so gradient flows ONLY through action tokens. The thought
+                # remains in the input (it still conditions the prediction) — we just
+                # don't train on producing it. Same boundary the eval uses.
+                if train_action_only:
+                    _action_msg = getattr(episode_step, "action", None)
+                    _target_content = (
+                        _action_msg.get("content") if isinstance(_action_msg, dict) else None
+                    )
+                    a_start = action_start_token(
+                        hf_tokenizer, sa_input_ids, state_len, _target_content
+                    )
+                    a_pos = max(0, a_start - 1)  # first action-token prediction position
+                    if a_pos > target_state_len:
+                        n_prefix = min(a_pos, len(padded_mask))
+                        for _i in range(target_state_len, n_prefix):
+                            padded_mask[_i] = 0
+                            padded_advantages[_i] = 0.0
+                        for _i in range(state_len, min(a_start, len(sa_labels))):
+                            sa_labels[_i] = -100
+                        n_prefix_masked += n_prefix - target_state_len
+                    n_action_tokens_total += sum(padded_mask)
+                    # A step whose action span masked away entirely carries no gradient
+                    # but would still inflate len(train_loader) -> gradient_accumulation_steps,
+                    # diluting the update on the steps that do (same reasoning as
+                    # drop_zero_advantage). Drop it.
+                    if sum(padded_mask) == 0:
+                        n_no_action_tokens += 1
+                        continue
                 # sa_labels = [-100] * target_state_len + sa_input_ids[target_state_len:]
 
                 # print(f"batch_idx: {batch_idx}")
@@ -558,6 +603,13 @@ def prepare_minibatch(
         )
     metrics["n_skipped_seq_len"] = n_skipped
     metrics["n_dropped_zero_advantage"] = n_zero_adv
+    if train_action_only:
+        # Visibility on how much of the target the action-only mask removed --
+        # if prefix_masked dwarfs action_tokens, the thought arms are training on
+        # very few tokens per step and may need more batches than the actions_only arm.
+        metrics["train_action_tokens"] = n_action_tokens_total
+        metrics["train_prefix_tokens_masked"] = n_prefix_masked
+        metrics["n_dropped_no_action_tokens"] = n_no_action_tokens
     if _verify_path is not None:
         with open(_verify_path, "w") as _vf:
             json.dump(

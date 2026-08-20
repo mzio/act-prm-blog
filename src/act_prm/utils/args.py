@@ -510,6 +510,17 @@ def get_args() -> argparse.Namespace:
     ## Training Updates
     parser.add_argument("--advantage_threshold", type=float)
     parser.add_argument("--learning_rate", type=float)
+    parser.add_argument(
+        "--train_action_only",
+        action="store_true",
+        default=None,
+        help=(
+            "Supervise ONLY the action tokens (<tool_call>...</tool_call> / Final Answer:), "
+            "masking the reasoning prefix out of the loss. The thought stays in the input and "
+            "still conditions the prediction; no gradient is taken on producing it. Makes the "
+            "trained span identical to the eval_actiononly_* scored span."
+        ),
+    )
     parser.add_argument("--kl_penalty_coef", type=float)
     parser.add_argument("--kl_discount_factor", type=float)
     parser.add_argument(

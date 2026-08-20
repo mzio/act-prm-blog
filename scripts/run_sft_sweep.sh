@@ -37,6 +37,14 @@ EXTRA=(); [ -n "$NUM_BATCHES" ] && EXTRA+=(--num_batches "$NUM_BATCHES")
 [ -n "$EVAL_EVERY" ] && EXTRA+=(--eval_every "$EVAL_EVERY")
 [ "$PATIENCE" != "0" ] && EXTRA+=(--early_stop_patience "$PATIENCE")
 ONLY="${VARIANTS:-}"   # space-separated variant labels to restrict to (default: all)
+# ACTION_ONLY=1: supervise only the <tool_call>/Final Answer: tokens, masking the
+# reasoning prefix out of the loss (the thought stays in the input and still
+# conditions the prediction). Makes the TRAINED span identical to the span
+# eval_actiononly_ppl/accuracy score, so the variants are compared like-for-like.
+# Tagged _ao so these never collide with the whole-span runs.
+ACTION_ONLY="${ACTION_ONLY:-0}"
+AOTAG=""
+if [ "$ACTION_ONLY" = 1 ]; then EXTRA+=(--train_action_only); AOTAG="_ao"; fi
 # Model is parametrized: MODEL_CFG selects both the <MODEL> path dir AND (exported for the
 # train_sft.sh children) their --model_config. Default keeps 4B behavior.
 MODEL="${MODEL_CFG:-hf_qwen3_4b_instruct}"; export MODEL_CFG="$MODEL"
@@ -53,7 +61,7 @@ corpus_ok(){ [ -s "$1/train.json" ] && [ "$(python3 -c "import json;print(len(js
 run_one(){  # $1=sft_variant  $2=label(run_tag)  $3=regime(hide|full)  $4..=extra flags
   local variant=$1 label=$2 regime=$3; shift 3
   if [ -n "$ONLY" ] && [[ " $ONLY " != *" $label "* ]]; then return 0; fi
-  local tag="${DOM}_s2_${label}${LRTAG}_heldout"; [ "$regime" = full ] && tag="${tag}_fullctx"
+  local tag="${DOM}_s2_${label}${AOTAG}${LRTAG}_heldout"; [ "$regime" = full ] && tag="${tag}_fullctx"
   if [ -n "$(newest "$CKROOT/${tag}-*/step_best")" ]; then log "$tag: done, skip"; return 0; fi
   local fc=(); [ "$regime" = full ] && fc=(SFT_FULLCTX=1)
   log "$tag: SFT ($regime-obs, lr=${LR:-default}) $*"

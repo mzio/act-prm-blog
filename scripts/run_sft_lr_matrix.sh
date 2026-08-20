@@ -22,6 +22,8 @@ cd "$(dirname "$0")/.."
 export PATH="$HOME/.local/bin:$HOME/.cargo/bin:/usr/local/bin:$PATH"
 
 LRS="${LRS:-1e-4 1e-3}"
+# Action-only supervision on by default for this sweep: train the span we score.
+export ACTION_ONLY="${ACTION_ONLY:-1}"
 ENVS="${ENVS:-act_prm/tau2_retail act_prm/tau2_airline act_prm/snorkel_finance_split}"
 DRY="${DRY:-0}"
 MDIR=/tmp/aprm/lrmatrix; mkdir -p "$MDIR"
