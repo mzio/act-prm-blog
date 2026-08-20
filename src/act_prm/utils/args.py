@@ -546,7 +546,6 @@ def get_args() -> argparse.Namespace:
 
     ## More Evaluation
     parser.add_argument("--eval_every", type=int, help="Iters to evaluate, 0 = disabled")
-    parser.add_argument("--early_stop_patience", type=int, help="Stop if eval best_metric doesn't improve for N consecutive evals (0=off)")
     parser.add_argument("--eval_gen_every", type=int, help="Iters to evaluate generation, 0 = disabled")
     parser.add_argument(
         "--eval_rollout_every",
