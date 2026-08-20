@@ -42,6 +42,10 @@ EXTRA=(); [ -n "$NUM_BATCHES" ] && EXTRA+=(--num_batches "$NUM_BATCHES")
 [ -n "$EVAL_EVERY" ] && EXTRA+=(--eval_every "$EVAL_EVERY")
 [ "$PATIENCE" != "0" ] && EXTRA+=(--early_stop_patience "$PATIENCE")
 ONLY="${VARIANTS:-}"   # space-separated variant labels to restrict to (default: all)
+# Which context regimes this invocation covers. Default both, but the matrix driver
+# passes one at a time so it can run regime-major: ALL hide arms across every dataset
+# before any full-context arm.
+REGIMES="${REGIMES:-hide full}"
 # ACTION_ONLY=1: supervise only the <tool_call>/Final Answer: tokens, masking the
 # reasoning prefix out of the loss (the thought stays in the input and still
 # conditions the prediction). Makes the TRAINED span identical to the span
@@ -89,7 +93,7 @@ for k in "" _last; do
 done
 
 log "=== SFT sweep $ENVCFG : {actions_only, expert_thoughts, thoughts_{policy,base}x{best,last}} x {hide,full} ==="
-for regime in hide full; do
+for regime in $REGIMES; do
   run_one actions_only    actions_only    "$regime"
   run_one expert_thoughts expert_thoughts "$regime"
   for k in "" _last; do   # "" = step_best corpus, _last = step_last corpus

@@ -59,23 +59,29 @@ done
 
 # LR-major so a full LR tier finishes across all datasets before the next starts:
 # if 1e-3 turns out to diverge, the 1e-4 tier is already complete and usable.
+# REGIME-MAJOR: every hide arm across all three datasets first, then full-context.
+# The hide regime is the one the Stage-3 RL pipeline consumes, so it is the set worth
+# completing first; full-context is the replication check.
+for regime in ${REGIMES:-hide full}; do
 for lr in $LRS; do
   for env in $ENVS; do
-    log "--- lr=$lr env=$env"
+    log "--- regime=$regime lr=$lr env=$env"
     if [ "$DRY" = 1 ]; then
       LR="$lr" SFT_DRY_RUN=1 ./scripts/run_sft_sweep.sh "$env" 2>&1 | sed 's/^/    /'
       continue
     fi
-    LR="$lr" ./scripts/run_sft_sweep.sh "$env" >> "$MDIR/lr${lr}_${env##*/}.log" 2>&1 \
-      && log "lr=$lr $env: sweep done" || log "lr=$lr $env: sweep FAILED (see $MDIR/lr${lr}_${env##*/}.log)"
+    LR="$lr" REGIMES="$regime" ./scripts/run_sft_sweep.sh "$env" >> "$MDIR/lr${lr}_${regime}_${env##*/}.log" 2>&1 \
+      && log "regime=$regime lr=$lr $env: sweep done" || log "regime=$regime lr=$lr $env: sweep FAILED"
   done
-  log "=== LR tier $lr complete across all datasets ==="
+  log "=== regime=$regime lr=$lr complete across all datasets ==="
   # Refresh the per-dataset SFT notes/CSVs as each tier lands, so results are
   # readable without waiting for the whole matrix.
   for env in $ENVS; do
     uv run --no-project python scripts/analyze_sft.py "$env" >/dev/null 2>&1 || true
   done
 done
+done
+
 # Marker so watch_sft_sweep.sh stops relaunching a no-op matrix every 5 min and exits.
 touch "$MDIR/DONE"
 log "=== LR matrix done ==="

@@ -39,6 +39,35 @@ if [ ! -f "$G/lrprobe/thoughts_base.done" ]; then
   exit 0
 fi
 
+# 2b. Back-fill .done for arms whose metrics reached the final batch but were never
+# marked (driver restarted mid-arm). Without this a reorder or restart silently re-runs
+# finished work -- ~2.5h each.
+uv run --no-project python - <<'BACKFILL' >> "$G/guard.log" 2>&1 || true
+import glob, json, os, re
+for env, dom in [("act_prm_tau2_retail","retail"),("act_prm_tau2_airline","airline"),
+                 ("act_prm_snorkel_finance_split","snorkel_finance_split")]:
+    mdir = f"/tmp/aprm/sft_sweep_{'tau2_'+dom if dom in ('retail','airline') else dom}"
+    if not os.path.isdir(mdir):
+        continue
+    for d in glob.glob(f"logs/{env}/hf_qwen3_4b_instruct/{dom}_s2_*_lr*_heldout*/"):
+        tag = os.path.basename(d.rstrip('/')).split('-act-prm')[0]
+        marker = f"{mdir}/{tag}.done"
+        if os.path.exists(marker):
+            continue
+        m = re.search(r'-nb=(\d+)', d)
+        if not m:
+            continue
+        nb = int(m.group(1))
+        try:
+            rows = [json.loads(l) for l in open(d + "metrics.jsonl") if l.strip()]
+        except Exception:
+            continue
+        last = max((r.get("progress/batch", -1) for r in rows), default=-1)
+        if last >= nb - 1:
+            open(marker, "w").close()
+            print(f"back-filled .done: {tag} (reached b{last}/{nb})")
+BACKFILL
+
 # 3. keep the matrix moving
 if [ -f "$G/lrmatrix/DONE" ]; then exit 0; fi
 log "matrix idle -> advancing it"
