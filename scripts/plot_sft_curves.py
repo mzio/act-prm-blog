@@ -119,6 +119,12 @@ def main():
     ap.add_argument("--span", choices=["subspan", "whole"], default="subspan")
     ap.add_argument("--model", default="hf_qwen3_4b_instruct")
     ap.add_argument("--out", default="notebooks/figs_sft")
+    ap.add_argument(
+        "--match", default="",
+        help="only plot variants whose name contains this substring, e.g. '_ao_lr1e-4'. "
+             "Default '' keeps the six original whole-span lr=4e-5 arms.",
+    )
+    ap.add_argument("--suffix", default="", help="appended to the output filename")
     args = ap.parse_args()
 
     sub = args.span == "subspan"
@@ -143,6 +149,20 @@ def main():
     outdir.mkdir(parents=True, exist_ok=True)
     data = {dom: load_runs(env, dom, args.model) for env, dom, _ in DOMAINS}
 
+    # Variant list: the fixed six by default, else every variant matching --match
+    # (the LR sweep tags carry _ao / _lr… in the variant name). Hues stay assigned by
+    # position in a stable sorted order so a method keeps its colour across figures.
+    if args.match:
+        found = sorted({v for d in data.values() for (v, _r) in d if args.match in v})
+        if not found:
+            print(f"no variants matching {args.match!r}"); return
+        palette = [c for _, _, c in VARIANTS] + ["#4a3aa7", "#e34948"]
+        variants = [(v, v, palette[i % len(palette)]) for i, v in enumerate(found)]
+    else:
+        variants = VARIANTS
+        keep = {v for v, _, _ in VARIANTS}
+        data = {d: {k: r for k, r in runs.items() if k[0] in keep} for d, runs in data.items()}
+
     for regime in ("hide", "full"):
         fig, axes = plt.subplots(len(ROWS), len(DOMAINS),
                                  figsize=(5.2 * len(DOMAINS), 3.7 * len(ROWS)))
@@ -151,7 +171,7 @@ def main():
             for r, (rowtitle, keys, ylab, lower_better) in enumerate(ROWS):
                 ax = axes[r][col]
                 used_key = None
-                for variant, label, color in VARIANTS:
+                for variant, label, color in variants:
                     rows = data[dom].get((variant, regime))
                     if not rows:
                         continue
@@ -198,7 +218,7 @@ def main():
             fontsize=13, color="#1a1a19", x=0.005, ha="left", y=1.0,
         )
         fig.tight_layout(rect=(0, 0.045, 1, 0.965))
-        path = outdir / f"sft_curves_{args.span}_{regime}.png"
+        path = outdir / f"sft_curves_{args.span}_{regime}{args.suffix}.png"
         fig.savefig(path, dpi=160, bbox_inches="tight")
         plt.close(fig)
         print(f"wrote {path}")
