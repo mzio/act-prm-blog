@@ -24,7 +24,11 @@ DOM="${ENVNAME#tau2_}"                      # retail / airline (matches existing
 # init (max|B@A| ~ 4e-5 vs base weights ~1e-2), which is why this knob exists.
 LR="${LR:-}"
 LR_ARGS=(); LRTAG=""
-if [ -n "$LR" ]; then LR_ARGS=(--learning_rate "$LR"); LRTAG="_lr${LR}"; fi
+# NB sanitize the LR for the tag: main_pytorch's run-name builder rewrites "-" and "."
+# to "_", so a tag of _lr1e-4 lands on disk as _lr1e_4 and the step_best skip-glob below
+# would never match -> the sweep would re-run finished work forever. Pre-sanitize so the
+# tag we search for is the tag that exists.
+if [ -n "$LR" ]; then LR_ARGS=(--learning_rate "$LR"); LRTAG="_lr${LR//[-.]/_}"; fi
 # Short-probe knobs: cheap validation that the adapter actually moves before
 # committing the full matrix (NUM_BATCHES=8 EVAL_EVERY=2 VARIANTS=actions_only).
 NUM_BATCHES="${NUM_BATCHES:-}"
