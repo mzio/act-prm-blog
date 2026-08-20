@@ -24,6 +24,12 @@ export PATH="$HOME/.local/bin:$HOME/.cargo/bin:/usr/local/bin:$PATH"
 LRS="${LRS:-1e-4 1e-3}"
 # Action-only supervision on by default for this sweep: train the span we score.
 export ACTION_ONLY="${ACTION_ONLY:-1}"
+# Best-checkpoint thought corpora only. The _last flavours (relabelled from the EM
+# step_last rather than step_best) were within noise of their best counterparts in the
+# lr=4e-5 results (retail hide subspan: thoughts_base 3.173 vs _last 3.193;
+# thoughts_policy 3.182 vs _last 3.208), and dropping them takes the matrix from 72
+# runs to 48. Set VARIANTS="" to sweep all six again.
+export VARIANTS="${VARIANTS-actions_only expert_thoughts thoughts_policy thoughts_base}"
 ENVS="${ENVS:-act_prm/tau2_retail act_prm/tau2_airline act_prm/snorkel_finance_split}"
 DRY="${DRY:-0}"
 MDIR=/tmp/aprm/lrmatrix; mkdir -p "$MDIR"
