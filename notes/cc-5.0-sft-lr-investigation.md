@@ -224,6 +224,39 @@ a properly trained baseline is far better than the broken one (2.34 vs 3.84).
 
 Figures: `notebooks/figs_sft/sft_curves_subspan_hide_lr3e3.png`.
 
+## CROSS-DOMAIN (hide, 3e-3, 150 batches) — retail + airline complete, finance partial
+
+| domain | baseline | Act-PRM (policy) | Act-PRM (base) | oracle | oracle gap | recovery (policy) |
+|---|---|---|---|---|---|---|
+| retail | 2.3422 | 2.2059 | 2.2003 | 2.1071 | **10.04%** | **58%** |
+| airline | 2.4506 | 2.3868 | 2.3981 | 2.3383 | **4.58%** | **57%** |
+| finance | 1.8930 | 1.8486* | running | 1.8589 | **1.80%** | 130%* |
+
+\* finance thoughts_policy still running at b104.
+
+Accuracy: retail 0.7726 / 0.7925 / 0.7973 (gap 2.47pp, 81% recovered); airline 0.7629 /
+0.7691 / 0.7732 (gap 1.03pp, 60%); finance 0.8398 / 0.8575 / 0.8455 (gap 0.57pp — Act-PRM
+above the oracle).
+
+**Finding 1 — the recovery fraction replicates.** 58% (retail) and 57% (airline) on PPL,
+across domains whose oracle gaps differ by more than 2×. This is the Act-PRM claim in its
+robust form: inferred thoughts capture a stable *fraction* of what expert thoughts buy.
+
+**Finding 2 — how much thoughts help at all is strongly domain-dependent** and shrinks
+sharply: 10.0% → 4.6% → 1.8%. On finance the expert-thought advantage is nearly nil.
+
+**Finding 3 — on finance the inferred thoughts currently BEAT the expert oracle**
+(1.8486 vs 1.8589 PPL; 0.8575 vs 0.8455 accuracy). Consistent with self-generated thoughts
+being better matched to the model than borrowed GPT-5-mini ones. But with a 1.80% oracle
+gap the recovery *ratio* is meaningless (the accuracy version comes out at 311%), so
+finance should be reported in absolute terms only: Act-PRM 2.3% better than baseline,
+expert thoughts 1.8% better — too close on a 25-task eval to rank.
+
+**Correction to an earlier claim.** From retail alone I concluded the effect "does not
+hinge on the scorer choice" (the two Act-PRM variants agreed to 0.006 PPL). Airline breaks
+that: `thoughts_base` recovers 47% PPL / 15% accuracy against `thoughts_policy`'s 57% /
+60%. The scorer choice *is* domain-dependent; the retail agreement was not general.
+
 ## Open questions
 
 - **Accuracy does not move.** At 1e-3, PPL improves 4.31% while held-out accuracy goes
