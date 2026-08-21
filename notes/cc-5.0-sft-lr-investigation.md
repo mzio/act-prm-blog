@@ -197,31 +197,32 @@ Still to come: `thoughts_policy` and `thoughts_base` — the actual Act-PRM arms
 question they answer is how much of this 9.7% / 2.4pp oracle gap the *inferred* thoughts
 recover.
 
-## HEADLINE: the Act-PRM result at a working LR (retail, hide, 3e-3, 150 batches)
+## HEADLINE: retail hide, all four arms converged (lr 3e-3, 150 batches)
 
-All three arms converged:
+| arm | PPL | vs base | accuracy | vs base | PPL gap recovered | acc gap recovered |
+|---|---|---|---|---|---|---|
+| actions_only (baseline) | 2.3422 | — | 0.7726 | — | — | — |
+| thoughts_base (Act-PRM, base-scored) | 2.2003 | 6.06% | 0.7890 | +1.64pp | **60%** | **66%** |
+| thoughts_policy (Act-PRM, policy-scored) | 2.2059 | 5.82% | 0.7925 | +1.99pp | **58%** | **81%** |
+| expert_thoughts (oracle) | 2.1071 | 10.04% | 0.7973 | +2.47pp | — | — |
 
-| arm | PPL | vs baseline | accuracy | vs baseline |
-|---|---|---|---|---|
-| actions_only (baseline) | 2.3422 | — | 0.7726 | — |
-| **thoughts_policy (Act-PRM)** | **2.2059** | **5.82%** | **0.7925** | **+1.99pp** |
-| expert_thoughts (oracle) | 2.1071 | 10.04% | 0.7973 | +2.47pp |
+Oracle gap: 0.2351 PPL / 2.47pp accuracy.
 
-**Act-PRM recovers 58% of the oracle PPL gap and 81% of the oracle accuracy gap.**
+Three things this establishes on retail:
 
-Compare the same recovery computed on the old, untrained (4e-5) numbers: **71% PPL /
-76% accuracy**. So the *qualitative* story is intact — inferred thoughts sit between
-actions-only and the expert oracle and recover most of the way — and the ordering is
-unchanged.
+1. **The ordering holds**: baseline < Act-PRM < oracle, monotone on both metrics.
+2. **Act-PRM recovers ~60% of the oracle PPL gap and 66–81% of the accuracy gap.**
+3. **The two Act-PRM variants agree to 0.0056 PPL and 0.35pp accuracy** despite being
+   scored by different models — so the effect does not hinge on the scorer choice. (They
+   swap rank between the two metrics, which is a good reminder that a 0.006 PPL
+   difference is not a result.)
 
-What changes is the **magnitude**. The oracle's advantage over the baseline fell from
-24.0% to 10.0% PPL (and +2.9pp to +2.5pp accuracy) once the baseline was trained
-properly. The headline "thoughts help" claim survives at roughly half the effect size;
-the "Act-PRM recovers most of it" claim survives largely intact.
+Against the old untrained numbers the recovery fractions were 71% PPL / 76% accuracy — so
+the *qualitative* Act-PRM claim survives essentially intact. What does not survive is the
+magnitude: the oracle's advantage over the baseline fell from 24.0% to 10.0% PPL, because
+a properly trained baseline is far better than the broken one (2.34 vs 3.84).
 
-Accuracy is the friendlier framing of the two: the Act-PRM arm recovers 81% of the oracle
-accuracy gap, and accuracy is the quantity closest to "does the agent pick the right
-action".
+Figures: `notebooks/figs_sft/sft_curves_subspan_hide_lr3e3.png`.
 
 ## Open questions
 
