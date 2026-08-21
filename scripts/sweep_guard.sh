@@ -68,6 +68,18 @@ for env, dom in [("act_prm_tau2_retail","retail"),("act_prm_tau2_airline","airli
             print(f"back-filled .done: {tag} (reached b{last}/{nb})")
 BACKFILL
 
+# 2c. Rollout eval of the finished hide-regime SFT checkpoints, BEFORE the full-context
+# arms. Scores TASK COMPLETION in the live tau2 gym rather than teacher-forced PPL, on
+# never-in-logs tasks (retail 42 / airline 18). Prioritised because it is the metric the
+# Act-PRM story is actually about, and the hide matrix it evaluates is already complete.
+if [ ! -f "$G/rollout/ALLDONE" ]; then
+  log "advancing the SFT rollout eval (task completion)"
+  ./scripts/run_sft_rollout_eval.sh >> "$G/rollout/driver.log" 2>&1
+  n=$(ls "$G"/rollout/*_lr3e_3.done 2>/dev/null | wc -l)
+  [ "$n" -ge 8 ] && { touch "$G/rollout/ALLDONE"; log "rollout eval complete ($n/8)"; }
+  exit 0
+fi
+
 # 3. keep the matrix moving
 if [ -f "$G/lrmatrix/DONE" ]; then exit 0; fi
 log "matrix idle -> advancing it"
