@@ -78,6 +78,12 @@ run_one(){  # $1=sft_variant  $2=label(run_tag)  $3=regime(hide|full)  $4..=extr
   local fc=(); [ "$regime" = full ] && fc=(SFT_FULLCTX=1)
   log "$tag: SFT ($regime-obs, lr=${LR:-default}) $*"
   wait_gpu_free
+  # RE-CHECK after waiting. wait_gpu_free can block for hours behind another run, and in
+  # that window a different driver may have completed this very arm -- which is exactly
+  # what happened on 08-20: a sweep queued at 14:14 waited 3.5h for a trainer that was
+  # finishing THIS arm, then launched a duplicate into the same log dir and began
+  # overwriting the finished curve.
+  if [ -f "$MDIR/${tag}.done" ]; then log "$tag: completed by another driver while waiting, skip"; return 0; fi
   env "${fc[@]}" ./scripts/train_sft.sh "$ENVCFG" "$variant" \
       --run_tag "$tag" --best_metric eval_action_ppl \
       "${LR_ARGS[@]}" "${EXTRA[@]}" "$@" > "$MDIR/${tag}.log" 2>&1 \
