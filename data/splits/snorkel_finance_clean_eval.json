@@ -1,8 +1,8 @@
 {
- "note": "finqa_reasoning ids never seen by Stage-1 EM or Stage-2 SFT (complement of act_prm_train u act_prm_eval, matched by question text, 100% match rate)",
+ "note": "finqa_reasoning question ids with NO usable trajectory in the aprm dataset, hence never seen by Stage-1 EM, Stage-2 SFT or any eval. The cleanest possible rollout / RL hold-out for the snorkel_finance gym.",
  "n_total": 79,
- "n_train": 45,
- "n_eval": 21,
+ "n_used_by_v2": 51,
+ "n_clean": 28,
  "clean_ids": [
   "4",
   "5",
@@ -26,7 +26,6 @@
   "55",
   "57",
   "65",
-  "67",
   "68",
   "69",
   "70",
