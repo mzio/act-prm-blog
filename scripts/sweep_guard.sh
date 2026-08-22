@@ -76,7 +76,15 @@ if [ ! -f "$G/rollout/ALLDONE" ]; then
   log "advancing the SFT rollout eval (task completion)"
   ./scripts/run_sft_rollout_eval.sh >> "$G/rollout/driver.log" 2>&1
   n=$(ls "$G"/rollout/*_lr3e_3.done 2>/dev/null | wc -l)
-  [ "$n" -ge 8 ] && { touch "$G/rollout/ALLDONE"; log "rollout eval complete ($n/8)"; }
+  if [ "$n" -ge 8 ]; then
+    # hide pass done -> run the same 8 checkpoints with FULL context at rollout time.
+    # Deliberate train/test mismatch: do policies trained on a compacted context
+    # generalise when handed the whole thing?
+    log "hide rollout complete ($n/8) -> starting the full-context rollout pass"
+    REGIME=full ./scripts/run_sft_rollout_eval.sh >> "$G/rollout/driver_full.log" 2>&1
+    m=$(ls "$G"/rollout/*_lr3e_3_fullctx.done 2>/dev/null | wc -l)
+    [ "$m" -ge 8 ] && { touch "$G/rollout/ALLDONE"; log "rollout eval complete: hide $n/8, full $m/8"; }
+  fi
   exit 0
 fi
 

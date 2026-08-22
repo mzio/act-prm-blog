@@ -28,6 +28,13 @@ MODEL="${MODEL_CFG:-hf_qwen3_4b_instruct}"; export MODEL_CFG="$MODEL"
 MDIR=/tmp/aprm/rollout; mkdir -p "$MDIR"
 SMOKE="${SMOKE:-0}"
 MAX_TURNS="${MAX_TURNS:-20}"
+# REGIME=hide  : --hide_observations, matching how the checkpoints were trained.
+# REGIME=full  : same checkpoints, FULL context at rollout time. A train/test mismatch on
+#                purpose -- it asks whether a policy trained to act on a compacted context
+#                generalises when given the whole thing. Tagged _fullctx so the two passes
+#                never collide.
+REGIME="${REGIME:-hide}"
+if [ "$REGIME" = full ]; then HIDE_ARGS=(); RTAG="_fullctx"; else HIDE_ARGS=(--hide_observations); RTAG=""; fi
 VARIANTS="${VARIANTS:-actions_only expert_thoughts thoughts_policy thoughts_base}"
 log(){ echo "[$(date '+%m-%d %H:%M:%S')] $*" | tee -a "$MDIR/rollout.log"; }
 wait_gpu_free(){ while pgrep -f '[m]ain_pytorch.py' >/dev/null 2>&1; do sleep 60; done; sleep 10; }
@@ -43,7 +50,7 @@ run_one(){  # $1=domain  $2=variant  $3=eval ids  $4=throwaway train id
   local envdir="act_prm_tau2_${dom}"
   local ck; ck=$(newest "checkpoints_lora/$envdir/$MODEL/${dom}_s2_${v}_lr3e_3_nb150_heldout-*/step_best")
   [ -z "$ck" ] && { log "ROLLOUT $dom/$v: no checkpoint, skip"; return; }
-  local tag="${dom}_rollout_${v}_lr3e_3"
+  local tag="${dom}_rollout_${v}_lr3e_3${RTAG}"
   [ "$SMOKE" = 1 ] && tag="${tag}_smoke"
   if [ -f "$MDIR/${tag}.done" ]; then log "ROLLOUT $dom/$v: done, skip"; return; fi
   local nb=(--num_batches 1 --eval_every 1) turns=(--max_turns "$MAX_TURNS")
@@ -53,14 +60,14 @@ run_one(){  # $1=domain  $2=variant  $3=eval ids  $4=throwaway train id
   ./scripts/train_rl_from_sft.sh "$dom" "$ck" --run_tag "$tag" \
       --generator_config hf_rlvr --env_config "tau2bench/${dom}_rlvr" \
       --no_train "${nb[@]}" --group_size 2 --batch_size 1 \
-      "${turns[@]}" --max_tokens 2048 --discount_factor 1.0 --hide_observations \
+      "${turns[@]}" --max_tokens 2048 --discount_factor 1.0 "${HIDE_ARGS[@]}" \
       --train_task_ids "$tid" --eval_task_ids $ids \
       > "$MDIR/${tag}.log" 2>&1 \
     && { touch "$MDIR/${tag}.done"; log "ROLLOUT $dom/$v: done"; } \
     || log "ROLLOUT $dom/$v: FAILED (see $MDIR/${tag}.log)"
 }
 
-log "=== SFT rollout eval (task completion) smoke=$SMOKE turns=$MAX_TURNS ==="
+log "=== SFT rollout eval (task completion) regime=$REGIME smoke=$SMOKE turns=$MAX_TURNS ==="
 log "  retail hold-out: $(echo $RETAIL_IDS | wc -w) tasks | airline hold-out: $(echo $AIRLINE_IDS | wc -w) tasks"
 for v in $VARIANTS; do run_one retail  "$v" "$RETAIL_IDS"  "$RETAIL_TRAIN";  done
 for v in $VARIANTS; do run_one airline "$v" "$AIRLINE_IDS" "$AIRLINE_TRAIN"; done
