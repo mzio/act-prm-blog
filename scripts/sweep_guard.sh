@@ -29,7 +29,7 @@ if pgrep -f '[m]ain_pytorch.py' >/dev/null 2>&1; then exit 0; fi
 # Any of OUR driver shells mid-launch -> let it be. This list must include every driver
 # the guard can start; omitting one (run_matched_control) let cron launch a SECOND copy
 # of a control run that was already going, and both appended to the same metrics.jsonl.
-if ps -eo args | grep -qE 'scripts/(run_sft_lr_matrix|run_sft_sweep|probe_sft_lr|run_matched_control|run_expert_all|run_sft_rollout_eval)\.sh'; then exit 0; fi
+if ps -eo args | grep -qE 'scripts/(run_sft_lr_matrix|run_sft_sweep|probe_sft_lr|run_matched_control|run_expert_all|run_sft_rollout_eval|run_finance_v3)\.sh'; then exit 0; fi
 
 # 2. thoughts_base LR probe (once)
 if [ ! -f "$G/lrprobe/thoughts_base.done" ]; then
@@ -107,11 +107,12 @@ if [ ! -f "$G/expert_all/ALLDONE" ]; then
   exit 0
 fi
 
-# 2f. Finance v2: same training pools, CLEAN eval (v1 eval was 76% contaminated at the
-# question level). Produces honest train/eval action-span curves + final checkpoints.
-if [ ! -f "$G/finance_v2/ALLDONE" ]; then
-  log "advancing finance v2 Stage-2"
-  ./scripts/run_finance_v2.sh >> "$G/finance_v2/driver.log" 2>&1
+# 2f. Finance v3: QUESTION-level 40/10 split, subselected from the existing pools (v1 eval
+# was 76% contaminated at the question level). Honest train/eval action-span curves +
+# final checkpoints for rollout on the 10 eval questions and the 29 expert-failure questions.
+if [ ! -f "$G/finance_v3/ALLDONE" ]; then
+  log "advancing finance v3 Stage-2"
+  ./scripts/run_finance_v3.sh >> "$G/finance_v3/driver.log" 2>&1
   exit 0
 fi
 
