@@ -390,6 +390,17 @@ def get_args() -> argparse.Namespace:
         help="Explicit tau2 task ids for the train split (overrides count-based split)",
     )
     parser.add_argument(
+        "--eval_query_ids",
+        nargs="+",
+        type=str,
+        default=None,
+        help=(
+            "Explicit finqa question ids for the snorkel_finance gym eval split. The aprm "
+            "finance data leaks at the QUESTION level (many uids share a question), so eval "
+            "sets must be chosen by question id rather than by fraction."
+        ),
+    )
+    parser.add_argument(
         "--eval_task_ids",
         type=int,
         nargs="+",

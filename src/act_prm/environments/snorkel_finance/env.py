@@ -85,6 +85,12 @@ class SnorkelFinanceEnv(Environment):
         num_train_samples: int | None = None,
         num_val_samples: int | None = None,
         num_test_samples: int | None = None,
+        # Explicit finqa question-id selection. The env's own frac split cannot express
+        # the split we need: the aprm finance data leaks at the QUESTION level (many uids
+        # share a question), so eval/rollout sets must be chosen by question id, not by
+        # fraction. train_query_ids / eval_query_ids override the fractional split.
+        train_query_ids: list | None = None,
+        eval_query_ids: list | None = None,
         frac_train: float = 0.6,
         frac_val: float = 0.2,
         frac_test: float = 0.2,
@@ -117,6 +123,8 @@ class SnorkelFinanceEnv(Environment):
         self.num_train_samples = num_train_samples
         self.num_val_samples = num_val_samples
         self.num_test_samples = num_test_samples
+        self.train_query_ids = [str(i) for i in train_query_ids] if train_query_ids is not None else None
+        self.eval_query_ids = [str(i) for i in eval_query_ids] if eval_query_ids is not None else None
         self.frac_train = frac_train
         self.frac_val = frac_val
         self.frac_test = frac_test
@@ -185,6 +193,21 @@ class SnorkelFinanceEnv(Environment):
 
     def _get_splits(self, dataset: Dataset) -> DatasetDict:
         """Split dataset into train/eval/test."""
+        if self.train_query_ids is not None or self.eval_query_ids is not None:
+            # Explicit question-id selection, overriding the fractional split.
+            tr = set(self.train_query_ids or [])
+            ev = set(self.eval_query_ids or [])
+            idx_tr = [i for i, q in enumerate(dataset["query_id"]) if str(q) in tr]
+            idx_ev = [i for i, q in enumerate(dataset["query_id"]) if str(q) in ev]
+            missing = (tr | ev) - {str(q) for q in dataset["query_id"]}
+            if missing:
+                logger.warning("snorkel_finance: %d requested query_ids not in the benchmark: %s",
+                               len(missing), sorted(missing)[:10])
+            d_tr = dataset.select(idx_tr) if idx_tr else dataset.select([])
+            d_ev = dataset.select(idx_ev) if idx_ev else dataset.select([])
+            logger.info("snorkel_finance (explicit ids): train=%d eval=%d", len(d_tr), len(d_ev))
+            return DatasetDict({"train": d_tr if idx_tr else d_ev, "eval": d_ev, "test": d_ev})
+
         if self.eval_all_samples:
             # Evaluate over the entire dataset: all splits = full set.
             return DatasetDict({"train": dataset, "eval": dataset, "test": dataset})

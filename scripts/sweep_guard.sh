@@ -29,7 +29,7 @@ if pgrep -f '[m]ain_pytorch.py' >/dev/null 2>&1; then exit 0; fi
 # Any of OUR driver shells mid-launch -> let it be. This list must include every driver
 # the guard can start; omitting one (run_matched_control) let cron launch a SECOND copy
 # of a control run that was already going, and both appended to the same metrics.jsonl.
-if ps -eo args | grep -qE 'scripts/(run_sft_lr_matrix|run_sft_sweep|probe_sft_lr|run_matched_control|run_expert_all|run_sft_rollout_eval|run_finance_v3)\.sh'; then exit 0; fi
+if ps -eo args | grep -qE 'scripts/(run_sft_lr_matrix|run_sft_sweep|probe_sft_lr|run_matched_control|run_expert_all|run_sft_rollout_eval|run_finance_v3|run_finance_rollout)\.sh'; then exit 0; fi
 
 # 2. thoughts_base LR probe (once)
 if [ ! -f "$G/lrprobe/thoughts_base.done" ]; then
@@ -113,6 +113,15 @@ fi
 if [ ! -f "$G/finance_v3/ALLDONE" ]; then
   log "advancing finance v3 Stage-2"
   ./scripts/run_finance_v3.sh >> "$G/finance_v3/driver.log" 2>&1
+  exit 0
+fi
+
+# 2g. Finance rollout eval on the two v3 sets: the 10 fair eval questions (expert solved
+# them; same questions the SFT curves score) and the 29 expert-FAILURE questions as a
+# labelled hard test. Reported separately, never pooled.
+if [ -f "$G/finance_v3/ALLDONE" ] && [ ! -f "$G/finance_rollout/ALLDONE" ]; then
+  log "advancing the finance rollout eval"
+  ./scripts/run_finance_rollout.sh >> "$G/finance_rollout/driver.log" 2>&1
   exit 0
 fi
 

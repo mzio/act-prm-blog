@@ -63,8 +63,18 @@ run_one(){  # $1=domain  $2=variant  $3=eval ids  $4=throwaway train id
       "${turns[@]}" --max_tokens 2048 --discount_factor 1.0 "${HIDE_ARGS[@]}" \
       --train_task_ids "$tid" --eval_task_ids $ids \
       > "$MDIR/${tag}.log" 2>&1 \
-    && { touch "$MDIR/${tag}.done"; log "ROLLOUT $dom/$v: done"; } \
-    || log "ROLLOUT $dom/$v: FAILED (see $MDIR/${tag}.log)"
+    || { log "ROLLOUT $dom/$v: FAILED (see $MDIR/${tag}.log)"; return; }
+  # Validity gate. A transient Claude Agent SDK outage makes every episode die on turn 1,
+  # which the trainer happily records as 0/N correct -- indistinguishable from a real
+  # result unless you look at timesteps. Seen 08-22 01:35-02:09: all 8 full-context
+  # rollouts returned 0/42 and 0/18 with timesteps=1.0 and exactly one generate call per
+  # task. Refuse to mark such a run done, so it is retried instead of banked as a finding.
+  if ! ROLLOUT_DIR="$(newest "logs/tau2bench_${dom}_rlvr/$MODEL/${tag}-*/")" \
+       uv run --no-project python scripts/check_rollout_valid.py "$(newest "logs/tau2bench_${dom}_rlvr/$MODEL/${tag}-*/")"; then
+    log "ROLLOUT $dom/$v: INVALID (episodes died on turn 1 -- user-sim outage?); not marking done"
+    return
+  fi
+  touch "$MDIR/${tag}.done"; log "ROLLOUT $dom/$v: done"
 }
 
 log "=== SFT rollout eval (task completion) regime=$REGIME smoke=$SMOKE turns=$MAX_TURNS ==="
