@@ -292,6 +292,28 @@ is what carries it. Needs ≥3 rollouts/task before publication.
 Finance has no rollout number: its gym env was only ported here (from the recovered
 mz-airline branch) and has never been run or validated on this box.
 
+## VOLUME-MATCHED CONTROL (retail): the advantage is not a data artifact
+
+The retail thought corpora carried 1043 supervised steps against the baseline's 635 (the
+relabel emitted up to two generations per task; the export kept both). Retrained
+`thoughts_policy` on one generation per task -- 48 traj / 627 steps, matching the baseline
+-- with identical hyperparameters:
+
+| retail thoughts_policy | steps | final PPL | final acc |
+|---|---|---|---|
+| as run | 1043 | 2.2059 | 0.7925 |
+| **volume-matched** | **627** | **2.2119** | **0.7918** |
+| actions_only baseline | 635 | 2.3422 | 0.7726 |
+
+0.3% apart on PPL and 0.07pp on accuracy. The curves also track each other throughout
+(b10..b50: 3.136/3.033/2.897/2.740/2.594 matched vs 3.140/3.036/2.902/2.746/2.601 as-run).
+
+**So the retail Act-PRM advantage is not explained by extra supervision.** Combined with
+airline -- whose arms were already matched at 221 steps and which showed the *largest*
+effect (+22.2pp rollout) -- the volume confound is closed on both domains.
+
+Rollout eval of the matched checkpoint on the same 42 never-in-logs tasks is running.
+
 ## Open questions
 
 - **Accuracy does not move.** At 1e-3, PPL improves 4.31% while held-out accuracy goes
