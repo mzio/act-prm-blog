@@ -78,3 +78,7 @@ wandb_name: null
 # the variants are comparable on a same-span basis; otherwise the thought arms spend
 # most of their gradient on tokens the metric never looks at. No-op for actions_only.
 train_action_only: false
+
+# Train only on assistant turns with reasoning before the action (see --require_thought).
+# Off by default; the expert_thoughts_all arm switches it on.
+require_thought: false

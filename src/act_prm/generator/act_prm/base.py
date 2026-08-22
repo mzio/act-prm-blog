@@ -428,6 +428,28 @@ class ActPrmGenerator(HuggingFaceGenerator):
         from act_prm.environments.act_prm_traces.data import compact_observations
 
         action_indices = [i for i, m in enumerate(messages) if m["role"] == "assistant"]
+        # require_thought: train ONLY on assistant turns that carry reasoning before the
+        # action. Motivation: ~50% of GPT-5-mini's logged retail actions (46% airline) are
+        # a bare <tool_call> with no reasoning at all, so the expert_thoughts arm was
+        # taught "usually don't think" and at rollout it reasons before 0-8% of its tool
+        # calls. Filtering the TARGETS (not the messages) keeps every prior turn in the
+        # context -- state is still messages[:idx] -- so trajectories stay coherent.
+        if getattr(self, "require_thought", False) or (cfg is not None and cfg.get("require_thought", False)):
+            from act_prm.environments.act_prm_traces.data import extract_action as _xa
+
+            def _has_thought(i: int) -> bool:
+                c = messages[i].get("content") or ""
+                a = _xa(c)
+                if not a or c.find(a) < 0:
+                    return False  # no separable action -> not an action target
+                return len(c[: c.find(a)].strip()) >= 10
+
+            _kept = [i for i in action_indices if _has_thought(i)]
+            logger.info(
+                "require_thought: %d/%d assistant turns carry reasoning (targets filtered)",
+                len(_kept), len(action_indices),
+            )
+            action_indices = _kept
         max_steps = self.max_steps_per_traj or getattr(env, "max_steps_per_traj", None) or len(action_indices)
         action_indices = action_indices[:max_steps]
 

@@ -32,7 +32,7 @@
 # Usage:
 #   ./scripts/train_sft.sh <env> <variant> [extra main_pytorch flags]
 #   env     : act_prm/tau2_retail | act_prm/tau2_airline | act_prm/snorkel_finance_split
-#   variant : actions_only | thoughts_policy | thoughts_base | expert_thoughts
+#   variant : actions_only | thoughts_policy | thoughts_base | expert_thoughts | expert_thoughts_all
 # e.g.:
 #   CUDA_VISIBLE_DEVICES=0 ./scripts/train_sft.sh act_prm/tau2_retail expert_thoughts
 #
@@ -72,6 +72,16 @@ case "$VARIANT" in
     else
       GEN="act_prm"; MODE=(--advantage_mode best --score_with_base)
     fi ;;
+  expert_thoughts_all)
+    # Expert reasoning+action, but trained ONLY on the turns that actually HAVE reasoning.
+    # The plain expert_thoughts arm is ~50%% bare <tool_call> targets (46%% on airline), which
+    # taught it not to think: at rollout it reasons before 0-8%% of its tool calls. Filtering
+    # the targets keeps every turn in the context, so trajectories stay coherent.
+    GEN="act_prm_actions_only"; MODE=(--keep_expert_thoughts --require_thought)
+    if [ "$HAS_DATASET_PATH" = 0 ]; then
+      MODE+=(--dataset_path "data/${ENVNAME}_expert_thoughts")
+    fi
+    ;;
   expert_thoughts)
     # Target = original expert reasoning+action (keep_expert_thoughts loader flag).
     # Cached pools are keyed by dataset_path, so use a distinct one unless overridden.

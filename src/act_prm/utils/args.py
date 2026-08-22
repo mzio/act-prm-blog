@@ -511,6 +511,17 @@ def get_args() -> argparse.Namespace:
     parser.add_argument("--advantage_threshold", type=float)
     parser.add_argument("--learning_rate", type=float)
     parser.add_argument(
+        "--require_thought",
+        action="store_true",
+        default=None,
+        help=(
+            "Train only on assistant turns that carry reasoning BEFORE the action. ~50% of "
+            "GPT-5-mini's logged retail actions (46% airline) are a bare <tool_call>, so the "
+            "expert_thoughts arm learned 'usually do not think'. Filters TARGETS only -- every "
+            "turn stays in the context, so trajectories remain coherent."
+        ),
+    )
+    parser.add_argument(
         "--train_action_only",
         action="store_true",
         default=None,
