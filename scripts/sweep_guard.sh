@@ -16,6 +16,15 @@ cd "$(dirname "$0")/.." || exit 0
 export PATH="$HOME/.local/bin:$HOME/.cargo/bin:/usr/local/bin:/usr/bin:/bin:$PATH"
 export HF_HUB_OFFLINE=${HF_HUB_OFFLINE:-0}
 G=/tmp/aprm; mkdir -p "$G"
+# CRITICAL: the tau2 user simulator and the finance judge shell out to the `claude` CLI,
+# which mints Meta auth tokens via `clicat`. Under cron's stripped environment clicat
+# fails ("No CATs were created / clicat create-all returned empty output"), the CLI
+# returns an error, and EVERY episode dies on its first turn -- recorded as a plausible
+# 0/N. That is exactly what happened to the full-context rollout pass and the matched
+# control's rollout. Sourcing a snapshot of the interactive environment fixes it
+# (verified: FAILED(None) under `env -i`, OK with the snapshot).
+# Refresh with:  env | grep -vE "^(_|PWD|OLDPWD|SHLVL)=" > /tmp/aprm/agent_env.sh
+[ -f "$G/agent_env.sh" ] && { set -a; . "$G/agent_env.sh" 2>/dev/null; set +a; }
 LOCK="$G/guard.lock"
 log(){ echo "[$(date '+%m-%d %H:%M:%S')] $*" >> "$G/guard.log"; }
 

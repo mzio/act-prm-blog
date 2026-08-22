@@ -47,6 +47,12 @@ if [ ! -f "$MDIR/rollout.done" ]; then
       --max_turns 20 --max_tokens 2048 --discount_factor 1.0 --hide_observations \
       --train_task_ids "$TID" --eval_task_ids $IDS \
       > "$MDIR/rollout.log" 2>&1 \
-    && { touch "$MDIR/rollout.done"; log "ROLLOUT: done"; } || log "ROLLOUT: FAILED (see $MDIR/rollout.log)"
+    || { log "ROLLOUT: FAILED (see $MDIR/rollout.log)"; exit 1; }
+  D=$(newest "logs/tau2bench_retail_rlvr/hf_qwen3_4b_instruct/retail_rollout_thoughts_policy_1gen_lr3e_3-*/")
+  if uv run --no-project python scripts/check_rollout_valid.py "$D"; then
+    touch "$MDIR/rollout.done"; log "ROLLOUT: done"
+  else
+    log "ROLLOUT: INVALID (user-sim/auth failure); not marking done"; exit 1
+  fi
 fi
 touch "$MDIR/ALLDONE"; log "=== matched control complete ==="
