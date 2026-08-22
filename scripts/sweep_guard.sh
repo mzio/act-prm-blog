@@ -95,6 +95,15 @@ if [ ! -f "$G/control/ALLDONE" ]; then
   exit 0
 fi
 
+# 2e. expert_thoughts_all: SFT on expert reasoning+action but only on turns that HAVE
+# reasoning, then rollout-eval. Tests whether expert thoughts help once the arm is actually
+# trained to produce them (the plain arm was ~50% bare-action targets).
+if [ ! -f "$G/expert_all/ALLDONE" ]; then
+  log "advancing expert_thoughts_all"
+  ./scripts/run_expert_all.sh >> "$G/expert_all/driver.log" 2>&1
+  exit 0
+fi
+
 # 3. keep the matrix moving
 if [ -f "$G/lrmatrix/DONE" ]; then exit 0; fi
 log "matrix idle -> advancing it"
