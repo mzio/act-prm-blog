@@ -26,7 +26,10 @@ flock -n 9 || exit 0
 # 1. a trainer is live -> nothing to do
 if pgrep -f '[m]ain_pytorch.py' >/dev/null 2>&1; then exit 0; fi
 # a driver shell is mid-launch -> let it be
-if ps -eo args | grep -qE 'bash \./scripts/(run_sft_lr_matrix|run_sft_sweep|probe_sft_lr)\.sh'; then exit 0; fi
+# Any of OUR driver shells mid-launch -> let it be. This list must include every driver
+# the guard can start; omitting one (run_matched_control) let cron launch a SECOND copy
+# of a control run that was already going, and both appended to the same metrics.jsonl.
+if ps -eo args | grep -qE 'scripts/(run_sft_lr_matrix|run_sft_sweep|probe_sft_lr|run_matched_control|run_expert_all|run_sft_rollout_eval)\.sh'; then exit 0; fi
 
 # 2. thoughts_base LR probe (once)
 if [ ! -f "$G/lrprobe/thoughts_base.done" ]; then
