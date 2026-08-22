@@ -312,7 +312,22 @@ relabel emitted up to two generations per task; the export kept both). Retrained
 airline -- whose arms were already matched at 221 steps and which showed the *largest*
 effect (+22.2pp rollout) -- the volume confound is closed on both domains.
 
-Rollout eval of the matched checkpoint on the same 42 never-in-logs tasks is running.
+### Rollout half (complete)
+
+| retail, 42 never-in-logs tasks | steps | completion | gains/loses vs base | McNemar p |
+|---|---|---|---|---|
+| actions_only (baseline) | 635 | 5/42 = 11.9% | — | — |
+| thoughts_policy, **matched** | **627** | **8/42 = 19.0%** | 5 / 2 | 0.453 |
+| thoughts_policy, as run | 1043 | 9/42 = 21.4% | 6 / 2 | 0.289 |
+
+The advantage survives volume-matching on the BEHAVIOURAL metric too: +7.1pp at matched
+supervision vs +9.5pp with 64% more data. The two Act-PRM runs also solve overlapping task
+sets (25, 65, 73 in both), which is what a real effect looks like rather than luck.
+
+**So the volume confound is closed on both domains and both metrics.** What is NOT closed
+is significance: neither arm reaches p<0.05 alone (0.29 / 0.45), and the pooled figure
+across retail+airline was 0.077. Only more rollouts per task fix that -- more arms cannot.
+
 
 ## Open questions
 
