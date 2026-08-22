@@ -26,7 +26,7 @@ for wordiness rather than for mispredicting the action, which inverts the rankin
 | expert_thoughts_lr3e_3_nb150 | hide | 2.1071 | 0.7973 | 149 | 3.2141 | 0.6958 | 149 | 0.5808 |
 | thoughts_base_last | hide | 3.1928 | 0.7784 | 59 | 3.6738 | 0.7401 | 59 | 0.9956 |
 | thoughts_base_lr3e_3_nb150 | hide | 2.2003 | 0.7890 | 149 | 2.3705 | 0.7610 | 149 | 0.6979 |
-| thoughts_policy_1gen_lr3e_3_nb150 | hide | 2.2669 | 0.7903 | 100 | 2.4662 | 0.7576 | 100 | 1.1454 |
+| thoughts_policy_1gen_lr3e_3_nb150 | hide | 2.2457 | 0.7912 | 110 | 2.4442 | 0.7583 | 110 | 1.0243 |
 | thoughts_policy_last | hide | 3.2078 | 0.7825 | 40 | 3.7470 | 0.7390 | 10 | 1.5987 |
 | thoughts_policy_lr3e_3_nb150 | hide | 2.2059 | 0.7925 | 149 | 2.3959 | 0.7609 | 149 | 0.8757 |
 | actions_only_lr3e_3_nb150 | full | 2.9830 | 0.8021 | 40 | 2.9830 | 0.8021 | 40 | 0.4462 |
@@ -56,7 +56,7 @@ that saved step:
 | expert_thoughts_lr3e_3_nb150 | hide | 2.1071 | 0.7973 |
 | thoughts_base_last | hide | 3.1928 | 0.7784 |
 | thoughts_base_lr3e_3_nb150 | hide | 2.2003 | 0.7890 |
-| thoughts_policy_1gen_lr3e_3_nb150 | hide | 2.2669 | 0.7903 |
+| thoughts_policy_1gen_lr3e_3_nb150 | hide | 2.2457 | 0.7912 |
 | thoughts_policy_last | hide | 3.2100 | 0.7810 |
 | thoughts_policy_lr3e_3_nb150 | hide | 2.2059 | 0.7925 |
 | actions_only_lr3e_3_nb150 | full | 2.9830 | 0.8021 |
