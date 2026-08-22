@@ -257,44 +257,40 @@ hinge on the scorer choice" (the two Act-PRM variants agreed to 0.006 PPL). Airl
 that: `thoughts_base` recovers 47% PPL / 15% accuracy against `thoughts_policy`'s 57% /
 60%. The scorer choice *is* domain-dependent; the retail agreement was not general.
 
-## ROLLOUT EVAL: task completion inverts the perplexity ranking
+## ROLLOUT EVAL (complete, hide regime): task completion inverts the PPL ranking
 
-Teacher-forced PPL measures how well the model *predicts* the logged action. The rollout
-eval lets each policy act in the live tau2 gym on **never-in-logs** tasks (retail 42,
-airline 18 — no expert demos, no training exposure) and scores task completion. No gold
-targets and no inferred-thought corpus needed, which is also why it sidesteps the
-rl_eval-expansion problem entirely.
+Each policy acts in the live tau2 gym on **never-in-logs** tasks (retail 42, airline 18 —
+no expert demos, no training exposure) and is scored on task completion.
 
-| retail (42 tasks) | completion | PPL rank |
-|---|---|---|
-| actions_only | 11.9% (5/42) | 4th |
-| expert_thoughts (oracle) | 11.9% (5/42) | **1st** |
-| thoughts_base | 16.7% (7/42) | 2nd |
-| **thoughts_policy** | **21.4% (9/42)** | 3rd |
+| arm | retail (42) | airline (18) | PPL rank |
+|---|---|---|---|
+| actions_only | 11.9% | 50.0% | 4th |
+| expert_thoughts (oracle) | 11.9% (+0.0pp) | **33.3% (−16.7pp)** | **1st** |
+| thoughts_base | 16.7% (+4.8pp) | 44.4% (−5.6pp) | 2nd |
+| **thoughts_policy** | **21.4% (+9.5pp)** | **72.2% (+22.2pp)** | 3rd |
 
-| airline (18 tasks) | completion | PPL rank |
-|---|---|---|
-| actions_only | 50.0% (9/18) | 4th |
-| expert_thoughts (oracle) | **33.3% (6/18)** | **1st** |
+**1. `thoughts_policy` is the result.** 1.8× baseline on retail, 1.44× on airline —
+consistent in direction and large in both. Combined 22/60 vs 14/60 against baseline.
 
-**The ranking inverts.** The expert-thought arm has the best action-token perplexity in
-every domain and delivers *no* completion benefit on retail (tied with baseline) and a
-16.7pp *penalty* on airline. Meanwhile Act-PRM's inferred thoughts roughly double retail
-completion (11.9% -> 21.4%).
+**2. Expert thoughts are not an upper bound on behaviour.** They have the best
+action-token PPL in every domain, yet deliver zero completion benefit on retail and a
+16.7pp penalty on airline. The model imitates GPT-5-mini's reasoning closely enough to
+lower perplexity without that reasoning improving — or while it degrades — its own acting.
 
-Reading: the model can imitate GPT-5-mini's reasoning closely enough to lower perplexity
-without that reasoning improving — or while it actively degrades — its own behaviour.
-Thoughts drawn from the model's own distribution (Act-PRM) do improve behaviour. This is
-the same direction as the finance teacher-forced result, where BOTH Act-PRM variants beat
-the oracle (1.7969 / 1.8167 vs 1.8589).
+**3. Perplexity is the wrong yardstick here.** The completion ranking is nearly the
+inverse of the PPL ranking. Any Stage-2 conclusion drawn from PPL alone (including the
+"58% of the oracle gap" framing) describes prediction, not behaviour.
 
-If it survives more rollouts, this is a stronger claim than "Act-PRM recovers 58% of the
-oracle gap": the oracle is not an upper bound on *behaviour* at all, and perplexity is the
-wrong yardstick for this question.
+**4. Scorer choice matters and base-scoring is unreliable**: +4.8pp retail, −5.6pp
+airline. Only the policy-scored variant is consistently positive. Consistent with the
+teacher-forced result where policy beat base in 2 of 3 domains.
 
-**Caveat: one rollout per task.** 5 vs 9 successes on 42 tasks; binomial SE ~5.5pp at
-p~0.15, so retail's +9.5pp is ~1.7 SE. Airline's -16.7pp on 18 tasks is ~1.4 SE. Both are
-suggestive, neither is established. Needs 3+ rollouts per task before publication.
+**Caveat: one rollout per task.** retail +9.5pp ≈ 1.7 binomial SE; airline +22.2pp ≈ 1.9
+SE (n=18, SE≈11.8pp). Individually suggestive, not significant; the cross-domain agreement
+is what carries it. Needs ≥3 rollouts/task before publication.
+
+Finance has no rollout number: its gym env was only ported here (from the recovered
+mz-airline branch) and has never been run or validated on this box.
 
 ## Open questions
 
