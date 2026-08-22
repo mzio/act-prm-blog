@@ -80,26 +80,6 @@ for env, dom in [("act_prm_tau2_retail","retail"),("act_prm_tau2_airline","airli
             print(f"back-filled .done: {tag} (reached b{last}/{nb})")
 BACKFILL
 
-# 2c. Rollout eval of the finished hide-regime SFT checkpoints, BEFORE the full-context
-# arms. Scores TASK COMPLETION in the live tau2 gym rather than teacher-forced PPL, on
-# never-in-logs tasks (retail 42 / airline 18). Prioritised because it is the metric the
-# Act-PRM story is actually about, and the hide matrix it evaluates is already complete.
-if [ ! -f "$G/rollout/ALLDONE" ]; then
-  log "advancing the SFT rollout eval (task completion)"
-  ./scripts/run_sft_rollout_eval.sh >> "$G/rollout/driver.log" 2>&1
-  n=$(ls "$G"/rollout/*_lr3e_3.done 2>/dev/null | wc -l)
-  if [ "$n" -ge 8 ]; then
-    # hide pass done -> run the same 8 checkpoints with FULL context at rollout time.
-    # Deliberate train/test mismatch: do policies trained on a compacted context
-    # generalise when handed the whole thing?
-    log "hide rollout complete ($n/8) -> starting the full-context rollout pass"
-    REGIME=full ./scripts/run_sft_rollout_eval.sh >> "$G/rollout/driver_full.log" 2>&1
-    m=$(ls "$G"/rollout/*_lr3e_3_fullctx.done 2>/dev/null | wc -l)
-    [ "$m" -ge 8 ] && { touch "$G/rollout/ALLDONE"; log "rollout eval complete: hide $n/8, full $m/8"; }
-  fi
-  exit 0
-fi
-
 # 2d. Volume-matched control for the retail Act-PRM result (see run_matched_control.sh).
 if [ ! -f "$G/control/ALLDONE" ]; then
   log "advancing the volume-matched control"
@@ -141,6 +121,27 @@ if [ -f "$G/finance_rollout/ALLDONE" ] && [ ! -f "$G/bestgen/ALLDONE" ]; then
   ./scripts/run_bestgen_sft.sh >> "$G/bestgen/driver.log" 2>&1
   exit 0
 fi
+
+# 2z. FULL-CONTEXT rollout pass. Deliberately LAST: these checkpoints were trained with
+# --hide_observations, so running them on full context is a generalisation curiosity, not
+# part of the main comparison. It must not preempt the control / expert_thoughts_all /
+# finance work.
+if [ ! -f "$G/rollout/ALLDONE" ]; then
+  log "advancing the SFT rollout eval (task completion)"
+  ./scripts/run_sft_rollout_eval.sh >> "$G/rollout/driver.log" 2>&1
+  n=$(ls "$G"/rollout/*_lr3e_3.done 2>/dev/null | wc -l)
+  if [ "$n" -ge 8 ]; then
+    # hide pass done -> run the same 8 checkpoints with FULL context at rollout time.
+    # Deliberate train/test mismatch: do policies trained on a compacted context
+    # generalise when handed the whole thing?
+    log "hide rollout complete ($n/8) -> starting the full-context rollout pass"
+    REGIME=full ./scripts/run_sft_rollout_eval.sh >> "$G/rollout/driver_full.log" 2>&1
+    m=$(ls "$G"/rollout/*_lr3e_3_fullctx.done 2>/dev/null | wc -l)
+    [ "$m" -ge 8 ] && { touch "$G/rollout/ALLDONE"; log "rollout eval complete: hide $n/8, full $m/8"; }
+  fi
+  exit 0
+fi
+
 
 # 3. keep the matrix moving
 if [ -f "$G/lrmatrix/DONE" ]; then exit 0; fi
