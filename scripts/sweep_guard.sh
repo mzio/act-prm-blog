@@ -88,6 +88,13 @@ if [ ! -f "$G/rollout/ALLDONE" ]; then
   exit 0
 fi
 
+# 2d. Volume-matched control for the retail Act-PRM result (see run_matched_control.sh).
+if [ ! -f "$G/control/ALLDONE" ]; then
+  log "advancing the volume-matched control"
+  ./scripts/run_matched_control.sh >> "$G/control/driver.log" 2>&1
+  exit 0
+fi
+
 # 3. keep the matrix moving
 if [ -f "$G/lrmatrix/DONE" ]; then exit 0; fi
 log "matrix idle -> advancing it"
