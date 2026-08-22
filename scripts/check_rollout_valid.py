@@ -14,6 +14,12 @@ bank it as a result.
 import json, os, sys
 
 MIN_CALLS_PER_TASK = 2.0
+# A dead JUDGE is invisible to the calls-per-task test: the policy still acts normally,
+# generating plenty of calls, and only the SCORING collapses to zero. The finance gym
+# grades with ClaudeQueryLLM over the same `claude` CLI as the user simulator, so it
+# shares the clicat auth failure mode. Treat a run as invalid if a meaningful fraction of
+# tasks saw an LLM query error AND nothing scored.
+MAX_QUERY_ERROR_FRAC = 0.10
 d = sys.argv[1] if len(sys.argv) > 1 else ""
 m = os.path.join(d, "metrics.jsonl")
 if not d or not os.path.exists(m):
@@ -33,5 +39,18 @@ if per_task < MIN_CALLS_PER_TASK:
     print(f"  check: INVALID -- {correct}/{total}, only {calls} generate calls "
           f"({per_task:.2f}/task); episodes died on turn 1")
     sys.exit(1)
-print(f"  check: ok -- {correct}/{total}, {calls} generate calls ({per_task:.1f}/task)")
+# judge / user-sim query failures recorded in the run log
+errs = 0
+for cand in (os.path.join(d, "logs.log"),):
+    if os.path.exists(cand):
+        try:
+            errs += open(cand, errors="ignore").read().count("ClaudeQueryLLM query error")
+        except Exception:
+            pass
+if total and errs > MAX_QUERY_ERROR_FRAC * total and correct == 0:
+    print(f"  check: INVALID -- {correct}/{total} with {errs} LLM query errors "
+          f"(judge or user-sim auth failure, not a real zero)")
+    sys.exit(1)
+note = f", {errs} query errors" if errs else ""
+print(f"  check: ok -- {correct}/{total}, {calls} generate calls ({per_task:.1f}/task){note}")
 sys.exit(0)

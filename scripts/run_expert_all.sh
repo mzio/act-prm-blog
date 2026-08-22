@@ -22,7 +22,11 @@ export PATH="$HOME/.local/bin:$HOME/.cargo/bin:/usr/local/bin:$PATH"
 MODEL="${MODEL_CFG:-hf_qwen3_4b_instruct}"; export MODEL_CFG="$MODEL"
 MDIR=/tmp/aprm/expert_all; mkdir -p "$MDIR"
 NUM_BATCHES="${NUM_BATCHES:-150}"
-ENVS="${ENVS:-act_prm/tau2_retail act_prm/tau2_airline act_prm/snorkel_finance_split}"
+# Finance is deliberately EXCLUDED here: run_finance_v3.sh already trains
+# expert_thoughts_all for finance against the CLEAN v3 eval. Running it here too would
+# spend ~2.7h producing a second finance number scored on the 76%-contaminated v1 eval,
+# which we would only have to discard.
+ENVS="${ENVS:-act_prm/tau2_retail act_prm/tau2_airline}"
 log(){ echo "[$(date '+%m-%d %H:%M:%S')] $*" | tee -a "$MDIR/expert_all.log"; }
 wait_gpu_free(){ while pgrep -f '[m]ain_pytorch.py' >/dev/null 2>&1; do sleep 60; done; sleep 10; }
 newest(){ ls -dt $1 2>/dev/null | head -1; }
