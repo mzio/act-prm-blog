@@ -10,8 +10,8 @@
 name: "snorkel_finance"
 is_async: true
 
-data_path: "src/act_prm/data/snorkel_finance/raw"
-benchmark_csv: "src/act_prm/data/snorkel_finance/benchmark/finqa_reasoning.csv"
+data_path: "data/snorkel_finance/raw"
+benchmark_csv: "data/snorkel_finance/benchmark/finqa_reasoning.csv"
 task: "finqa_reasoning"
 
 # LLM-judge grader (Claude Agent SDK).

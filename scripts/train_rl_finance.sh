@@ -17,7 +17,10 @@ export HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 HF_HUB_DISABLE_XET=1 UV_FROZEN=1
 export PYTORCH_CUDA_ALLOC_CONF="${PYTORCH_CUDA_ALLOC_CONF:-expandable_segments:True}"
 [ -f "$SFT/adapter_model.safetensors" ] || { echo "no adapter_model.safetensors under $SFT"; exit 1; }
 # CLAUDECODE cleared so the grader's Claude Agent SDK can spawn a (nested) claude subprocess.
-CUDA_VISIBLE_DEVICES=$GPU CLAUDECODE= exec .venv/bin/python main_pytorch.py \
+# Run in .venv-tau2, same as train_rl_from_sft.sh: the grader's Claude Agent SDK lives
+# there, not in the base .venv (the finance box's base venv had it; ours does not).
+CUDA_VISIBLE_DEVICES=$GPU CLAUDECODE= UV_PROJECT_ENVIRONMENT=.venv-tau2 \
+  exec uv run --no-sync python main_pytorch.py \
   --env_config act_prm/snorkel_finance_gym --model_config hf_qwen3_4b_instruct \
   --lora_config r8_a16_linear --generator_config hf_grpo --trainer_config pg \
   --replay_buffer_config default --resume_from "$SFT" \
