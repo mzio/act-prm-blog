@@ -1,0 +1,43 @@
+{
+ "note": "finqa question ids NEVER in act_prm_train, i.e. unseen by the existing finance Stage-2 checkpoints. 'teacher_forced' have usable demos and can be scored with action-span PPL/accuracy; 'rollout_only' have no demos and are usable for gym rollouts.",
+ "teacher_forced": [
+  "0",
+  "17",
+  "26",
+  "62",
+  "67",
+  "77"
+ ],
+ "rollout_only": [
+  "4",
+  "5",
+  "7",
+  "8",
+  "9",
+  "10",
+  "18",
+  "19",
+  "31",
+  "35",
+  "37",
+  "38",
+  "39",
+  "40",
+  "45",
+  "48",
+  "49",
+  "52",
+  "54",
+  "55",
+  "57",
+  "65",
+  "68",
+  "69",
+  "70",
+  "74",
+  "76",
+  "78"
+ ],
+ "n_teacher_forced": 6,
+ "n_rollout_only": 28
+}

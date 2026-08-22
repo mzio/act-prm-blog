@@ -107,6 +107,14 @@ if [ ! -f "$G/expert_all/ALLDONE" ]; then
   exit 0
 fi
 
+# 2f. Finance v2: same training pools, CLEAN eval (v1 eval was 76% contaminated at the
+# question level). Produces honest train/eval action-span curves + final checkpoints.
+if [ ! -f "$G/finance_v2/ALLDONE" ]; then
+  log "advancing finance v2 Stage-2"
+  ./scripts/run_finance_v2.sh >> "$G/finance_v2/driver.log" 2>&1
+  exit 0
+fi
+
 # 3. keep the matrix moving
 if [ -f "$G/lrmatrix/DONE" ]; then exit 0; fi
 log "matrix idle -> advancing it"
