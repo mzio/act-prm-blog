@@ -29,7 +29,7 @@ if pgrep -f '[m]ain_pytorch.py' >/dev/null 2>&1; then exit 0; fi
 # Any of OUR driver shells mid-launch -> let it be. This list must include every driver
 # the guard can start; omitting one (run_matched_control) let cron launch a SECOND copy
 # of a control run that was already going, and both appended to the same metrics.jsonl.
-if ps -eo args | grep -qE 'scripts/(run_sft_lr_matrix|run_sft_sweep|probe_sft_lr|run_matched_control|run_expert_all|run_sft_rollout_eval|run_finance_v3|run_finance_rollout)\.sh'; then exit 0; fi
+if ps -eo args | grep -qE 'scripts/(run_sft_lr_matrix|run_sft_sweep|probe_sft_lr|run_matched_control|run_expert_all|run_sft_rollout_eval|run_finance_v3|run_finance_rollout|run_bestgen_sft)\.sh'; then exit 0; fi
 
 # 2. thoughts_base LR probe (once)
 if [ ! -f "$G/lrprobe/thoughts_base.done" ]; then
@@ -122,6 +122,14 @@ fi
 if [ -f "$G/finance_v3/ALLDONE" ] && [ ! -f "$G/finance_rollout/ALLDONE" ]; then
   log "advancing the finance rollout eval"
   ./scripts/run_finance_rollout.sh >> "$G/finance_rollout/driver.log" 2>&1
+  exit 0
+fi
+
+# 2h. Act-PRM Stage-2 with ONE generation per task (the best, by mean EM likelihood),
+# volume-matched to actions_only in every domain, then rollout eval per environment.
+if [ -f "$G/finance_rollout/ALLDONE" ] && [ ! -f "$G/bestgen/ALLDONE" ]; then
+  log "advancing the best-generation Act-PRM SFT"
+  ./scripts/run_bestgen_sft.sh >> "$G/bestgen/driver.log" 2>&1
   exit 0
 fi
 
