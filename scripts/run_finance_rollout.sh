@@ -14,6 +14,14 @@
 set -uo pipefail
 cd "$(dirname "$0")/.."
 export PATH="$HOME/.local/bin:$HOME/.cargo/bin:/usr/local/bin:$PATH"
+# HuggingFace access. This driver calls main_pytorch.py DIRECTLY rather than going through
+# train_rl_from_sft.sh, so it does not inherit that script's proxy setup -- and cron gives
+# us an environment with none of it. huggingface.co is not directly resolvable from this
+# box, so load_llm died with `httpx.ConnectError: [Errno -2] Name or service not known`
+# AFTER loading the cached weights, taking all 10 arms down in ~18s each on 08-23 07:55.
+export https_proxy="${https_proxy:-http://fwdproxy:8080}"
+export http_proxy="${http_proxy:-http://fwdproxy:8080}"
+export HF_TOKEN="${HF_TOKEN:-$(cat "$HOME/models/token" 2>/dev/null || true)}"
 MODEL="${MODEL_CFG:-hf_qwen3_4b_instruct}"; export MODEL_CFG="$MODEL"
 MDIR=/tmp/aprm/finance_rollout; mkdir -p "$MDIR"
 NB="${NUM_BATCHES:-150}"
@@ -52,4 +60,17 @@ for arm in $ARMS; do
     fi
   done
 done
-touch "$MDIR/ALLDONE"; log "=== finance rollout complete ==="
+# Only claim completion if every arm/set actually banked a .done. Touching ALLDONE
+# unconditionally is how 10 straight failures got recorded as "finance rollout complete"
+# and the guard advanced past them.
+_missing=0
+for arm in $ARMS; do
+  for setname in fair hard; do
+    [ -f "$MDIR/finance_rollout_${arm}_v3_${setname}.done" ] || _missing=$((_missing+1))
+  done
+done
+if [ "$_missing" -eq 0 ]; then
+  touch "$MDIR/ALLDONE"; log "=== finance rollout complete ==="
+else
+  log "=== finance rollout INCOMPLETE: $_missing run(s) missing; not marking ALLDONE ==="
+fi
