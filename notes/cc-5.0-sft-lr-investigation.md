@@ -357,7 +357,7 @@ retail/actions_only_lr1e_3_nb150                     hide  149     3.8307 ->   3
 
 2/2 arms complete   (Δ% = held-out action-subspan PPL improvement, higher is better)
 ```
-_last refreshed: 2026-08-22 21:40_
+_last refreshed: 2026-08-22 22:00_
 <!--/RESULTS-->
 
 ## Infrastructure
