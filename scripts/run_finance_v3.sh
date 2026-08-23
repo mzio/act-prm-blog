@@ -31,7 +31,10 @@ wait_gpu_free(){ while pgrep -f '[m]ain_pytorch.py' >/dev/null 2>&1; do sleep 60
 ARMS=(
   "actions_only:actions_only:data/snorkel_finance_split_v3:"
   "expert_thoughts:expert_thoughts:data/snorkel_finance_split_expert_thoughts_v3:"
-  "expert_thoughts_all:expert_thoughts_all:data/snorkel_finance_split_expert_thoughts_v3:"
+  # Pre-filtered pool: 56% of the finance expert trajectories (65/116) carry NO reasoning
+  # on any turn, so --require_thought left ~31% of batch_size-2 batches with zero trainable
+  # steps. eval.json is the UNFILTERED 25-traj/10-question set, identical to every other arm.
+  "expert_thoughts_all:expert_thoughts_all:data/snorkel_finance_split_expert_thoughts_all_v3:"
   "thoughts_policy:thoughts_policy:data/sft_corpus/snorkel_finance_split/policy_v3:"
   "thoughts_base:thoughts_base:data/sft_corpus/snorkel_finance_split/base_v3:"
 )

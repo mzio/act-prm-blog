@@ -434,7 +434,13 @@ class ActPrmGenerator(HuggingFaceGenerator):
         # taught "usually don't think" and at rollout it reasons before 0-8% of its tool
         # calls. Filtering the TARGETS (not the messages) keeps every prior turn in the
         # context -- state is still messages[:idx] -- so trajectories stay coherent.
-        if getattr(self, "require_thought", False) or (cfg is not None and cfg.get("require_thought", False)):
+        # TRAIN ONLY. Filtering the eval targets too would score this arm on a different
+        # (and harder -- thought-bearing targets are longer) subset than every other arm,
+        # making the teacher-forced PPL/accuracy tables silently non-comparable.
+        _req_thought = getattr(self, "require_thought", False) or (
+            cfg is not None and cfg.get("require_thought", False)
+        )
+        if _req_thought and split == "train":
             from act_prm.environments.act_prm_traces.data import extract_action as _xa
 
             def _has_thought(i: int) -> bool:
