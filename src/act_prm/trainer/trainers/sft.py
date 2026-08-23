@@ -9,6 +9,7 @@ this collapses to standard maximum-likelihood SFT — no PPO-style importance
 ratio.
 """
 
+import hashlib
 import json
 import logging
 import math
@@ -100,10 +101,8 @@ class SFTTrainer(RLTrainer):
         # all of them, actions_only on none. Restricting the comparison to turns where the
         # EXPERT reasoned is a fair, on-distribution question, but it cannot be answered from
         # inside a single arm's run: actions_only has no thoughts in its own targets and so
-        # cannot identify the subset. (sample_id, timestep) is a stable join key across arms
-        # -- every arm's eval pool is the same trajectories in the same deterministic order,
-        # differing only in whether a thought precedes the action. Joining these records
-        # across arms yields the restricted table for every arm at once.
+        # cannot identify the subset. Join these records across arms on `action_key` (see
+        # below) to get the restricted table for every arm at once.
         step_records: list[dict[str, Any]] = []
         for traj in trajs:
             for step in traj.episode_steps:
@@ -147,8 +146,24 @@ class SFTTrainer(RLTrainer):
                     act_ce += _ce
                     act_correct += _ok
                     act_tokens += _n
+                    # Content key. (sample_id, timestep) is NOT stable across arms: the
+                    # thought pools carry a different number of trajectories than the
+                    # actions_only pool (finance eval: 27/398 steps vs 25/363), so the
+                    # sample numbering shifts and only ~90% of nominally-shared turns even
+                    # agree on action length. The gold ACTION tokens, by contrast, are
+                    # identical across arms for the same turn -- only the thought prefix
+                    # differs -- so they identify the turn. Paired with the trailing state
+                    # tokens to disambiguate a repeated identical tool call.
+                    _akey = hashlib.sha1(
+                        ",".join(str(int(t)) for t in a_labels.tolist()).encode()
+                    ).hexdigest()[:16]
+                    _skey = hashlib.sha1(
+                        ",".join(str(int(t)) for t in ids[max(0, state_len - 64) : state_len]).encode()
+                    ).hexdigest()[:16]
                     step_records.append(
                         {
+                            "action_key": _akey,
+                            "state_key": _skey,
                             "sample_id": getattr(step, "sample_id", None),
                             "timestep": getattr(step, "timestep", None),
                             "action_ce": _ce,
