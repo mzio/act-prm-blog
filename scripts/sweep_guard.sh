@@ -138,7 +138,8 @@ fi
 if [ -f "$G/finance_rollout/ALLDONE" ] && [ ! -f "$G/expert_all_fix/ALLDONE" ]; then
   log "advancing the expert_thoughts_all re-run (comparable eval)"
   mkdir -p "$G/expert_all_fix"
-  MDIR="$G/expert_all_fix" ./scripts/run_expert_all.sh >> "$G/expert_all_fix/driver.log" 2>&1
+  MDIR="$G/expert_all_fix" TAGSFX="_fixeval" \
+    ./scripts/run_expert_all.sh >> "$G/expert_all_fix/driver.log" 2>&1
   exit 0
 fi
 

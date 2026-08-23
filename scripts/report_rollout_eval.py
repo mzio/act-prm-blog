@@ -18,12 +18,15 @@ def main():
     args = ap.parse_args()
     suffix = "_fullctx" if args.regime == "full" else ""
     rows = {}
-    for d in glob.glob(f"logs/tau2bench_*_rlvr/hf_qwen3_4b_instruct/*_rollout_*_lr3e_3{suffix}-*/"):
+    # `_fixeval` marks the expert_thoughts_all re-run whose checkpoint was selected against
+    # the corrected (train-only require_thought) eval. Keep it as a separate row rather than
+    # overwriting the original -- the two are the comparison.
+    for d in glob.glob(f"logs/tau2bench_*_rlvr/hf_qwen3_4b_instruct/*_rollout_*_lr3e_3{suffix}*-*/"):
         tag = os.path.basename(d.rstrip("/")).split("-act-prm")[0]
-        m = re.match(rf"(\w+?)_rollout_(.+)_lr3e_3{suffix}$", tag)
+        m = re.match(rf"(\w+?)_rollout_(.+)_lr3e_3{suffix}(_fixeval)?$", tag)
         if not m:
             continue
-        dom, var = m.group(1), m.group(2)
+        dom, var = m.group(1), m.group(2) + (m.group(3) or "")
         try:
             recs = [json.loads(l) for l in open(d + "metrics.jsonl") if l.strip()]
         except Exception:

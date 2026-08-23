@@ -29,6 +29,11 @@ NUM_BATCHES="${NUM_BATCHES:-150}"
 # spend ~2.7h producing a second finance number scored on the 76%-contaminated v1 eval,
 # which we would only have to discard.
 ENVS="${ENVS:-act_prm/tau2_retail act_prm/tau2_airline}"
+# Appended to every run tag. The corrected re-run (require_thought no longer filters the
+# EVAL targets) MUST NOT reuse the first pass's tag: the log dir name is derived from the
+# tag + a config hash, and require_thought is unchanged in the config, so it would resolve
+# to the SAME directory and append a second run's metrics into the finished curve.
+TAGSFX="${TAGSFX:-}"
 log(){ echo "[$(date '+%m-%d %H:%M:%S')] $*" | tee -a "$MDIR/expert_all.log"; }
 wait_gpu_free(){ while pgrep -f '[m]ain_pytorch.py' >/dev/null 2>&1; do sleep 60; done; sleep 10; }
 newest(){ ls -dt $1 2>/dev/null | head -1; }
@@ -36,7 +41,7 @@ newest(){ ls -dt $1 2>/dev/null | head -1; }
 # --- 1. SFT per domain ---
 for env in $ENVS; do
   ENVNAME="${env##*/}"; DOM="${ENVNAME#tau2_}"
-  TAG="${DOM}_s2_expert_thoughts_all_lr3e_3_nb${NUM_BATCHES}_heldout"
+  TAG="${DOM}_s2_expert_thoughts_all_lr3e_3_nb${NUM_BATCHES}_heldout${TAGSFX}"
   if [ -f "$MDIR/${TAG}.done" ]; then log "$TAG: done, skip"; continue; fi
   log "SFT $TAG (hide-obs, lr=3e-3, ${NUM_BATCHES} batches)"
   wait_gpu_free
@@ -50,8 +55,8 @@ done
 # --- 2. rollout eval (retail + airline only; finance has no gym data on this box) ---
 for spec in "retail:act_prm_tau2_retail" "airline:act_prm_tau2_airline"; do
   DOM="${spec%%:*}"; ENVDIR="${spec##*:}"
-  TAG="${DOM}_s2_expert_thoughts_all_lr3e_3_nb${NUM_BATCHES}_heldout"
-  RTAG="${DOM}_rollout_expert_thoughts_all_lr3e_3"
+  TAG="${DOM}_s2_expert_thoughts_all_lr3e_3_nb${NUM_BATCHES}_heldout${TAGSFX}"
+  RTAG="${DOM}_rollout_expert_thoughts_all_lr3e_3${TAGSFX}"
   [ -f "$MDIR/${RTAG}.done" ] && { log "$RTAG: done, skip"; continue; }
   CK=$(newest "checkpoints_lora/$ENVDIR/$MODEL/${TAG}-*/step_best")
   [ -z "$CK" ] && { log "$RTAG: no checkpoint, skip"; continue; }
