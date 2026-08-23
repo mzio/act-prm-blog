@@ -20,7 +20,9 @@ set -uo pipefail
 cd "$(dirname "$0")/.."
 export PATH="$HOME/.local/bin:$HOME/.cargo/bin:/usr/local/bin:$PATH"
 MODEL="${MODEL_CFG:-hf_qwen3_4b_instruct}"; export MODEL_CFG="$MODEL"
-MDIR=/tmp/aprm/expert_all; mkdir -p "$MDIR"
+# Overridable so the corrected re-run (require_thought no longer filters the eval targets)
+# gets its own marker dir instead of tripping over the first pass's .done files.
+MDIR="${MDIR:-/tmp/aprm/expert_all}"; mkdir -p "$MDIR"
 NUM_BATCHES="${NUM_BATCHES:-150}"
 # Finance is deliberately EXCLUDED here: run_finance_v3.sh already trains
 # expert_thoughts_all for finance against the CLEAN v3 eval. Running it here too would

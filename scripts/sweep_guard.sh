@@ -114,6 +114,21 @@ if [ -f "$G/finance_v3/ALLDONE" ] && [ ! -f "$G/finance_rollout/ALLDONE" ]; then
   exit 0
 fi
 
+# 2g1. RE-RUN retail+airline expert_thoughts_all. The first pass ran with --require_thought
+# filtering the EVAL targets as well as the train targets, so its teacher-forced PPL was
+# scored on a thought-bearing (longer, harder) subset -- mean eval target 497.7 tokens vs
+# 293.6 for the same pool without the flag -- and is not comparable to the other arms.
+# base.py now gates the filter on split=="train". Rollout numbers from the first pass are
+# unaffected (gym task completion never touches that path), but step_best was selected
+# against the filtered metric, so the rollouts re-run off the corrected checkpoints.
+# Placed after the finance work to preserve the requested ordering.
+if [ -f "$G/finance_rollout/ALLDONE" ] && [ ! -f "$G/expert_all_fix/ALLDONE" ]; then
+  log "advancing the expert_thoughts_all re-run (comparable eval)"
+  mkdir -p "$G/expert_all_fix"
+  MDIR="$G/expert_all_fix" ./scripts/run_expert_all.sh >> "$G/expert_all_fix/driver.log" 2>&1
+  exit 0
+fi
+
 # 2g2. 3 rollouts per task for the key arms. Ordered AFTER the finance work and BEFORE
 # best-gen because it is the only stage that can make the headline result significant
 # (pooled McNemar is currently p=0.077); every other pending stage adds interpretation,
