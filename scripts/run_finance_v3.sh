@@ -40,7 +40,7 @@ for spec in "${ARMS[@]}"; do
   IFS=":" read -r label variant pool extra <<< "$spec"
   TAG="snorkel_finance_split_s2_${label}_v3_lr3e_3_nb${NB}_heldout"
   if [ -f "$MDIR/${TAG}.done" ]; then log "$TAG: done, skip"; continue; fi
-  log "SFT $TAG  (train: original pool, eval: clean 5 questions)"
+  log "SFT $TAG  (question-level split: 40 train / 10 eval questions, pool=$pool)"
   wait_gpu_free
   ./scripts/train_sft.sh "$ENV" "$variant" \
       --dataset_path "$pool" --run_tag "$TAG" --best_metric eval_action_ppl \
