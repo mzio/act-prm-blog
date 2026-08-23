@@ -8,6 +8,25 @@
 # --eval_group_size 3 makes the generator produce 3 independent rollouts per task in a
 # single pass, so n goes 42 -> 126 (retail) and 18 -> 54 (airline).
 #
+# MEASURED NOISE FLOOR (08-23). Two runs of expert_thoughts_all with identical config, data
+# and hyperparameters -- differing only in GPU reduction nondeterminism, both selecting
+# step_best=149, train losses agreeing to 3-4 decimals, adapters differing by a median 0.03%
+# per tensor -- scored 9/42 and 6/42 on the SAME 42 tasks. A 7.1pp swing, agreeing on only
+# 35/42 tasks. That is the reproducibility floor of the 1-rollout protocol, and it is the
+# same size as the effects being reported (+9.5pp retail thoughts_policy, +7.1pp the matched
+# control, +4.8pp thoughts_base). Only airline thoughts_policy (+22.2pp) clearly clears it.
+#
+# That swing conflates TWO sources: rollout sampling (stochastic generation + a stochastic
+# LLM user simulator) and training nondeterminism. --eval_group_size only attacks the first.
+# This run therefore also DECOMPOSES the noise: if the within-adapter spread across 3
+# rollouts is ~7pp, sampling dominates and more rollouts is the right fix; if it is much
+# smaller, training nondeterminism dominates and the fix is multiple training SEEDS instead.
+#
+# ANALYSIS: with 3 rollouts/task each task gets a success FRACTION (0, 1/3, 2/3, 1). Compare
+# arms with a paired test on those continuous per-task scores (Wilcoxon signed-rank), not by
+# binarising and running McNemar -- binarising throws away exactly the resolution this run
+# was launched to buy.
+#
 # Measured cost: retail 74 min/arm at 1 try -> ~3.7h at 3; airline 38 min -> ~1.9h.
 # ARMS default is the key contrast (baseline vs Act-PRM policy-scored) = ~11h.
 # Set ARMS="actions_only expert_thoughts thoughts_policy thoughts_base" for all four (~22h).
