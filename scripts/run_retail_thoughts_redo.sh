@@ -19,6 +19,14 @@
 set -uo pipefail
 cd "$(dirname "$0")/.."
 export PATH="$HOME/.local/bin:$HOME/.cargo/bin:/usr/local/bin:$PATH"
+# HuggingFace access. Cron hands us an environment with no proxy, and huggingface.co is
+# not directly resolvable from this box -- load_llm then dies on DNS *after* loading the
+# cached weights (this took all 10 finance rollouts down on 08-23). Any driver that calls
+# main_pytorch.py directly must export these itself; only train_sft.sh / train_rl_from_sft.sh
+# do it for their callers.
+export https_proxy="${https_proxy:-http://fwdproxy:8080}"
+export http_proxy="${http_proxy:-http://fwdproxy:8080}"
+export HF_TOKEN="${HF_TOKEN:-$(cat "$HOME/models/token" 2>/dev/null || true)}"
 
 MODEL="hf_qwen3_4b_instruct"; export MODEL_CFG="$MODEL"
 CKROOT="checkpoints_lora/act_prm_tau2_retail/$MODEL"   # Stage-2 SFT checkpoints

@@ -17,8 +17,17 @@
 set -uo pipefail
 cd "$(dirname "$0")/.."
 export PATH="$HOME/.local/bin:$HOME/.cargo/bin:/usr/local/bin:$PATH"
+# HuggingFace access. Cron hands us an environment with no proxy, and huggingface.co is
+# not directly resolvable from this box -- load_llm then dies on DNS *after* loading the
+# cached weights (this took all 10 finance rollouts down on 08-23). Any driver that calls
+# main_pytorch.py directly must export these itself; only train_sft.sh / train_rl_from_sft.sh
+# do it for their callers.
+export https_proxy="${https_proxy:-http://fwdproxy:8080}"
+export http_proxy="${http_proxy:-http://fwdproxy:8080}"
+export HF_TOKEN="${HF_TOKEN:-$(cat "$HOME/models/token" 2>/dev/null || true)}"
 MODEL="${MODEL_CFG:-hf_qwen3_4b_instruct}"; export MODEL_CFG="$MODEL"
 MDIR=/tmp/aprm/bestgen; mkdir -p "$MDIR"
+_fail=0
 NB="${NUM_BATCHES:-150}"
 log(){ echo "[$(date '+%m-%d %H:%M:%S')] $*" | tee -a "$MDIR/bestgen.log"; }
 wait_gpu_free(){ while pgrep -f '[m]ain_pytorch.py' >/dev/null 2>&1; do sleep 60; done; sleep 10; }
@@ -46,7 +55,7 @@ for spec in "${SPECS[@]}"; do
       --run_tag "$TAG" --best_metric eval_action_ppl \
       --learning_rate 3e-3 --num_batches "$NB" --early_stop_patience 3 \
       > "$MDIR/${TAG}.log" 2>&1 \
-    && { touch "$MDIR/${TAG}.done"; log "$TAG: done"; } || log "$TAG: FAILED (see $MDIR/${TAG}.log)"
+    && { touch "$MDIR/${TAG}.done"; log "$TAG: done"; } || { _fail=$((_fail+1)); log "${TAG}: FAILED (see $MDIR/${TAG}.log)"; }
 done
 
 # --- 2. rollout eval of the best checkpoint, per environment ---
@@ -74,10 +83,11 @@ for spec in "${SPECS[@]}"; do
           --replay_buffer_config default --resume_from "$CK" \
           --no_train --num_batches 1 --eval_every 1 --group_size 2 --batch_size 1 \
           --max_tokens 2048 --hide_observations --run_tag "$RT" --eval_query_ids $IDS --verbose \
-          > "$MDIR/${RT}.log" 2>&1 || { log "$RT: FAILED"; continue; }
+          > "$MDIR/${RT}.log" 2>&1 || { { _fail=$((_fail+1)); log "${RT}: FAILED"; }; continue; }
       D=$(newest "logs/act_prm_snorkel_finance_gym/$MODEL/${RT}-*/")
       uv run --no-project python scripts/check_rollout_valid.py "$D" \
-        && { touch "$MDIR/${RT}.done"; log "$RT: done"; } || log "$RT: INVALID; not marking done"
+        && { touch "$MDIR/${RT}.done"; log "$RT: done"; } \
+      || { _fail=$((_fail+1)); log "$RT: INVALID; not marking done"; }
     done
   else
     IDS=$RETAIL_IDS; TID=$RETAIL_TID
@@ -90,10 +100,18 @@ for spec in "${SPECS[@]}"; do
         --no_train --num_batches 1 --eval_every 1 --group_size 2 --batch_size 1 \
         --max_turns 20 --max_tokens 2048 --discount_factor 1.0 --hide_observations \
         --train_task_ids "$TID" --eval_task_ids $IDS > "$MDIR/${RT}.log" 2>&1 \
-      || { log "$RT: FAILED"; continue; }
+      || { { _fail=$((_fail+1)); log "${RT}: FAILED"; }; continue; }
     D=$(newest "logs/tau2bench_${dom}_rlvr/$MODEL/${RT}-*/")
     uv run --no-project python scripts/check_rollout_valid.py "$D" \
-      && { touch "$MDIR/${RT}.done"; log "$RT: done"; } || log "$RT: INVALID; not marking done"
+      && { touch "$MDIR/${RT}.done"; log "$RT: done"; } \
+      || { _fail=$((_fail+1)); log "$RT: INVALID; not marking done"; }
   fi
 done
-touch "$MDIR/ALLDONE"; log "=== bestgen SFT + rollout complete ==="
+# Only claim completion if nothing failed. Touching ALLDONE unconditionally is how a
+# wholesale failure (10/10 finance rollouts dying on HF DNS, 08-23) got recorded as a
+# completed stage and the guard advanced straight past it.
+if [ "${_fail:-0}" -eq 0 ]; then
+  touch "$MDIR/ALLDONE"; log "=== best-generation Act-PRM complete ==="
+else
+  log "=== best-generation Act-PRM INCOMPLETE: $_fail failure(s); not marking ALLDONE ==="
+fi

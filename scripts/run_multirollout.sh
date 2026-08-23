@@ -16,6 +16,7 @@ cd "$(dirname "$0")/.."
 export PATH="$HOME/.local/bin:$HOME/.cargo/bin:/usr/local/bin:$PATH"
 MODEL="${MODEL_CFG:-hf_qwen3_4b_instruct}"; export MODEL_CFG="$MODEL"
 MDIR=/tmp/aprm/multirollout; mkdir -p "$MDIR"
+_fail=0
 NTRIES="${NTRIES:-3}"
 ARMS="${ARMS:-actions_only thoughts_policy}"
 log(){ echo "[$(date '+%m-%d %H:%M:%S')] $*" | tee -a "$MDIR/multirollout.log"; }
@@ -44,10 +45,18 @@ for dom in retail airline; do
         --eval_group_size "$NTRIES" \
         --max_turns 20 --max_tokens 2048 --discount_factor 1.0 --hide_observations \
         --train_task_ids "$TID" --eval_task_ids $IDS > "$MDIR/${TAG}.log" 2>&1 \
-      || { log "$TAG: FAILED"; continue; }
+      || { { _fail=$((_fail+1)); log "${TAG}: FAILED"; }; continue; }
     D=$(newest "logs/tau2bench_${dom}_rlvr/$MODEL/${TAG}-*/")
     uv run --no-project python scripts/check_rollout_valid.py "$D" \
-      && { touch "$MDIR/${TAG}.done"; log "$TAG: done"; } || log "$TAG: INVALID; not marking done"
+      && { touch "$MDIR/${TAG}.done"; log "$TAG: done"; } \
+      || { _fail=$((_fail+1)); log "$TAG: INVALID; not marking done"; }
   done
 done
-touch "$MDIR/ALLDONE"; log "=== multi-rollout complete ==="
+# Only claim completion if nothing failed. Touching ALLDONE unconditionally is how a
+# wholesale failure (10/10 finance rollouts dying on HF DNS, 08-23) got recorded as a
+# completed stage and the guard advanced straight past it.
+if [ "${_fail:-0}" -eq 0 ]; then
+  touch "$MDIR/ALLDONE"; log "=== multi-rollout complete ==="
+else
+  log "=== multi-rollout INCOMPLETE: $_fail failure(s); not marking ALLDONE ==="
+fi
