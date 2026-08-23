@@ -99,6 +99,19 @@ fi
 # 2f. Finance v3: QUESTION-level 40/10 split, subselected from the existing pools (v1 eval
 # was 76% contaminated at the question level). Honest train/eval action-span curves +
 # final checkpoints for rollout on the 10 eval questions and the 29 expert-failure questions.
+#
+# The driver touches ALLDONE unconditionally, even when an arm FAILED -- expert_thoughts_all
+# crashed on 08-23 (empty minibatch; 56% of finance expert trajectories carry no reasoning).
+# Retract ALLDONE whenever an arm marker is missing so the driver is re-invoked and picks up
+# just the failed arm; its per-arm .done files make that a cheap no-op for the rest.
+if [ -f "$G/finance_v3/ALLDONE" ]; then
+  for _a in actions_only expert_thoughts expert_thoughts_all thoughts_policy thoughts_base; do
+    if [ ! -f "$G/finance_v3/snorkel_finance_split_s2_${_a}_v3_lr3e_3_nb150_heldout.done" ]; then
+      log "finance v3: arm '$_a' never completed -- retracting ALLDONE for a retry"
+      rm -f "$G/finance_v3/ALLDONE"; break
+    fi
+  done
+fi
 if [ ! -f "$G/finance_v3/ALLDONE" ]; then
   log "advancing finance v3 Stage-2"
   ./scripts/run_finance_v3.sh >> "$G/finance_v3/driver.log" 2>&1
