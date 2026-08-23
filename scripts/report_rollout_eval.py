@@ -40,7 +40,8 @@ def main():
     for dom in sorted({d for d, _ in rows}):
         base = rows.get((dom, "actions_only"))
         print(f"  {dom}")
-        for v in ORDER:
+        seen = [v for _d, v in rows if _d == dom]
+        for v in ORDER + sorted(v for v in seen if v not in ORDER):
             got = rows.get((dom, v))
             if not got:
                 continue
