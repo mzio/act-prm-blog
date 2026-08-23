@@ -76,7 +76,8 @@ for spec in "retail:act_prm_tau2_retail" "airline:act_prm_tau2_airline"; do
       --max_turns 20 --max_tokens 2048 --discount_factor 1.0 --hide_observations \
       --train_task_ids "$TID" --eval_task_ids $IDS \
       > "$MDIR/${RTAG}.log" 2>&1 \
-    && { touch "$MDIR/${RTAG}.done"; log "$RTAG: done"; } || log "$RTAG: FAILED"
+    && { touch "$MDIR/${RTAG}.done"; log "$RTAG: done"; } \
+    || { _fail=$((_fail+1)); log "$RTAG: FAILED"; }
 done
 # Only claim completion if nothing failed (see run_finance_rollout.sh: 10/10 arms died
 # on HF DNS under cron and the unconditional touch recorded it as a completed stage).
