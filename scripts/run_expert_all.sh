@@ -23,6 +23,7 @@ MODEL="${MODEL_CFG:-hf_qwen3_4b_instruct}"; export MODEL_CFG="$MODEL"
 # Overridable so the corrected re-run (require_thought no longer filters the eval targets)
 # gets its own marker dir instead of tripping over the first pass's .done files.
 MDIR="${MDIR:-/tmp/aprm/expert_all}"; mkdir -p "$MDIR"
+_fail=0
 NUM_BATCHES="${NUM_BATCHES:-150}"
 # Finance is deliberately EXCLUDED here: run_finance_v3.sh already trains
 # expert_thoughts_all for finance against the CLEAN v3 eval. Running it here too would
@@ -49,7 +50,7 @@ for env in $ENVS; do
       --run_tag "$TAG" --best_metric eval_action_ppl \
       --learning_rate 3e-3 --num_batches "$NUM_BATCHES" --early_stop_patience 3 \
       > "$MDIR/${TAG}.log" 2>&1 \
-    && { touch "$MDIR/${TAG}.done"; log "$TAG: done"; } || log "$TAG: FAILED (see $MDIR/${TAG}.log)"
+    && { touch "$MDIR/${TAG}.done"; log "$TAG: done"; } || { _fail=$((_fail+1)); log "$TAG: FAILED (see $MDIR/${TAG}.log)"; }
 done
 
 # --- 2. rollout eval (retail + airline only; finance has no gym data on this box) ---
@@ -77,4 +78,10 @@ for spec in "retail:act_prm_tau2_retail" "airline:act_prm_tau2_airline"; do
       > "$MDIR/${RTAG}.log" 2>&1 \
     && { touch "$MDIR/${RTAG}.done"; log "$RTAG: done"; } || log "$RTAG: FAILED"
 done
-touch "$MDIR/ALLDONE"; log "=== expert_thoughts_all complete ==="
+# Only claim completion if nothing failed (see run_finance_rollout.sh: 10/10 arms died
+# on HF DNS under cron and the unconditional touch recorded it as a completed stage).
+if [ "${_fail:-0}" -eq 0 ]; then
+  touch "$MDIR/ALLDONE"; log "=== expert_thoughts_all complete ==="
+else
+  log "=== expert_thoughts_all INCOMPLETE: $_fail failure(s); not marking ALLDONE ==="
+fi
