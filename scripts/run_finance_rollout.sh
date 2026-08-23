@@ -11,6 +11,13 @@
 #
 # Reported separately and never pooled: the hard set is selected for difficulty, so mixing
 # them would produce a number that means nothing.
+#
+# MAX_TURNS=24, not the env default of 12. Measured on the 116 v3 expert trajectories, the
+# assistant-turn count is p50=11, p90=19, max=24 -- a cap of 12 covers only 61% of the
+# EXPERT's own demonstrations, so it makes the cap, not the policy, the binding constraint.
+# At 12 every arm scored 0/10 with timesteps=0 and a final message of "Sorry, you have
+# reached the maximum number of steps": the policy never got to call respond_user, so no
+# answer was ever graded. 24 covers 100% of expert trajectories.
 set -uo pipefail
 cd "$(dirname "$0")/.."
 export PATH="$HOME/.local/bin:$HOME/.cargo/bin:/usr/local/bin:$PATH"
@@ -48,7 +55,7 @@ for arm in $ARMS; do
         --lora_config r8_a16_linear --generator_config hf_grpo --trainer_config pg \
         --replay_buffer_config default --resume_from "$CK" \
         --no_train --num_batches 1 --eval_every 1 --group_size 2 --batch_size 1 \
-        --max_tokens 2048 --hide_observations --run_tag "$TAG" \
+        --max_tokens 2048 --max_turns "${MAX_TURNS:-24}" --hide_observations --run_tag "$TAG" \
         --eval_query_ids $IDS --verbose \
         > "$MDIR/${TAG}.log" 2>&1 \
       || { log "$TAG: FAILED (see $MDIR/${TAG}.log)"; continue; }
