@@ -160,10 +160,24 @@ fi
 # a positional padding artifact are all ruled out, so either x1 was a lucky draw or the
 # batched path depresses scores. That distinction decides whether the 3-rollout null is a
 # real result or an artifact, so it runs BEFORE the new domain. ~2.5h for 2 arms x 2 reps.
+# Seed 42 is included deliberately, as a REPRODUCIBILITY probe rather than a new draw: the
+# original 72.2% was measured at seed 42, so re-running it tests whether an outcome is
+# pinned by the seed at all. If it reproduces, outcomes are seed-determined and the spread
+# ACROSS seeds is the real uncertainty. If it does NOT reproduce, CUDA nondeterminism alone
+# moves the score ~20pp, which is a worse problem than the seed story and would mean single
+# -rollout evals cannot be replicated even in principle.
+X1_SEEDS="0 1 7 42"
+X1_ARMS="thoughts_policy actions_only"
+if [ -f "$G/x1replicate/ALLDONE" ]; then
+  for _a in $X1_ARMS; do for _s in $X1_SEEDS; do
+    [ -f "$G/x1replicate/airline_rollout_${_a}_x1seed${_s}.done" ] || {
+      log "x1replicate: ${_a}/seed${_s} missing -- retracting ALLDONE"; rm -f "$G/x1replicate/ALLDONE"; break 2; }
+  done; done
+fi
 if [ -f "$G/finance_rollout/ALLDONE" ] && [ ! -f "$G/x1replicate/ALLDONE" ]; then
-  log "advancing the x1 replicate (is the batched eval path depressing scores?)"
+  log "advancing the x1 seed sweep (seeds: $X1_SEEDS)"
   mkdir -p "$G/x1replicate"
-  ./scripts/run_x1_replicate.sh >> "$G/x1replicate/driver.log" 2>&1
+  SEEDS="$X1_SEEDS" ARMS="$X1_ARMS" ./scripts/run_x1_replicate.sh >> "$G/x1replicate/driver.log" 2>&1
   exit 0
 fi
 
