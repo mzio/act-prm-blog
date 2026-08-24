@@ -1,0 +1,57 @@
+# Interactive Snorkel Insurance underwriting gym (SnorkelInsuranceEnv) for rollout eval.
+#
+# The LoRA policy does tool-calling rollouts (list_tables / get_table_descriptions /
+# get_underwriting_guidelines / sql_query / ... / final answer) over the snorkel benchmark
+# tables, and an LLM judge grades the answer.
+#
+# Data setup (github is blocked from this box, so clone from a github-capable shell):
+#   mkdir -p data/snorkel_insurance && cd data/snorkel_insurance
+#   git clone https://github.com/snorkel-ai/multi-turn-insurance-underwriting-benchmark-generation _repo
+#   cp -r _repo/resources ./resources && cp -r _repo/tool_data ./tool_data
+#   mkdir -p task_data && cp _repo/task_data/downsampled_task_set.json task_data/
+name: "snorkel_insurance"
+is_async: true
+
+data_path: "data/snorkel_insurance"
+task_data_path: "data/snorkel_insurance/task_data/downsampled_task_set.json"
+task: "default"
+
+# LLM-judge grader (Claude Agent SDK), matching the finance gym.
+grader_model_config:
+  name: "claude_agent_sdk"
+  model_config:
+    model: "claude-sonnet-4-5"
+    max_turns: 1
+grader_model_samples: 1
+grader_model_verbose: false
+
+# Explicit task-id selection. These MUST be declared here even as null: update_configs only
+# applies a CLI flag when `argname in config`, so an undeclared key means --eval_task_ids is
+# SILENTLY DROPPED and the env falls back to the fractional split below. That is exactly how
+# all ten finance rollouts came to score the env's own 11-question split instead of the
+# fair-10/hard-29 sets they were launched for.
+# The driver fills these from data/splits/snorkel_insurance_uid_to_task.json:
+#   rollout_task_ids -> the 41 held-out questions (never seen by Stage 1 or Stage 2)
+train_task_ids: null
+eval_task_ids: null
+
+# Fallback fractional split; unused whenever the *_task_ids above are set.
+frac_train: 0.7
+frac_val: 0.15
+frac_test: 0.15
+eval_all_samples: false
+
+# hide-obs regime, matching how the Stage-2 checkpoints were trained.
+hide_observations: true
+first_obs_to_show: 1
+last_obs_to_show: 1
+
+# Expert trajectories run 2-20 steps (p50 13, p90 19, max 20), so 20 would make the cap
+# bind on the tail. The finance gym defaulted to 12 against a p90 of 19 and every arm
+# scored 0/10 with timesteps=0, capped out before it could ever submit an answer.
+max_turns: 28
+num_tries: 1
+eval_num_tries: 1
+seed: 0
+data_seed: 0
+split: "train"
