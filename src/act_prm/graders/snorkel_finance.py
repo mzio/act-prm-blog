@@ -51,6 +51,43 @@ Model Response: {response}
 Label: {correct_answer}"""
 
 
+def parse_verdict(grading_response: str) -> tuple[str, bool]:
+    """Extract yes/no from the judge's text. Returns (verdict, parsed_cleanly).
+
+    The strict `correct:\\s*(yes|no)` pattern silently defaults to "no" whenever the judge
+    replies in any other shape, and the system prompt invites exactly that: it asks for
+    `correct: yes/no` but its own worked example shows `{True, 'Yes they both match'}`.
+    Observed live on 08-23 -- a judge wrote a prose analysis with no `correct:` line and
+    was recorded as INCORRECT without a verdict ever being read. Since the default is "no",
+    every parse failure biases the score DOWN, which is the direction that manufactures a
+    null result.
+
+    Falls back through the formats the judge actually emits, and reports whether any
+    matched so callers can log the rate rather than absorb it silently.
+    """
+    t = (grading_response or "").strip()
+    if not t:
+        return "no", False
+    # 1. the requested format
+    m = re.search(r"correct\s*:\s*\**\s*(yes|no)\b", t, flags=re.IGNORECASE)
+    if m:
+        return m.group(1).lower(), True
+    # 2. the format the system prompt's own example demonstrates: {True, '...'} / {False, ...}
+    m = re.search(r"\{\s*(true|false)\s*[,}]", t, flags=re.IGNORECASE)
+    if m:
+        return ("yes" if m.group(1).lower() == "true" else "no"), True
+    # 3. a bare leading verdict, e.g. "**Yes** -- they match" or "No, the figures differ"
+    m = re.match(r"\**\s*(yes|no)\b", t, flags=re.IGNORECASE)
+    if m:
+        return m.group(1).lower(), True
+    # 4. an explicit match/mismatch statement anywhere
+    if re.search(r"\b(do(es)? not match|don't match|mismatch|not a match)\b", t, flags=re.IGNORECASE):
+        return "no", True
+    if re.search(r"\b(they (both )?match|is a match|matches the label)\b", t, flags=re.IGNORECASE):
+        return "yes", True
+    return "no", False
+
+
 class SnorkelFinanceGrader(LLMGraderForQA):
     """Grader for Snorkel Finance QA using the reference FinQABenchmark prompt.
 
@@ -86,8 +123,12 @@ class SnorkelFinanceGrader(LLMGraderForQA):
             logger.warning("Grader returned no actions (model request may have failed)")
             return "no", "Grader error: no response from model"
         grading_response = actions[-1].text or ""
-        match = re.search(r"correct:\s*(yes|no)\b", grading_response, flags=re.IGNORECASE)
-        match = match.group(1).lower() if match else "no"
+        match, parsed = parse_verdict(grading_response)
+        if not parsed:
+            logger.warning(
+                "Grader verdict UNPARSEABLE -- defaulting to 'no'. First 200 chars: %r",
+                grading_response[:200],
+            )
         return match, grading_response.strip()
 
     async def grade_sample_async(
@@ -116,6 +157,10 @@ class SnorkelFinanceGrader(LLMGraderForQA):
             logger.warning("Grader returned no actions (model request may have failed)")
             return "no", "Grader error: no response from model"
         grading_response = actions[-1].text or ""
-        match = re.search(r"correct:\s*(yes|no)\b", grading_response, flags=re.IGNORECASE)
-        match = match.group(1).lower() if match else "no"
+        match, parsed = parse_verdict(grading_response)
+        if not parsed:
+            logger.warning(
+                "Grader verdict UNPARSEABLE -- defaulting to 'no'. First 200 chars: %r",
+                grading_response[:200],
+            )
         return match, grading_response.strip()
