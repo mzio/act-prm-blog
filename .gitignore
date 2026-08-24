@@ -234,3 +234,7 @@ docs/
 /tau2-bench/
 _quarantine_action_only_training/
 _quarantine_stubs/
+# snorkel insurance benchmark data (cloned from the snorkel-ai repo; per-box, not dotsynced)
+data/snorkel_insurance/_repo/
+data/snorkel_insurance/resources/
+data/snorkel_insurance/tool_data/
