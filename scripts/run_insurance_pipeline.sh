@@ -84,7 +84,12 @@ for scorer in policy base; do
   # -- 1a. EM training
   EMTAG="insurance_s1em_${scorer}"
   if [ ! -f "$MDIR/${EMTAG}.done" ]; then
+    # TIMING CHECK. This is the largest EM pass attempted: 2,273 train steps x group_size 4,
+    # against retail's 635. Cost was never calibrated for this scale, so measure it and
+    # report a real ETA instead of guessing (and so a pathological run is visible early).
     log "STAGE-1a EM training $EMTAG (${scorer}-scored, nb=$EM_NB bs=4 gs=4)"
+    log "  [timing] EM pass starting; will report measured s/batch on completion"
+    _t0=$(date +%s)
     wait_gpu_free
     ./scripts/train.sh --env_config "$ENVCFG" --generator_config act_prm --trainer_config pg \
         --model_config "$MODEL" --lora_config r8_a16_linear --replay_buffer_config default \
@@ -92,6 +97,9 @@ for scorer in policy base; do
         --length_penalty 0.15 --save_generations --verbose \
         > "$MDIR/${EMTAG}.log" 2>&1 \
       || { _fail=$((_fail+1)); log "$EMTAG: FAILED (see $MDIR/${EMTAG}.log)"; continue; }
+    _el=$(( $(date +%s) - _t0 ))
+    log "  [timing] $EMTAG took ${_el}s for $EM_NB batches = $((_el / (EM_NB>0?EM_NB:1)))s/batch"
+    log "  [timing] -> relabel ($RELABEL_NB batches) projects to ~$(( _el / (EM_NB>0?EM_NB:1) * RELABEL_NB / 60 ))min"
     touch "$MDIR/${EMTAG}.done"; log "$EMTAG: done"
   fi
 
@@ -174,9 +182,20 @@ for arm in $ARMS; do
       > "$MDIR/${RTAG}.log" 2>&1 \
     || { _fail=$((_fail+1)); log "$RTAG: FAILED (see $MDIR/${RTAG}.log)"; continue; }
   D=$(newest "logs/act_prm_snorkel_insurance_gym/$MODEL/${RTAG}-*/")
-  uv run --no-project python scripts/check_rollout_valid.py "$D" \
-    && { touch "$MDIR/${RTAG}.done"; log "$RTAG: done"; } \
-    || { _fail=$((_fail+1)); log "$RTAG: INVALID (user-sim/judge outage?); not marking done"; }
+  # JUDGE PARSE-RATE CHECK. The finance rollouts silently graded 67% of answers by DEFAULT
+  # ("no") because the judge replied in a shape the parser did not match. The fall-through
+  # parser should fix that, but "should" is not a measurement -- verify per run, and refuse
+  # to bank one whose scores are mostly unread defaults (they all bias toward incorrect).
+  _JOK=1
+  uv run --no-project python scripts/check_judge_parse_rate.py "$MDIR/${RTAG}.log" \
+      2>&1 | tee -a "$MDIR/insurance.log" | grep -q "FAIL:" && _JOK=0
+  if ! uv run --no-project python scripts/check_rollout_valid.py "$D"; then
+    _fail=$((_fail+1)); log "$RTAG: INVALID (episodes died early -- user-sim/judge outage?); not marking done"
+  elif [ "$_JOK" = 0 ]; then
+    _fail=$((_fail+1)); log "$RTAG: judge parse rate too low; not marking done"
+  else
+    touch "$MDIR/${RTAG}.done"; log "$RTAG: done"
+  fi
 done
 fi
 
