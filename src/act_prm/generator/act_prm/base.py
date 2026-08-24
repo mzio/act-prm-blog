@@ -434,13 +434,27 @@ class ActPrmGenerator(HuggingFaceGenerator):
         # taught "usually don't think" and at rollout it reasons before 0-8% of its tool
         # calls. Filtering the TARGETS (not the messages) keeps every prior turn in the
         # context -- state is still messages[:idx] -- so trajectories stay coherent.
-        # TRAIN ONLY. Filtering the eval targets too would score this arm on a different
-        # (and harder -- thought-bearing targets are longer) subset than every other arm,
-        # making the teacher-forced PPL/accuracy tables silently non-comparable.
+        #
+        # Applies to TRAIN ONLY by default. Filtering eval as well would score the arm on a
+        # different (and harder -- thought-bearing targets are longer) subset than every
+        # other arm, making the PPL/accuracy tables silently non-comparable; that bug
+        # inflated retail's mean eval target from 293.6 to 497.7 tokens and made
+        # expert_thoughts_all look 24% better than baseline on finance when it was 1.4%
+        # worse.
+        #
+        # `require_thought_eval` opts eval in as well. That is only sound when EVERY arm in
+        # the comparison sets it -- then the eval subset is identical across arms (so still
+        # comparable) AND on-distribution for all of them (each arm was trained on the same
+        # kind of turn). This is the insurance setup: all four arms train and evaluate on
+        # the 64% of turns that carry expert reasoning, which also removes the handicap that
+        # sank expert_thoughts elsewhere, where a third of its targets were bare tool calls.
         _req_thought = getattr(self, "require_thought", False) or (
             cfg is not None and cfg.get("require_thought", False)
         )
-        if _req_thought and split == "train":
+        _req_thought_eval = getattr(self, "require_thought_eval", False) or (
+            cfg is not None and cfg.get("require_thought_eval", False)
+        )
+        if _req_thought and (split == "train" or _req_thought_eval):
             from act_prm.environments.act_prm_traces.data import extract_action as _xa
 
             def _has_thought(i: int) -> bool:
@@ -450,6 +464,10 @@ class ActPrmGenerator(HuggingFaceGenerator):
                     return False  # no separable action -> not an action target
                 return len(c[: c.find(a)].strip()) >= 10
 
+            # NB: this decides targets from the CONTENT, so it only makes sense on a pool
+            # that keeps the expert reasoning. An actions_only pool has it stripped, so the
+            # check finds nothing and the arm would train on zero targets -- do not enable
+            # require_thought for a baseline arm.
             _kept = [i for i in action_indices if _has_thought(i)]
             logger.info(
                 "require_thought: %d/%d assistant turns carry reasoning (targets filtered)",

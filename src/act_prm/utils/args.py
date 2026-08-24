@@ -529,7 +529,20 @@ def get_args() -> argparse.Namespace:
             "Train only on assistant turns that carry reasoning BEFORE the action. ~50% of "
             "GPT-5-mini's logged retail actions (46% airline) are a bare <tool_call>, so the "
             "expert_thoughts arm learned 'usually do not think'. Filters TARGETS only -- every "
-            "turn stays in the context, so trajectories remain coherent."
+            "turn stays in the context, so trajectories remain coherent. TRAIN split only "
+            "unless --require_thought_eval is also passed."
+        ),
+    )
+    parser.add_argument(
+        "--require_thought_eval",
+        action="store_true",
+        default=None,
+        help=(
+            "Apply --require_thought to the EVAL split too. Only sound when EVERY arm being "
+            "compared sets it: the eval subset is then identical across arms (comparable) and "
+            "on-distribution for all of them. Setting it on a single arm makes that arm's "
+            "PPL/accuracy incomparable to the rest -- thought-bearing targets are longer and "
+            "harder, which once made an arm look 24%% better than baseline when it was worse."
         ),
     )
     parser.add_argument(

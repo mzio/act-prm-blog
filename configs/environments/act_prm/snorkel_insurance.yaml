@@ -34,5 +34,19 @@ hide_observations: false
 first_obs_to_show: 1
 last_obs_to_show: 1
 
+# NO target filtering. All four arms train on every logged action of the selected
+# trajectories (2,273 train / 540 eval targets), so they are matched step for step.
+#
+# The sample filter is at TRAJECTORY level and was applied when the pools were built:
+#   (1) the expert solved it        -> 910/1000 successful trajectories
+#   (2) >=1 reasoning-bearing step  -> 220/220 of the selected trajectories already qualify,
+#                                      so this filters nothing on insurance (it would matter
+#                                      on finance, where 56% of expert trajectories carry no
+#                                      reasoning on any turn).
+# expert_thoughts therefore keeps the 36% of its targets that are bare <tool_call>. That is
+# a faithful property of the expert data, not an artifact -- and insurance is the mildest
+# case of it we have (retail 50% bare, airline 46%, finance 69%), which makes this the
+# fairest head-to-head between real expert thoughts and Act-PRM inferred thoughts.
+
 num_tries: 1
 seed: 0
