@@ -38,7 +38,7 @@ if pgrep -f '[m]ain_pytorch.py' >/dev/null 2>&1; then exit 0; fi
 # Any of OUR driver shells mid-launch -> let it be. This list must include every driver
 # the guard can start; omitting one (run_matched_control) let cron launch a SECOND copy
 # of a control run that was already going, and both appended to the same metrics.jsonl.
-if ps -eo args | grep -qE 'scripts/(run_sft_lr_matrix|run_sft_sweep|probe_sft_lr|run_matched_control|run_expert_all|run_sft_rollout_eval|run_finance_v3|run_finance_rollout|run_bestgen_sft|run_multirollout)\.sh'; then exit 0; fi
+if ps -eo args | grep -qE 'scripts/(run_sft_lr_matrix|run_sft_sweep|probe_sft_lr|run_matched_control|run_expert_all|run_sft_rollout_eval|run_finance_v3|run_finance_rollout|run_bestgen_sft|run_multirollout|run_base_rollout)\.sh'; then exit 0; fi
 
 # 2. thoughts_base LR probe (once)
 if [ ! -f "$G/lrprobe/thoughts_base.done" ]; then
@@ -140,6 +140,17 @@ if [ -f "$G/finance_rollout/ALLDONE" ] && [ ! -f "$G/expert_all_fix/ALLDONE" ]; 
   mkdir -p "$G/expert_all_fix"
   MDIR="$G/expert_all_fix" TAGSFX="_fixeval" \
     ./scripts/run_expert_all.sh >> "$G/expert_all_fix/driver.log" 2>&1
+  exit 0
+fi
+
+# 2g1b. BASE-MODEL rollout: the missing control. Every other rollout loads a Stage-2
+# adapter, so nothing measures the raw instruct model in the gym and we cannot say what
+# Stage-2 SFT bought -- only how the arms compare to each other. ~1.9h for both domains.
+# Ordered before the multi-rollout so the baseline lands early and cheaply.
+if [ -f "$G/finance_rollout/ALLDONE" ] && [ ! -f "$G/base_rollout/ALLDONE" ]; then
+  log "advancing the base-model rollout (no Stage-2 adapter)"
+  mkdir -p "$G/base_rollout"
+  ./scripts/run_base_rollout.sh >> "$G/base_rollout/driver.log" 2>&1
   exit 0
 fi
 
