@@ -1,0 +1,535 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Act-PRM · finance rollout answers vs ground truth</title><style>
+:root{
+  --bg:#fbfbfa; --surface:#fff; --ink:#1b1b1a; --ink2:#4a4a48; --ink3:#77776f;
+  --line:#e4e4e0; --hit:#1f6f5c; --hit-bg:#e2f1ec; --miss:#8a5a00; --miss-bg:#fdf1dc;
+  --no:#9b2c2c; --no-bg:#fbe9e9; --yes:#1f6f5c; --yes-bg:#e2f1ec;
+}
+@media (prefers-color-scheme:dark){:root{
+  --bg:#16171a; --surface:#1e2024; --ink:#ececeb; --ink2:#b9b9b5; --ink3:#8b8b85;
+  --line:#31333a; --hit:#7fd8bf; --hit-bg:#16342c; --miss:#e8b566; --miss-bg:#3a2d15;
+  --no:#f0918f; --no-bg:#3a1e1e; --yes:#7fd8bf; --yes-bg:#16342c;}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);
+  font:15px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif}
+.wrap{max-width:1180px;margin:0 auto;padding:32px 24px 80px}
+h1{font-size:22px;margin:0 0 4px;letter-spacing:-.01em}
+.sub{color:var(--ink3);font-size:13px;margin-bottom:24px}
+.stats{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:22px}
+.stat{background:var(--surface);border:1px solid var(--line);border-radius:8px;
+  padding:10px 14px;min-width:120px}
+.stat b{display:block;font-size:20px;font-variant-numeric:tabular-nums;letter-spacing:-.02em}
+.stat span{color:var(--ink3);font-size:11px;text-transform:uppercase;letter-spacing:.05em}
+.bar{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:20px;align-items:center}
+button{font:inherit;font-size:13px;padding:5px 12px;border-radius:999px;cursor:pointer;
+  border:1px solid var(--line);background:var(--surface);color:var(--ink2)}
+button[aria-pressed=true]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:10px;
+  padding:18px 20px;margin-bottom:14px}
+.meta{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:10px}
+.tag{font-size:11px;padding:2px 8px;border-radius:5px;border:1px solid var(--line);
+  color:var(--ink2);font-weight:600;letter-spacing:.02em}
+.v{font-size:11px;padding:2px 8px;border-radius:5px;font-weight:700}
+.v.no{background:var(--no-bg);color:var(--no)} .v.yes{background:var(--yes-bg);color:var(--yes)}
+.warn{background:var(--miss-bg);color:var(--miss);font-size:11px;padding:2px 8px;
+  border-radius:5px;font-weight:600}
+.q{font-weight:600;margin:2px 0 14px;line-height:1.45}
+.cols{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+@media(max-width:820px){.cols{grid-template-columns:1fr}}
+.col h4{margin:0 0 6px;font-size:11px;text-transform:uppercase;letter-spacing:.06em;
+  color:var(--ink3);font-weight:700}
+.col div.body{font-size:13.5px;color:var(--ink2);white-space:pre-wrap;word-break:break-word}
+mark.hit{background:var(--hit-bg);color:var(--hit);padding:0 3px;border-radius:3px;font-weight:600}
+mark.miss{background:var(--miss-bg);color:var(--miss);padding:0 3px;border-radius:3px;font-weight:600}
+details{margin-top:12px;border-top:1px solid var(--line);padding-top:10px}
+summary{cursor:pointer;font-size:12px;color:var(--ink3);font-weight:600}
+details .body{font-size:13px;color:var(--ink2);white-space:pre-wrap;margin-top:8px}
+.legend{font-size:12px;color:var(--ink3);margin:-8px 0 20px}
+.none{color:var(--ink3);font-style:italic}
+</style></head><body>
+<div class="wrap">
+<h1>Finance rollout — model answers vs ground truth</h1>
+<div class="sub">Every finance arm scores 0/10 (fair) and 0/29 (hard). This page shows each
+answer the grader actually saw, so the null can be checked rather than taken on trust.
+Re-graded offline with the corrected verdict parser; no re-rollout.</div>
+
+<div class="stats">
+  <div class="stat"><b>127</b><span>episodes</span></div>
+  <div class="stat"><b>18</b><span>reached an answer</span></div>
+  <div class="stat"><b>0</b><span>judged correct</span></div>
+  <div class="stat"><b>35%</b><span>gold figures reproduced</span></div>
+  <div class="stat"><b>12/18</b><span>old parser defaulted</span></div>
+  <div class="stat"><b>0</b><span>verdicts changed</span></div>
+</div>
+
+<div class="bar"><button data-filter="all" aria-pressed="true">all</button><button data-filter="actions_only">actions_only</button><button data-filter="expert_thoughts">expert_thoughts</button><button data-filter="expert_thoughts_all">expert_thoughts_all</button><button data-filter="thoughts_policy">thoughts_policy</button>
+  <button data-filter="fair">fair set</button><button data-filter="hard">hard set</button></div>
+<div class="legend">Numbers are highlighted <mark class="hit">green</mark> when the figure appears
+on both sides and <mark class="miss">amber</mark> when it appears on only one — so a gold answer
+full of amber is one whose key quantities the model never produced.</div>
+
+
+<div class="card" data-arm="actions_only" data-set="fair">
+  <div class="meta">
+    <span class="tag">actions_only</span>
+    <span class="tag">fair set</span>
+    <span class="v no">judge: no</span>
+    <span class="tag">1/4 gold figures reproduced</span>
+    <span class="tag">16 turns</span>
+    <span class="warn">judge text had no <code>correct:</code> line</span>
+  </div>
+  <div class="q">What is the company&#x27;s effective tax rate structure and geographic income distribution for fiscal year 2023, and how does it compare to the U.S. statutory rate?</div>
+  <div class="cols">
+    <div class="col"><h4>Ground truth</h4><div class="body">For fiscal year <mark class="hit">2023,</mark> the company had a complex tax structure with significant international operations. The ratio of combined U.S. state income taxes and income taxed outside the U.S. to the U.S. statutory tax rate was <mark class="miss">0.200</mark>, indicating that non-federal tax components represented <mark class="miss">20%</mark> of the statutory rate. Additionally, U.S. domestic income represented <mark class="miss">88.7%</mark> of total income before taxes, showing that while the majority of income is generated domestically, the company has meaningful international operations that affect its overall tax strategy.</div></div>
+    <div class="col"><h4>Model answer</h4><div class="body">Walmart&#x27;s effective tax rate structure in <mark class="hit">2023</mark> includes a U.S. statutory tax rate of <mark class="miss">21.0%</mark>, U.S. state income taxes net of federal income tax benefit of <mark class="miss">3.1%</mark>, income taxed outside the U.S. of <mark class="miss">1.1%</mark>, separation/disposal/wind-down of business operations of <mark class="miss">6.3%</mark>, valuation allowance of <mark class="miss">1.7%</mark>, net impact of repatriated international earnings of (<mark class="miss">0.4</mark>)%, federal tax credits of (<mark class="miss">1.3</mark>)%, change in unrecognized tax benefits of <mark class="miss">0.3%</mark>, and other net of <mark class="miss">1.8%</mark>. The company&#x27;s effective income tax rate is <mark class="miss">33.6%</mark>, which is higher than the U.S. statutory rate of <mark class="miss">21.0%</mark>. This increase is due to a higher rate for U.S. state income taxes and the impact of certain business operations. The geographic income distribution shows that U.S. income before income taxes was $<mark class="miss">15,089,</mark> non-U.S. income before income taxes was $<mark class="miss">1,927,</mark> and the total income before income taxes was $<mark class="miss">17,016.</mark></div></div>
+  </div>
+  <details><summary>Judge rationale</summary>
+    <div class="body">Looking at this question, I need to determine if the model response matches the label.
+
+Let me verify the key claims in the label using the data from the model response:
+
+**Verification 1: The ratio of 0.200**
+- Model response states: U.S. state income taxes = 3.1%, Income taxed outside U.S. = 1.1%
+- Combined: 3.1% + 1.1% = 4.2%
+- U.S. statutory rate from model: 21.0%
+- Ratio: 4.2% ÷ 21.0% = 0.20 ✓
+
+**Verification 2: U.S. domestic income percentage of 88.7%**
+- Model response states: U.S. income = $15,089, Total income = $17,016
+- Percentage: $15,089 ÷ $17,016 = 0.8867 = 88.67% ≈ 88.7% ✓
+
+**Analysis:**
+
+The model response provides comprehensive raw data including all tax rate components and absolute dollar values for geographic income distribution. The label, however, focuses on specific derived metrics (the 0.200 ratio and 88.7% percentage) that are not explicitly calculated or stated in the model response.
+
+While the model response contains all the information necessary to calculate the label&#x27;s metrics, and those calculations are mathematically correct, the model did not actually perform or state these specific calculations. The responses represent different levels of analysis - the model provides granular components while the label provides synthesized insights.
+
+**correct:** no
+
+**rationale:** The model response provides detailed raw data (tax components like 3.1%, 1.1%, 21.0% and income figures like $15,089, $1,927) but does not explicitly state the specific derived metrics emphasized in the label (the 0.200 ratio and 88.7% percentage). While the underlying data is mathematically consistent and could be used to calculate these values, the model did not actually present these key insights that the label focuses on.</div></details>
+</div>
+<div class="card" data-arm="actions_only" data-set="fair">
+  <div class="meta">
+    <span class="tag">actions_only</span>
+    <span class="tag">fair set</span>
+    <span class="v no">judge: no</span>
+    <span class="tag">4/8 gold figures reproduced</span>
+    <span class="tag">17 turns</span>
+    
+  </div>
+  <div class="q">What is the company&#x27;s lease structure composition and how has lease-related cash flow changed in 2024?</div>
+  <div class="cols">
+    <div class="col"><h4>Ground truth</h4><div class="body">The company&#x27;s lease portfolio is heavily weighted toward operating leases, with operating lease costs being <mark class="miss">6.7</mark> times higher than short-term lease costs in <mark class="hit">2024.</mark> Short-term leases represent only <mark class="miss">10%</mark> of net lease costs in <mark class="hit">2023,</mark> indicating the company primarily relies on longer-term lease commitments. Finance leases make up a small portion (about <mark class="miss">0.97%</mark>) of net lease costs, suggesting the company prefers operating lease structures. Lease-related cash outflows increased modestly by <mark class="miss">3%</mark> from <mark class="hit">2023</mark> to <mark class="hit">2024,</mark> indicating relatively stable lease obligations year-over-year.</div></div>
+    <div class="col"><h4>Model answer</h4><div class="body">FedEx&#x27;s lease structure composition shows that the company&#x27;s operating lease right-of-use assets, net increased from $<mark class="miss">1.8</mark> billion in <mark class="hit">2023</mark> to $<mark class="miss">2.3</mark> billion in <mark class="hit">2024.</mark> The lease-related cash flow changed significantly in <mark class="hit">2024.</mark> The operating cash flows paid for operating leases increased from $<mark class="miss">1.4</mark> billion in <mark class="hit">2023</mark> to $<mark class="miss">1.9</mark> billion in <mark class="hit">2024.</mark> The operating cash flows paid for the interest portion of finance leases decreased from $<mark class="miss">147</mark> million in <mark class="hit">2023</mark> to $<mark class="miss">118</mark> million in <mark class="hit">2024.</mark> The operating cash flows paid for depreciation and amortization of right-of-use assets increased from $<mark class="miss">572</mark> million in <mark class="hit">2023</mark> to $<mark class="miss">687</mark> million in <mark class="hit">2024.</mark> The total lease-related cash outflows for lease payments decreased from $<mark class="miss">1.8</mark> billion in <mark class="hit">2023</mark> to $<mark class="miss">1.6</mark> billion in <mark class="hit">2024.</mark> This change reflects the company&#x27;s improved financial stability and better cash flow management.</div></div>
+  </div>
+  <details><summary>Judge rationale</summary>
+    <div class="body">correct: no
+
+rationale: The model response and label provide contradictory information about lease-related cash flow changes. The model states that &quot;total lease-related cash outflows for lease payments decreased from $1.8 billion in 2023 to $1.6 billion in 2024,&quot; while the label states that &quot;lease-related cash outflows increased modestly by 3% from 2023 to 2024.&quot; Additionally, regarding lease structure composition, the model focuses primarily on operating lease assets and various cash flow components without mentioning short-term leases, whereas the label provides specific comparative ratios (operating leases being 6.7x higher than short-term leases, short-term leases representing only 10% of net lease costs, finance leases at 0.97% of net lease costs). These fundamental discrepancies in both the direction of cash flow change and the description of lease composition mean the responses do not match.</div></details>
+</div>
+<div class="card" data-arm="actions_only" data-set="fair">
+  <div class="meta">
+    <span class="tag">actions_only</span>
+    <span class="tag">fair set</span>
+    <span class="v no">judge: no</span>
+    <span class="tag">2/9 gold figures reproduced</span>
+    <span class="tag">21 turns</span>
+    
+  </div>
+  <div class="q">How has the company&#x27;s investment portfolio performance improved in 2024, and what does this indicate about their risk management of available-for-sale debt securities?</div>
+  <div class="cols">
+    <div class="col"><h4>Ground truth</h4><div class="body">The company&#x27;s investment portfolio performance has significantly improved in <mark class="hit">2024.</mark> The ratio of gross gains to absolute gross losses from sales of AFS debt securities is <mark class="miss">0.408</mark>, indicating that while the company is still realizing net losses on these sales, the losses have moderated compared to what would be expected in a stressed environment. Additionally, the accumulated unrealized loss decreased by <mark class="miss">3.09%</mark> from December <mark class="miss">31,</mark> <mark class="miss">2023</mark> to December <mark class="miss">31,</mark> <mark class="hit">2024,</mark> showing that the fair value of the securities portfolio has recovered. The unrealized loss ratio for securities held less than twelve months is only <mark class="miss">0.003</mark> (<mark class="miss">0.3%</mark>), suggesting that recent investments are performing well and the company is effectively managing duration and credit risk in their new positions.</div></div>
+    <div class="col"><h4>Model answer</h4><div class="body">The company&#x27;s investment portfolio performance in <mark class="hit">2024</mark> indicates that the risk management of available-for-sale debt securities is being carefully handled. For the available-for-sale debt securities, the gross unrealized losses decreased by <mark class="miss">30.75%</mark> in <mark class="hit">2024</mark> compared to the previous year, from $<mark class="miss">100</mark> million to $<mark class="miss">69.3</mark> million, suggesting a successful reduction in losses. This is further supported by the fact that the amount of gross unrealized losses for securities held less than <mark class="miss">12</mark> months decreased by <mark class="miss">21.84%</mark> from $<mark class="miss">33</mark> million to $<mark class="miss">26</mark> million, and for securities held for <mark class="miss">12</mark> months or longer, it decreased by <mark class="miss">11.23%</mark> from $<mark class="miss">67</mark> million to $<mark class="miss">59.5</mark> million. These improvements indicate that the company has effectively managed and mitigated risks in its investment portfolio.</div></div>
+  </div>
+  <details><summary>Judge rationale</summary>
+    <div class="body">correct: no
+
+rationale: The model response and label discuss the same topic but provide fundamentally different metrics and percentages. The model claims a 30.75% decrease in gross unrealized losses (from $100M to $69.3M), while the label states a 3.09% decrease in accumulated unrealized loss. Additionally, the label includes key metrics that are completely absent from the model response: the 0.408 ratio of gross gains to absolute gross losses from sales of AFS debt securities, and the 0.003 (0.3%) unrealized loss ratio for securities held less than twelve months. While both conclude that risk management is effective, they use entirely different supporting evidence and quantitative measures to reach that conclusion. The specific numbers and percentages do not match.</div></details>
+</div>
+<div class="card" data-arm="actions_only" data-set="hard">
+  <div class="meta">
+    <span class="tag">actions_only</span>
+    <span class="tag">hard set</span>
+    <span class="v no">judge: no</span>
+    <span class="tag">3/10 gold figures reproduced</span>
+    <span class="tag">20 turns</span>
+    <span class="warn">judge text had no <code>correct:</code> line</span>
+  </div>
+  <div class="q">How is the company managing its pension obligations and what is the funding status of its pension plans as of September 28, 2024?</div>
+  <div class="cols">
+    <div class="col"><h4>Ground truth</h4><div class="body">The company had a net contribution to pension plan assets of -$<mark class="miss">592</mark> million as of September <mark class="hit">28,</mark> <mark class="hit">2024,</mark> indicating that more money flowed out of the pension plans than was contributed during this period. This negative contribution could suggest either benefit payments exceeding contributions or investment losses. The pension plans also show a significantly higher benefit payment burden compared to postretirement medical plans, with pension benefit payments being approximately <mark class="miss">14.7</mark> times larger than medical plan payments projected for fiscal <mark class="miss">2027.</mark> Additionally, the company has been adjusting compensation increase assumptions, with the weighted average rate declining from <mark class="miss">3.10%</mark> in both <mark class="miss">2022</mark> and <mark class="miss">2023</mark> to <mark class="miss">2.70%</mark> in <mark class="hit">2024,</mark> suggesting more conservative salary growth expectations.</div></div>
+    <div class="col"><h4>Model answer</h4><div class="body">Disney is managing its pension obligations through a structured approach involving regular contributions and a balance between actuarial gains and losses. As of September <mark class="hit">28,</mark> <mark class="hit">2024,</mark> the company&#x27;s pension plans show a funding status where the total assets are $<mark class="miss">50.5</mark> billion and the total liabilities are $<mark class="miss">48.2</mark> billion, resulting in a funded ratio of <mark class="miss">104.3%</mark>. This indicates the pension plans are overfunded by $<mark class="miss">2.3</mark> billion. For the postretirement medical plans, the total assets are $<mark class="miss">22.3</mark> billion and the total liabilities are $<mark class="miss">22.3</mark> billion, resulting in a funded ratio of <mark class="miss">100%</mark>. The total amount included in AOCI for pension plans is $<mark class="miss">2,971</mark> million, and for postretirement medical plans, it is $(<mark class="miss">657</mark>) million. The net actuarial gain (loss) is $<mark class="miss">2,314</mark> million, which reflects favorable conditions that could impact future pension costs.</div></div>
+  </div>
+  <details><summary>Judge rationale</summary>
+    <div class="body">Looking at the question, model response, and label:
+
+**correct:** no
+
+**rationale:** The model response and label address completely different aspects of pension management. The model response focuses on the funded status (assets of $50.5B vs. liabilities of $48.2B, 104.3% funded ratio, $2.3B overfunded), while the label discusses cash flows (net contribution of -$592 million), benefit payment comparisons (pension payments 14.7x larger than medical), and changes in actuarial assumptions (compensation increase rate declining from 3.10% to 2.70%). These are fundamentally different metrics and perspectives - one is balance sheet oriented (funding position) while the other is cash flow and assumption oriented. Neither answer contradicts the other, but they don&#x27;t match as they&#x27;re providing different information about pension management.</div></details>
+</div>
+<div class="card" data-arm="actions_only" data-set="hard">
+  <div class="meta">
+    <span class="tag">actions_only</span>
+    <span class="tag">hard set</span>
+    <span class="v no">judge: no</span>
+    <span class="tag">2/6 gold figures reproduced</span>
+    <span class="tag">10 turns</span>
+    <span class="warn">judge text had no <code>correct:</code> line</span>
+  </div>
+  <div class="q">How is the company managing its lease portfolio composition, and is there a trend toward more operating leases versus finance leases from 2022 to 2024?</div>
+  <div class="cols">
+    <div class="col"><h4>Ground truth</h4><div class="body">Based on the operating lease to total lease cost ratios, the company has been gradually shifting away from operating leases toward finance leases over the three-year period. The operating lease ratio declined from <mark class="miss">65.6%</mark> in <mark class="hit">2022</mark> to <mark class="miss">62.2%</mark> in <mark class="miss">2023,</mark> and further to <mark class="miss">60.5%</mark> in <mark class="hit">2024.</mark> This trend suggests the company may be taking on more finance leases, which could indicate a strategy to acquire rather than rent assets, potentially signaling confidence in long-term asset utilization or a shift in capital allocation strategy.</div></div>
+    <div class="col"><h4>Model answer</h4><div class="body">Disney is managing its lease portfolio by increasing its operating leases. From <mark class="hit">2022</mark> to <mark class="hit">2024,</mark> the company has increased its operating leases from <mark class="miss">1,998</mark> to <mark class="miss">2,942</mark> million, an increase of <mark class="miss">47.6%</mark>. Meanwhile, finance leases have decreased from <mark class="miss">3,250</mark> to <mark class="miss">1,773</mark> million, a decrease of <mark class="miss">45.4%</mark>. The company has shifted its lease portfolio composition from a more finance lease to a more operating lease by <mark class="hit">2024,</mark> with a significant increase in operating leases, suggesting a trend toward more operating leases than finance leases from <mark class="hit">2022</mark> to <mark class="hit">2024.</mark></div></div>
+  </div>
+  <details><summary>Judge rationale</summary>
+    <div class="body">Looking at this question about Disney&#x27;s lease portfolio management and trends:
+
+**correct:** no
+
+**rationale:** The model response and label provide contradictory conclusions about the trend direction. The model response claims there is a trend toward MORE operating leases (operating leases increased 47.6% while finance leases decreased 45.4% from 2022-2024). In contrast, the label states the company is shifting AWAY FROM operating leases toward finance leases, evidenced by the operating lease ratio declining from 65.6% in 2022 to 60.5% in 2024. These are opposite interpretations of the lease portfolio trend and therefore do not match.</div></details>
+</div>
+<div class="card" data-arm="actions_only" data-set="hard">
+  <div class="meta">
+    <span class="tag">actions_only</span>
+    <span class="tag">hard set</span>
+    <span class="v no">judge: no</span>
+    <span class="tag">0/4 gold figures reproduced</span>
+    <span class="tag">14 turns</span>
+    <span class="warn">judge text had no <code>correct:</code> line</span>
+  </div>
+  <div class="q">How significant are intangible assets in the company&#x27;s asset base and what is the composition of these intangibles as of 2023?</div>
+  <div class="cols">
+    <div class="col"><h4>Ground truth</h4><div class="body">The company has a substantial intangible asset base, with goodwill and intangible assets representing <mark class="miss">11.5%</mark> of total assets ($<mark class="miss">26,461</mark> M out of $<mark class="miss">230,682</mark> M). Within the intangible assets excluding goodwill, finite-lived intangible assets make up <mark class="miss">48.2%</mark> of the total, indicating a balanced mix between finite-lived and indefinite-lived intangible assets. This suggests the company has made significant acquisitions or has valuable intellectual property, with nearly half of these assets subject to amortization over time.</div></div>
+    <div class="col"><h4>Model answer</h4><div class="body">Intangible assets constitute <mark class="miss">50.0%</mark> of Chubb&#x27;s total assets as of <mark class="miss">2023.</mark> These intangibles are composed of <mark class="miss">22.4%</mark> goodwill, <mark class="miss">18.4%</mark> intangibles not subject to amortization (primarily trademarks), and <mark class="miss">9.2%</mark> intangibles subject to amortization (primarily agency distribution relationships and renewal rights).</div></div>
+  </div>
+  <details><summary>Judge rationale</summary>
+    <div class="body">Looking at this question about intangible assets, I need to compare the key facts:
+
+**Significance of intangible assets:**
+- Model Response: 50.0% of total assets
+- Label: 11.5% of total assets ($26,461M out of $230,682M)
+
+This is a fundamental discrepancy. The model claims intangible assets make up half of total assets, while the label states they represent only 11.5% - a difference of more than 4x.
+
+**Composition:**
+- Model Response: Breaks down as 22.4% goodwill + 18.4% indefinite-lived + 9.2% finite-lived (all as % of total assets)
+- Label: States that within intangible assets excluding goodwill, finite-lived assets make up 48.2%
+
+The compositional structures are also different and incompatible.
+
+**correct:** no
+
+**rationale:** The model response incorrectly states that intangible assets constitute 50.0% of total assets, while the label indicates they represent only 11.5% of total assets. This is a major factual error - the model has overstated the significance of intangible assets by more than 4x. The responses fundamentally disagree on the core quantitative fact being asked about.</div></details>
+</div>
+<div class="card" data-arm="actions_only" data-set="hard">
+  <div class="meta">
+    <span class="tag">actions_only</span>
+    <span class="tag">hard set</span>
+    <span class="v no">judge: no</span>
+    <span class="tag">4/7 gold figures reproduced</span>
+    <span class="tag">5 turns</span>
+    
+  </div>
+  <div class="q">How has the company&#x27;s liquidity position changed from 2023 to 2024, and what does this suggest about their financial flexibility?</div>
+  <div class="cols">
+    <div class="col"><h4>Ground truth</h4><div class="body">The company&#x27;s liquidity position has deteriorated significantly from <mark class="hit">2023</mark> to <mark class="hit">2024.</mark> The ratio of unused borrowing capacity to total debt decreased from <mark class="miss">1.074</mark> in <mark class="hit">2023</mark> to <mark class="miss">0.632</mark> in <mark class="hit">2024,</mark> indicating reduced financial flexibility. Additionally, cash and cash equivalents decreased by $<mark class="miss">259</mark> million year-over-year. This combination suggests the company has less available credit capacity and lower cash reserves, which could constrain their ability to fund operations, investments, or handle unexpected financial needs.</div></div>
+    <div class="col"><h4>Model answer</h4><div class="body">Tesla&#x27;s liquidity position has slightly decreased from <mark class="hit">2023</mark> to <mark class="hit">2024.</mark> The company&#x27;s total cash and cash equivalents and restricted cash was $<mark class="miss">17,189</mark> million as of December <mark class="miss">31,</mark> <mark class="hit">2023,</mark> and decreased to $<mark class="miss">17,037</mark> million as of December <mark class="miss">31,</mark> <mark class="hit">2024.</mark> This suggests that Tesla&#x27;s financial flexibility has slightly reduced, possibly due to the company&#x27;s investments or operational expenditures.</div></div>
+  </div>
+  <details><summary>Judge rationale</summary>
+    <div class="body">correct: no
+
+rationale: The model response and label do not match. While both identify a decrease in liquidity, they differ significantly in three key areas:
+
+1. **Magnitude of cash decrease**: The model states cash decreased by $152 million ($17,189M - $17,037M), while the label states $259 million - different figures.
+
+2. **Missing critical metric**: The label&#x27;s primary evidence is the ratio of unused borrowing capacity to total debt dropping from 1.074 to 0.632 (a ~41% decrease), which the model response completely omits.
+
+3. **Severity assessment**: The model characterizes this as a &quot;slight&quot; decrease with &quot;slightly reduced&quot; financial flexibility, whereas the label describes it as &quot;deteriorated significantly&quot; with potential constraints on operations and investments.
+
+The label presents a much more comprehensive and severe assessment of liquidity deterioration based on multiple metrics, while the model provides only a partial view focused on cash balances with a minimized severity characterization.</div></details>
+</div>
+<div class="card" data-arm="actions_only" data-set="hard">
+  <div class="meta">
+    <span class="tag">actions_only</span>
+    <span class="tag">hard set</span>
+    <span class="v no">judge: no</span>
+    <span class="tag">3/10 gold figures reproduced</span>
+    <span class="tag">9 turns</span>
+    <span class="warn">judge text had no <code>correct:</code> line</span>
+  </div>
+  <div class="q">How has the company&#x27;s stock-based compensation expense evolved over the past three years (2022-2024), and what does this trend suggest about the company&#x27;s equity compensation strategy?</div>
+  <div class="cols">
+    <div class="col"><h4>Ground truth</h4><div class="body">The company&#x27;s net stock-based compensation expense has shown consistent growth over the three-year period, increasing from $<mark class="miss">6,209</mark> million in <mark class="hit">2022</mark> to $<mark class="miss">7,960</mark> million in <mark class="miss">2023</mark> (<mark class="miss">28.2%</mark> increase) and further to $<mark class="miss">8,908</mark> million in <mark class="hit">2024</mark> (<mark class="miss">11.9%</mark> increase). This upward trend suggests the company is expanding its equity compensation programs, likely to attract and retain talent in a competitive market. The growth rate has moderated from <mark class="miss">2023</mark> to <mark class="hit">2024,</mark> which could indicate the company is reaching a more sustainable level of equity compensation or adjusting its strategy in response to market conditions.</div></div>
+    <div class="col"><h4>Model answer</h4><div class="body">Microsoft&#x27;s stock-based compensation expense has increased significantly over the past three years, rising from $<mark class="miss">2,294</mark> million in <mark class="hit">2022</mark> to $<mark class="miss">3,088</mark> million in <mark class="hit">2024.</mark> This growth of <mark class="miss">39%</mark> indicates that the company&#x27;s equity compensation strategy is focused on long-term incentive and retention, with an emphasis on aligning employee performance with shareholder value. The rise in expense is also influenced by increasing interest rates, which directly impact the valuation of equity awards. The average increase in expense is <mark class="miss">50%</mark> per year, signaling a strategic shift toward more aggressive equity compensation to attract and retain top talent in a competitive market.</div></div>
+  </div>
+  <details><summary>Judge rationale</summary>
+    <div class="body">**correct:** no
+
+**rationale:** The model response and label cite completely different numerical values for stock-based compensation expense. The model reports $2,294M (2022) and $3,088M (2024), while the label shows $6,209M (2022), $7,960M (2023), and $8,908M (2024) - the label values are roughly 2.7-2.9x higher. Additionally, the model omits 2023 data entirely, claims an internally inconsistent &quot;50% average annual increase&quot; vs &quot;39% total growth,&quot; and suggests an aggressive/accelerating strategy, while the label shows moderating growth (28.2% → 11.9%) reaching a more sustainable level. The fundamental mismatch in actual figures means these responses describe different datasets or metrics entirely.</div></details>
+</div>
+<div class="card" data-arm="expert_thoughts" data-set="fair">
+  <div class="meta">
+    <span class="tag">expert_thoughts</span>
+    <span class="tag">fair set</span>
+    <span class="v no">judge: no</span>
+    <span class="tag">1/4 gold figures reproduced</span>
+    <span class="tag">12 turns</span>
+    <span class="warn">judge text had no <code>correct:</code> line</span>
+  </div>
+  <div class="q">What is the company&#x27;s effective tax rate structure and geographic income distribution for fiscal year 2023, and how does it compare to the U.S. statutory rate?</div>
+  <div class="cols">
+    <div class="col"><h4>Ground truth</h4><div class="body">For fiscal year <mark class="hit">2023,</mark> the company had a complex tax structure with significant international operations. The ratio of combined U.S. state income taxes and income taxed outside the U.S. to the U.S. statutory tax rate was <mark class="miss">0.200</mark>, indicating that non-federal tax components represented <mark class="miss">20%</mark> of the statutory rate. Additionally, U.S. domestic income represented <mark class="miss">88.7%</mark> of total income before taxes, showing that while the majority of income is generated domestically, the company has meaningful international operations that affect its overall tax strategy.</div></div>
+    <div class="col"><h4>Model answer</h4><div class="body">I have analyzed Walmart&#x27;s tax structure and income distribution for fiscal year <mark class="hit">2023.</mark>
+
+<mark class="miss">1.</mark> **Effective Tax Rate Structure**: Walmart&#x27;s effective tax rate was <mark class="miss">17.8%</mark> in <mark class="hit">2023,</mark> lower than the U.S. statutory rate of <mark class="miss">21%</mark>. This was due to various components, including state taxes, foreign tax liabilities, and federal tax credits. The main reasons for the lower rate were tax credits, income taxed outside the U.S., and net impact of repatriated international earnings.
+
+<mark class="miss">2.</mark> **Geographic Income Distribution**: Total revenue from external customers was $<mark class="miss">635.9</mark> billion in <mark class="hit">2023.</mark> The majority of this revenue came from the U.S. operations, which accounted for <mark class="miss">72%</mark> of total revenues. Non-U.S. operations accounted for the remaining <mark class="miss">28%</mark>.
+
+<mark class="miss">3.</mark> **Comparison with U.S. Statutory Rate**: The effective rate of <mark class="miss">17.8%</mark> is below the U.S. statutory rate of <mark class="miss">21%</mark>, resulting in a tax savings of <mark class="miss">3.2</mark> percentage points, which equates to a $<mark class="miss">13.6</mark> billion annual tax benefit.</div></div>
+  </div>
+  <details><summary>Judge rationale</summary>
+    <div class="body">**correct:** no
+
+**rationale:** The model response and label provide different information about Walmart&#x27;s fiscal 2023 tax and income structure:
+
+1. **Geographic distribution mismatch**: The model states 72% U.S. revenue vs 28% non-U.S. revenue, while the label indicates 88.7% U.S. domestic income before taxes (implying 11.3% international). These are different metrics (revenue vs. pre-tax income) with substantially different percentages.
+
+2. **Tax structure metrics differ**: The model focuses on the effective tax rate of 17.8% compared to the statutory 21% rate. The label instead specifies a ratio of 0.200 (20%) for combined state and foreign tax components relative to the statutory rate - a different measurement entirely.
+
+3. **Different emphasis**: The model emphasizes overall tax savings and effective rates, while the label focuses on specific tax structure ratios and the precise income distribution, which are the actual answers to the question about tax rate structure and geographic income distribution.
+
+The responses discuss related topics but provide different numerical values and metrics that do not match.</div></details>
+</div>
+<div class="card" data-arm="expert_thoughts" data-set="hard">
+  <div class="meta">
+    <span class="tag">expert_thoughts</span>
+    <span class="tag">hard set</span>
+    <span class="v no">judge: no</span>
+    <span class="tag">4/10 gold figures reproduced</span>
+    <span class="tag">16 turns</span>
+    
+  </div>
+  <div class="q">How is the company managing its pension obligations and what is the funding status of its pension plans as of September 28, 2024?</div>
+  <div class="cols">
+    <div class="col"><h4>Ground truth</h4><div class="body">The company had a net contribution to pension plan assets of -$<mark class="miss">592</mark> million as of September <mark class="hit">28,</mark> <mark class="hit">2024,</mark> indicating that more money flowed out of the pension plans than was contributed during this period. This negative contribution could suggest either benefit payments exceeding contributions or investment losses. The pension plans also show a significantly higher benefit payment burden compared to postretirement medical plans, with pension benefit payments being approximately <mark class="miss">14.7</mark> times larger than medical plan payments projected for fiscal <mark class="miss">2027.</mark> Additionally, the company has been adjusting compensation increase assumptions, with the weighted average rate declining from <mark class="miss">3.10%</mark> in both <mark class="miss">2022</mark> and <mark class="hit">2023</mark> to <mark class="miss">2.70%</mark> in <mark class="hit">2024,</mark> suggesting more conservative salary growth expectations.</div></div>
+    <div class="col"><h4>Model answer</h4><div class="body">As of September <mark class="hit">28,</mark> <mark class="hit">2024,</mark> Disney is managing its pension obligations and post-retirement medical plans with a focus on increasing the funded status of its pension plans and reducing liabilities. The funded status of pension plans was improved from $<mark class="miss">752</mark> million (underfunded) on September <mark class="miss">30,</mark> <mark class="hit">2023,</mark> to $<mark class="miss">823</mark> million (overfunded) on September <mark class="hit">28,</mark> <mark class="hit">2024,</mark> resulting in an increase of $<mark class="miss">71</mark> million. This improvement was driven by a higher actual return on plan assets (from $<mark class="miss">1,324</mark> million to $<mark class="miss">2,789</mark> million), an increase in contributions, and a reduction in actuarial gains and losses. However, the funded status of the post-retirement medical plans declined from $(<mark class="miss">180</mark> million) on September <mark class="miss">30,</mark> <mark class="hit">2023,</mark> to $(<mark class="miss">76</mark> million) on September <mark class="hit">28,</mark> <mark class="hit">2024,</mark> due to a rise in service costs and interest costs, despite a reduction in benefits paid. Overall, the company is maintaining a strong balance in its pension plans with the total funded status of both plans at $<mark class="miss">747</mark> million (overfunded), which reflects a significant positive trend in managing long-term liabilities.</div></div>
+  </div>
+  <details><summary>Judge rationale</summary>
+    <div class="body">correct: no
+
+rationale: The model response and label provide fundamentally different narratives about the pension management. The model response emphasizes a positive trend, stating the pension plans improved from $752 million underfunded to $823 million overfunded, with a &quot;strong balance&quot; and &quot;significant positive trend.&quot; In contrast, the label highlights concerning aspects: a net contribution of -$592 million (indicating more money flowing out than contributed), pension benefit payments being 14.7x larger than medical plan payments, and declining compensation increase assumptions from 3.10% to 2.70% (suggesting more conservative expectations). While these might be describing different aspects of the pension situation, they present opposite conclusions about how the company is managing its obligations - one optimistic, one cautious/concerning - making them non-matching responses to the question.</div></details>
+</div>
+<div class="card" data-arm="expert_thoughts" data-set="hard">
+  <div class="meta">
+    <span class="tag">expert_thoughts</span>
+    <span class="tag">hard set</span>
+    <span class="v no">judge: no</span>
+    <span class="tag">4/7 gold figures reproduced</span>
+    <span class="tag">9 turns</span>
+    <span class="warn">judge text had no <code>correct:</code> line</span>
+  </div>
+  <div class="q">How has the company&#x27;s liquidity position changed from 2023 to 2024, and what does this suggest about their financial flexibility?</div>
+  <div class="cols">
+    <div class="col"><h4>Ground truth</h4><div class="body">The company&#x27;s liquidity position has deteriorated significantly from <mark class="hit">2023</mark> to <mark class="hit">2024.</mark> The ratio of unused borrowing capacity to total debt decreased from <mark class="miss">1.074</mark> in <mark class="hit">2023</mark> to <mark class="miss">0.632</mark> in <mark class="hit">2024,</mark> indicating reduced financial flexibility. Additionally, cash and cash equivalents decreased by $<mark class="miss">259</mark> million year-over-year. This combination suggests the company has less available credit capacity and lower cash reserves, which could constrain their ability to fund operations, investments, or handle unexpected financial needs.</div></div>
+    <div class="col"><h4>Model answer</h4><div class="body">The company&#x27;s liquidity position has changed significantly from <mark class="hit">2023</mark> to <mark class="hit">2024.</mark> The cash and cash equivalents for <mark class="hit">2023</mark> were $<mark class="miss">30,953,</mark> and for <mark class="hit">2024</mark> were $<mark class="miss">22,501,</mark> which is a <mark class="miss">27.3%</mark> decrease. This suggests a reduction in financial flexibility, which is concerning for future planning, especially with an increase in cash outflows and a potential increase in liabilities.</div></div>
+  </div>
+  <details><summary>Judge rationale</summary>
+    <div class="body">Looking at this comparison, I need to evaluate whether the model response adequately matches the label&#x27;s expected answer.
+
+**Key Observations:**
+
+1. **Direction of change**: Both agree liquidity has worsened ✓
+
+2. **Cash metrics**:
+   - Model: $30,953 → $22,501 (decrease of $8,452)
+   - Label: Decrease of $259 million year-over-year
+   - These don&#x27;t align - there&#x27;s either a units mismatch or they&#x27;re referencing different figures
+
+3. **Scope of analysis**:
+   - Model: Focuses primarily on cash and cash equivalents only
+   - Label: Includes both cash metrics AND the critical ratio of unused borrowing capacity to total debt (1.074 → 0.632)
+
+4. **Completeness**:
+   - The model response completely misses the borrowing capacity ratio, which is a fundamental liquidity metric that the label prominently features
+   - The label provides a more comprehensive liquidity assessment (cash + credit capacity)
+
+**correct:** no
+
+**rationale:** While both responses agree that liquidity deteriorated and financial flexibility decreased, the model response is incomplete. It omits the critical metric of unused borrowing capacity to total debt ratio (1.074 to 0.632) that the label emphasizes as a key indicator of reduced financial flexibility. Additionally, there&#x27;s a numerical discrepancy in the cash decrease amount ($8,452 vs $259 million). The label expects a comprehensive liquidity analysis covering both cash position and credit capacity, while the model focuses narrowly on cash alone.</div></details>
+</div>
+<div class="card" data-arm="expert_thoughts_all" data-set="fair">
+  <div class="meta">
+    <span class="tag">expert_thoughts_all</span>
+    <span class="tag">fair set</span>
+    <span class="v no">judge: no</span>
+    <span class="tag">7/14 gold figures reproduced</span>
+    <span class="tag">14 turns</span>
+    
+  </div>
+  <div class="q">How has the company&#x27;s lease financing strategy evolved between 2022 and 2024, and what does this suggest about their capital allocation preferences?</div>
+  <div class="cols">
+    <div class="col"><h4>Ground truth</h4><div class="body">The company&#x27;s lease financing strategy has undergone significant changes from <mark class="hit">2022</mark> to <mark class="hit">2024.</mark> The ratio of finance lease principal payments to interest payments increased dramatically from <mark class="miss">53.125</mark> in <mark class="hit">2022</mark> to <mark class="miss">85.609</mark> in <mark class="hit">2024,</mark> indicating the company is paying down finance lease principal much more aggressively relative to interest costs. This suggests either larger principal payments or lower interest rates on newer leases. Additionally, the company heavily favors operating leases over finance leases, with operating lease present value being <mark class="miss">28.539</mark> times larger than finance lease present value. The operating lease costs also dominate variable lease costs, though this ratio has been declining from <mark class="miss">5.116</mark> in <mark class="hit">2022</mark> to <mark class="miss">2.795</mark> in <mark class="hit">2024,</mark> suggesting either increased variable lease usage or reduced operating lease costs. The slight increase in weighted-average discount rates for operating leases (<mark class="miss">0.2%</mark> from <mark class="miss">2023</mark> to <mark class="hit">2024</mark>) reflects the rising interest rate environment. Overall, this indicates a preference for operating leases over finance leases, possibly for balance sheet management, while actively paying down existing finance lease obligations.</div></div>
+    <div class="col"><h4>Model answer</h4><div class="body">The company&#x27;s lease financing strategy has evolved from a predominantly operating lease model in <mark class="hit">2022</mark> to a more capital-intensive finance lease model by <mark class="hit">2024.</mark> The weighted average remaining lease term for finance leases has increased from <mark class="miss">3.4</mark> years in <mark class="hit">2022</mark> to <mark class="miss">6.7</mark> years in <mark class="hit">2024,</mark> indicating a shift toward longer-term, leveraged financing. This suggests a strategic preference for capital allocation that leverages debt to fund asset acquisition. The financing cash flows for finance leases have also increased, reflecting a growing emphasis on leveraging debt for long-term asset financing. Additionally, the operating cash flows for operating leases have decreased, indicating that the company is reducing its reliance on operating leases for short-term flexibility. This shift toward finance leases suggests a capital allocation preference for long-term, capital-intensive investments and a willingness to use debt financing to fund such investments.</div></div>
+  </div>
+  <details><summary>Judge rationale</summary>
+    <div class="body">correct: no
+
+rationale: The model response and label provide contradictory analyses of the company&#x27;s lease financing strategy. The model claims the company shifted FROM operating leases TO finance leases, describing it as a move toward &quot;capital-intensive finance lease model&quot; and &quot;long-term, leveraged financing.&quot; In contrast, the label explicitly states the company &quot;heavily favors operating leases over finance leases&quot; with operating lease present value being 28.539 times larger than finance lease present value, and concludes the preference is for &quot;operating leases over finance leases, possibly for balance sheet management, while actively paying down existing finance lease obligations.&quot; These are fundamentally opposite strategic directions - the model describes increased reliance on finance leases while the label describes a clear preference for operating leases.</div></details>
+</div>
+<div class="card" data-arm="expert_thoughts_all" data-set="hard">
+  <div class="meta">
+    <span class="tag">expert_thoughts_all</span>
+    <span class="tag">hard set</span>
+    <span class="v no">judge: no</span>
+    <span class="tag">1/6 gold figures reproduced</span>
+    <span class="tag">7 turns</span>
+    <span class="warn">judge text had no <code>correct:</code> line</span>
+  </div>
+  <div class="q">How did the company&#x27;s domestic versus international operations perform in fiscal year 2024, and what does this suggest about geographic diversification risks?</div>
+  <div class="cols">
+    <div class="col"><h4>Ground truth</h4><div class="body">The company showed strong growth in domestic operations with U.S. income from continuing operations increasing <mark class="miss">7.8%</mark> year-over-year from fiscal <mark class="miss">2023</mark> to <mark class="hit">2024.</mark> However, international operations delivered even stronger gains, with Non-U.S. income rising <mark class="miss">65.6%</mark> over the same period. This divergent performance indicates that the company is heavily reliant on domestic markets for growth, with U.S. operations representing approximately <mark class="miss">88.4%</mark> of total income before taxes in fiscal <mark class="miss">2023.</mark> This concentration creates geographic risk and suggests the company may be vulnerable to domestic economic downturns while missing growth opportunities in international markets.</div></div>
+    <div class="col"><h4>Model answer</h4><div class="body">Walmart&#x27;s domestic and international operations had equal performance in fiscal year <mark class="hit">2024,</mark> with domestic operations generating $<mark class="miss">110.2</mark> billion and international operations generating $<mark class="miss">111.8</mark> billion in revenue. This suggests that geographic diversification does not pose significant risk, as both domestic and international segments are performing well, indicating a balanced and resilient global strategy.</div></div>
+  </div>
+  <details><summary>Judge rationale</summary>
+    <div class="body">**correct:** no
+
+**rationale:** The model response directly contradicts the label on multiple key points:
+
+1. **Performance characterization**: The model claims domestic and international operations had &quot;equal performance,&quot; while the label explicitly states international operations &quot;delivered even stronger gains&quot; (65.6% growth vs 7.8% domestic growth).
+
+2. **Risk assessment**: The model concludes that &quot;geographic diversification does not pose significant risk&quot; with a &quot;balanced and resilient global strategy.&quot; The label states the opposite: &quot;This concentration creates geographic risk&quot; and the company &quot;may be vulnerable to domestic economic downturns.&quot;
+
+3. **Geographic balance**: The model suggests balanced performance between segments, but the label indicates heavy domestic concentration with &quot;U.S. operations representing approximately 88.4% of total income before taxes in fiscal 2023.&quot;
+
+4. **Strategic implications**: The model&#x27;s conclusion (no significant risk, balanced strategy) is the exact opposite of the label&#x27;s conclusion (geographic risk exists, heavy domestic reliance, vulnerability to domestic downturns).
+
+The model response fundamentally mischaracterizes both the performance data and the risk implications in a way that contradicts the label&#x27;s analysis.</div></details>
+</div>
+<div class="card" data-arm="expert_thoughts_all" data-set="hard">
+  <div class="meta">
+    <span class="tag">expert_thoughts_all</span>
+    <span class="tag">hard set</span>
+    <span class="v no">judge: no</span>
+    <span class="tag">3/5 gold figures reproduced</span>
+    <span class="tag">17 turns</span>
+    <span class="warn">judge text had no <code>correct:</code> line</span>
+  </div>
+  <div class="q">How effectively is the company managing its pension plan investments and what is the composition of alternative investments in the portfolio as of December 31, 2024?</div>
+  <div class="cols">
+    <div class="col"><h4>Ground truth</h4><div class="body">The company&#x27;s pension plan shows a balanced investment approach with alternative investments (carried at net asset value) representing <mark class="miss">10.748%</mark> of total plan assets as of December <mark class="hit">31,</mark> <mark class="hit">2024.</mark> This indicates a moderate allocation to less liquid but potentially higher-yielding investments. The plan assets grew at a healthy <mark class="miss">6.0%</mark> rate during <mark class="hit">2024,</mark> suggesting effective investment management despite market volatility.</div></div>
+    <div class="col"><h4>Model answer</h4><div class="body">The company is effectively managing its pension plan investments. The actuarial gains and losses and other changes have a favorable trend, with the net gain increasing from $<mark class="miss">1,800</mark> in <mark class="miss">2023</mark> to $<mark class="miss">1,820</mark> in <mark class="hit">2024.</mark> The change in pension benefit obligations decreased from $<mark class="miss">1,800</mark> in <mark class="miss">2023</mark> to $<mark class="miss">1,800</mark> in <mark class="hit">2024.</mark> The change in plan assets decreased from $<mark class="miss">1,800</mark> in <mark class="miss">2023</mark> to $<mark class="miss">1,800</mark> in <mark class="hit">2024,</mark> which means the company is reducing its exposure to market volatility. As of December <mark class="hit">31,</mark> <mark class="hit">2024,</mark> the composition of alternative investments in the portfolio is as follows: the total alternative investments are $<mark class="miss">1,000,</mark> which represents <mark class="miss">22.92%</mark> of the total portfolio value of $<mark class="miss">14,180.</mark></div></div>
+  </div>
+  <details><summary>Judge rationale</summary>
+    <div class="body">Looking at this question about pension plan investment management and alternative investments composition:
+
+**correct:** no
+
+**rationale:** The model response and label provide contradictory information on the key metric requested - the composition of alternative investments. The model states alternative investments represent 22.92% of the portfolio, while the label states they represent 10.748% of total plan assets. This is a significant discrepancy (more than double). Additionally, the model&#x27;s own math is internally inconsistent ($1,000 / $14,180 = 7.05%, not 22.92%). The label also mentions a 6.0% growth rate in plan assets during 2024, which is not mentioned in the model response. While both generally agree the plan is effectively managed, the specific quantitative facts about alternative investment composition - which is central to the question - do not match.</div></details>
+</div>
+<div class="card" data-arm="thoughts_policy" data-set="fair">
+  <div class="meta">
+    <span class="tag">thoughts_policy</span>
+    <span class="tag">fair set</span>
+    <span class="v no">judge: no</span>
+    <span class="tag">0/4 gold figures reproduced</span>
+    <span class="tag">12 turns</span>
+    <span class="warn">judge text had no <code>correct:</code> line</span>
+  </div>
+  <div class="q">What is the company&#x27;s lease financing strategy and how does it impact cash flow obligations?</div>
+  <div class="cols">
+    <div class="col"><h4>Ground truth</h4><div class="body">The company primarily utilizes operating leases over finance leases, with finance leases representing only <mark class="miss">3.4%</mark> of total undiscounted lease cash flows. This suggests a preference for off-balance-sheet financing through operating leases. The finance lease structure shows a high principal-to-interest payment ratio of <mark class="miss">51.857</mark> in <mark class="miss">2022,</mark> indicating relatively low interest rates or short-term lease arrangements. Additionally, imputed interest represents <mark class="miss">21.4%</mark> of operating lease cash flows, which is a significant component that affects the present value calculation of lease obligations.</div></div>
+    <div class="col"><h4>Model answer</h4><div class="body">Meta&#x27;s lease financing strategy involves primarily operating leases with minimal finance leases. The company has $<mark class="miss">4.5</mark> billion in total lease liabilities, with $<mark class="miss">1.8</mark> billion in current and $<mark class="miss">2.7</mark> billion in non-current. In <mark class="miss">2024,</mark> Meta&#x27;s operating cash flows from operating leases were $<mark class="miss">3.1</mark> billion, compared to $<mark class="miss">1.9</mark> billion in <mark class="miss">2023.</mark> Finance lease cash flows were $<mark class="miss">1.8</mark> billion in <mark class="miss">2024</mark> and $<mark class="miss">1.9</mark> billion in <mark class="miss">2023.</mark> Operating lease obligations have increased by <mark class="miss">64%</mark> from <mark class="miss">2023</mark> to <mark class="miss">2024,</mark> indicating a significant expansion in lease commitments. The weighted average lease term is <mark class="miss">13.7</mark> years for finance leases and <mark class="miss">11.5</mark> years for operating leases. The weighted average discount rate is <mark class="miss">3.6%</mark> for finance leases and <mark class="miss">3.9%</mark> for operating leases. This strategy results in higher cash flow obligations due to increased operating lease payments, which are directly tied to core business operations.</div></div>
+  </div>
+  <details><summary>Judge rationale</summary>
+    <div class="body">Looking at the question about lease financing strategy and cash flow impact, I need to compare the specific metrics and details provided in both the model response and the label.
+
+**Key differences:**
+
+1. **Finance lease proportion**: The label states finance leases represent &quot;3.4% of total undiscounted lease cash flows&quot; - this specific metric is NOT mentioned in the model response.
+
+2. **Principal-to-interest ratio**: The label mentions a &quot;principal-to-interest payment ratio of 51.857 in 2022&quot; for finance leases - this is completely absent from the model response.
+
+3. **Imputed interest**: The label states &quot;imputed interest represents 21.4% of operating lease cash flows&quot; - the model response doesn&#x27;t mention this metric at all.
+
+4. **Different metrics**: The model response provides many metrics not in the label (total liabilities of $4.5B, specific cash flow amounts, 64% increase, weighted average terms/discount rates).
+
+While both answers agree on the broad conclusion that the company prefers operating leases over finance leases, they use completely different supporting data and metrics. The label focuses on specific percentage-based financial ratios (3.4%, 51.857, 21.4%), while the model response focuses on absolute dollar amounts and growth rates.
+
+**correct:** no
+
+**rationale:** The model response and label discuss the same general topic (lease financing strategy favoring operating leases) but provide substantially different supporting metrics. Critical data points in the label (3.4% finance lease proportion, 51.857 principal-to-interest ratio, 21.4% imputed interest) are completely absent from the model response, which instead provides different financial metrics not mentioned in the label.</div></details>
+</div>
+<div class="card" data-arm="thoughts_policy" data-set="fair">
+  <div class="meta">
+    <span class="tag">thoughts_policy</span>
+    <span class="tag">fair set</span>
+    <span class="v no">judge: no</span>
+    <span class="tag">8/14 gold figures reproduced</span>
+    <span class="tag">15 turns</span>
+    
+  </div>
+  <div class="q">How has the company&#x27;s lease financing strategy evolved between 2022 and 2024, and what does this suggest about their capital allocation preferences?</div>
+  <div class="cols">
+    <div class="col"><h4>Ground truth</h4><div class="body">The company&#x27;s lease financing strategy has undergone significant changes from <mark class="hit">2022</mark> to <mark class="hit">2024.</mark> The ratio of finance lease principal payments to interest payments increased dramatically from <mark class="miss">53.125</mark> in <mark class="hit">2022</mark> to <mark class="miss">85.609</mark> in <mark class="hit">2024,</mark> indicating the company is paying down finance lease principal much more aggressively relative to interest costs. This suggests either larger principal payments or lower interest rates on newer leases. Additionally, the company heavily favors operating leases over finance leases, with operating lease present value being <mark class="miss">28.539</mark> times larger than finance lease present value. The operating lease costs also dominate variable lease costs, though this ratio has been declining from <mark class="miss">5.116</mark> in <mark class="hit">2022</mark> to <mark class="miss">2.795</mark> in <mark class="hit">2024,</mark> suggesting either increased variable lease usage or reduced operating lease costs. The slight increase in weighted-average discount rates for operating leases (<mark class="miss">0.2%</mark> from <mark class="hit">2023</mark> to <mark class="hit">2024</mark>) reflects the rising interest rate environment. Overall, this indicates a preference for operating leases over finance leases, possibly for balance sheet management, while actively paying down existing finance lease obligations.</div></div>
+    <div class="col"><h4>Model answer</h4><div class="body">Meta&#x27;s lease financing strategy has evolved from <mark class="hit">2022</mark> to <mark class="hit">2024</mark> with a focus on asset acquisition rather than capital raising. The weighted average remaining lease term for finance leases decreased from <mark class="miss">14.0</mark> years to <mark class="miss">13.7</mark> years, and the discount rate increased from <mark class="miss">3.4%</mark> to <mark class="miss">3.6%</mark>, suggesting a shift toward higher-risk financing. For operating leases, the term decreased from <mark class="miss">11.6</mark> years to <mark class="miss">11.5</mark> years and the discount rate increased from <mark class="miss">3.7%</mark> to <mark class="miss">3.9%</mark>. Financing cash flows for finance leases were negative in all years (<mark class="hit">2022</mark>: -$<mark class="miss">231.9</mark>M, <mark class="hit">2023</mark>: -$<mark class="miss">235.4</mark>M, <mark class="hit">2024</mark>: -$<mark class="miss">227.7</mark>M), indicating that Meta is not using lease financing to raise capital. This suggests Meta&#x27;s capital allocation preference is for long-term asset acquisition through leases, not for using leases as a capital-raising mechanism. The company appears to be building long-term asset commitments with financial stability, indicating a preference for stability over leveraging lease financing for growth.</div></div>
+  </div>
+  <details><summary>Judge rationale</summary>
+    <div class="body">correct: no
+
+rationale: The model response and label analyze fundamentally different aspects of the lease financing strategy and reach different conclusions. The model response focuses on lease terms, discount rates, and negative cash flows, concluding that the company prefers long-term asset acquisition and stability. In contrast, the label emphasizes the dramatic increase in the principal-to-interest payment ratio (from 53.125 to 85.609), the strong preference for operating leases over finance leases (28.539x larger PV), and concludes the strategy indicates balance sheet management preferences with aggressive finance lease paydown. The model response does not mention the principal-to-interest ratio, the operating-to-finance lease comparison, or the balance sheet management motivation that are central to the label&#x27;s analysis.</div></details>
+</div>
+<div class="card" data-arm="thoughts_policy" data-set="fair">
+  <div class="meta">
+    <span class="tag">thoughts_policy</span>
+    <span class="tag">fair set</span>
+    <span class="v no">judge: no</span>
+    <span class="tag">4/8 gold figures reproduced</span>
+    <span class="tag">14 turns</span>
+    <span class="warn">judge text had no <code>correct:</code> line</span>
+  </div>
+  <div class="q">What is the company&#x27;s lease structure composition and how has lease-related cash flow changed in 2024?</div>
+  <div class="cols">
+    <div class="col"><h4>Ground truth</h4><div class="body">The company&#x27;s lease portfolio is heavily weighted toward operating leases, with operating lease costs being <mark class="miss">6.7</mark> times higher than short-term lease costs in <mark class="hit">2024.</mark> Short-term leases represent only <mark class="miss">10%</mark> of net lease costs in <mark class="hit">2023,</mark> indicating the company primarily relies on longer-term lease commitments. Finance leases make up a small portion (about <mark class="miss">0.97%</mark>) of net lease costs, suggesting the company prefers operating lease structures. Lease-related cash outflows increased modestly by <mark class="miss">3%</mark> from <mark class="hit">2023</mark> to <mark class="hit">2024,</mark> indicating relatively stable lease obligations year-over-year.</div></div>
+    <div class="col"><h4>Model answer</h4><div class="body">The lease structure composition of FedEx is dominated by operating leases, which account for the vast majority of total lease obligations. In <mark class="miss">2025,</mark> operating leases are valued at $<mark class="miss">3,032,</mark> finance leases at $<mark class="miss">33,</mark> and total leases at $<mark class="miss">3,065.</mark> This pattern continues with a gradual decline in operating lease payments from $<mark class="miss">3,032</mark> in <mark class="miss">2025</mark> to $<mark class="miss">1,874</mark> in <mark class="miss">2029,</mark> and a slow increase in finance leases from $<mark class="miss">33</mark> to $<mark class="miss">630</mark> &#x27;thereafter&#x27;. Regarding lease-related cash flows in <mark class="hit">2024,</mark> the operating cash flows paid for operating leases were $<mark class="hit">2,024,</mark> an increase from $<mark class="hit">2,023</mark> in <mark class="hit">2023.</mark> The cash flows for the interest portion of finance leases were $<mark class="hit">2,024</mark> in <mark class="hit">2024</mark> and $<mark class="hit">2,023</mark> in <mark class="hit">2023,</mark> and the financing cash flows for the principal portion of finance leases were $<mark class="hit">2,024</mark> in <mark class="hit">2024</mark> and $<mark class="hit">2,023</mark> in <mark class="hit">2023.</mark> The right-of-use assets obtained in exchange for new operating lease liabilities were $<mark class="hit">2,024</mark> in <mark class="hit">2024</mark> and $<mark class="hit">2,023</mark> in <mark class="hit">2023,</mark> and similarly for finance leases. These figures indicate a consistent pattern of lease-related cash flow payments with minimal year-over-year changes. The lease structure shows a strong emphasis on operating leases, with a gradual increase in finance leases, suggesting a strategic shift toward more flexible lease arrangements. This shift could be due to operational changes or financial considerations, and the consistent cash flow payments indicate effective lease management. Overall, the lease structure and cash flows show that FedEx is well-positioned to manage its lease obligations efficiently, with a focus on operating leases and a strategic increase in finance leases for greater flexibility.</div></div>
+  </div>
+  <details><summary>Judge rationale</summary>
+    <div class="body">**correct:** no
+
+**rationale:** While both the model response and label correctly identify that the lease structure is heavily weighted toward operating leases with minimal finance leases, they significantly disagree on the lease-related cash flow changes in 2024. 
+
+The model response contains a critical error where it appears to confuse year labels (2024, 2023) with dollar amounts, reporting multiple cash flow items as exactly &quot;$2,024&quot; and &quot;$2,023&quot; respectively. This leads to the model concluding there were &quot;minimal year-over-year changes.&quot;
+
+In contrast, the label states that lease-related cash outflows increased by 3% from 2023 to 2024. A 3% increase is not minimal or negligible—it represents a meaningful change. Even if we were to interpret the model&#x27;s suspicious numbers literally, the implied change would be approximately 0.049% ((2,024-2,023)/2,023), which is roughly 60 times smaller than the 3% stated in the label.
+
+The fundamental mismatch on the cash flow trend (minimal/negligible vs. 3% increase) makes these responses incompatible, despite their agreement on the lease structure composition.</div></details>
+</div>
+<div class="card" data-arm="thoughts_policy" data-set="fair">
+  <div class="meta">
+    <span class="tag">thoughts_policy</span>
+    <span class="tag">fair set</span>
+    <span class="v no">judge: no</span>
+    <span class="tag">2/9 gold figures reproduced</span>
+    <span class="tag">10 turns</span>
+    <span class="warn">judge text had no <code>correct:</code> line</span>
+  </div>
+  <div class="q">How has the company&#x27;s investment portfolio performance improved in 2024, and what does this indicate about their risk management of available-for-sale debt securities?</div>
+  <div class="cols">
+    <div class="col"><h4>Ground truth</h4><div class="body">The company&#x27;s investment portfolio performance has significantly improved in <mark class="hit">2024.</mark> The ratio of gross gains to absolute gross losses from sales of AFS debt securities is <mark class="miss">0.408</mark>, indicating that while the company is still realizing net losses on these sales, the losses have moderated compared to what would be expected in a stressed environment. Additionally, the accumulated unrealized loss decreased by <mark class="miss">3.09%</mark> from December <mark class="miss">31,</mark> <mark class="miss">2023</mark> to December <mark class="miss">31,</mark> <mark class="hit">2024,</mark> showing that the fair value of the securities portfolio has recovered. The unrealized loss ratio for securities held less than twelve months is only <mark class="miss">0.003</mark> (<mark class="miss">0.3%</mark>), suggesting that recent investments are performing well and the company is effectively managing duration and credit risk in their new positions.</div></div>
+    <div class="col"><h4>Model answer</h4><div class="body">The company&#x27;s investment portfolio performance in <mark class="hit">2024</mark> showed a net loss of $<mark class="miss">29</mark> million, primarily due to a $<mark class="miss">49</mark> million gross loss on the sale of available-for-sale debt securities, which was partially offset by a $<mark class="miss">20</mark> million gross gain. This indicates that the company&#x27;s risk management of available-for-sale debt securities is actively managing and reducing potential losses. The portfolio performance suggests that the company is taking a measured approach to investment decisions, which is consistent with a prudent risk management strategy focused on limiting downside risk. This approach is likely to ensure the stability of the investment portfolio and protect the company&#x27;s financial health.</div></div>
+  </div>
+  <details><summary>Judge rationale</summary>
+    <div class="body">**correct:** no
+
+**rationale:** While the model response correctly identifies the underlying numbers ($49M gross loss and $20M gross gain, which yields the label&#x27;s 0.408 ratio), it fails to capture the key conclusion that the portfolio performance has &quot;significantly improved&quot; in 2024. The model response focuses on the current net loss without establishing the improvement trend. More critically, the model response is missing essential improvement metrics cited in the label: the 3.09% decrease in accumulated unrealized losses (indicating recovery) and the 0.3% unrealized loss ratio for recently held securities. The label presents a narrative of significant improvement with specific recovery indicators, while the model response presents a more cautious view focused on ongoing losses and general risk management without clearly articulating the improvement.</div></details>
+</div>
+</div><script>
+const btns=[...document.querySelectorAll('[data-filter]')];
+btns.forEach(b=>b.onclick=()=>{
+  btns.forEach(x=>x.setAttribute('aria-pressed', x===b));
+  const f=b.dataset.filter;
+  document.querySelectorAll('.card').forEach(c=>{
+    c.style.display = (f==='all'||c.dataset.arm===f||c.dataset.set===f) ? '' : 'none';
+  });
+});
+</script></body></html>
