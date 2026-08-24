@@ -10,10 +10,21 @@
 # checkpoints/task sets/turn caps (identical), and a positional padding artifact (gen_id
 # 0/1/2 scored 10/7/9 -- scatter, not a trend).
 #
-# The test. Re-run the SAME checkpoint on the SAME tasks at eval_group_size=1, i.e. an
-# independent second draw of the original protocol, twice for a little resolution.
-#   ~48-55%  -> 72.2% was a lucky draw; the 3-rollout null stands.
-#   ~72%     -> the batched path is depressing x3 and the null is an artifact of it.
+# The test. Re-run at eval_group_size=1 across SEVERAL SEEDS.
+#
+# Seeds matter here and nearly broke this test: main_pytorch.py calls seed_everything(
+# args.seed) -- random / numpy / torch / cuda -- with default seed=42, and BOTH the x1 and
+# x3 runs used 42. Re-running x1 unchanged would therefore have largely REPRODUCED 72.2%
+# and proved nothing. Varying the seed is what makes these independent draws.
+#
+# Note the same fact limits every single-rollout number in the project: base, actions_only,
+# expert_thoughts, thoughts_base and thoughts_policy on both domains are all ONE draw at
+# seed 42. This sweep is the first look at how much of that table is seed.
+#
+# Both arms run at every seed, so each seed yields a PAIRED comparison on identical tasks.
+#   thoughts_policy ~48-55% across seeds -> 72.2% was a seed-42 fluke; the 3-rollout null stands.
+#   thoughts_policy ~72% across seeds    -> the batched x3 path is depressing scores and the
+#                                           null is an artifact of it.
 #
 # Cheap: airline x1 measured at ~38 min per run.
 set -uo pipefail
@@ -22,7 +33,7 @@ export PATH="$HOME/.local/bin:$HOME/.cargo/bin:/usr/local/bin:$PATH"
 MODEL="${MODEL_CFG:-hf_qwen3_4b_instruct}"; export MODEL_CFG="$MODEL"
 MDIR="${MDIR:-/tmp/aprm/x1replicate}"; mkdir -p "$MDIR"
 _fail=0
-REPS="${REPS:-2}"
+SEEDS="${SEEDS:-0 1 7}"   # NOT 42: that is the seed every existing x1 number used
 ARMS="${ARMS:-thoughts_policy actions_only}"
 DOM="${DOM:-airline}"
 log(){ echo "[$(date '+%m-%d %H:%M:%S')] $*" | tee -a "$MDIR/x1replicate.log"; }
@@ -32,19 +43,19 @@ newest(){ ls -dt $1 2>/dev/null | head -1; }
 IDS=$(python3 -c "import json;print(' '.join(str(i) for i in json.load(open('data/splits/tau2_airline_taskmap.json'))['unseen_tau2_ids']))")
 TID=$(python3 -c "import json;print(json.load(open('data/splits/tau2_airline_taskmap.json'))['covered_tau2_ids'][0])")
 
-log "=== x1 replicate: dom=$DOM arms='$ARMS' reps=$REPS (eval_group_size=1, the ORIGINAL protocol) ==="
+log "=== x1 seed sweep: dom=$DOM arms='$ARMS' seeds='$SEEDS' (eval_group_size=1, the ORIGINAL protocol) ==="
 for arm in $ARMS; do
   CK=$(newest "checkpoints_lora/act_prm_tau2_${DOM}/$MODEL/${DOM}_s2_${arm}_lr3e_3_nb150_heldout-*/step_best")
   [ -z "$CK" ] && { log "$DOM/$arm: no checkpoint, skip"; continue; }
-  for rep in $(seq 1 "$REPS"); do
-    TAG="${DOM}_rollout_${arm}_x1rep${rep}"
+  for sd in $SEEDS; do
+    TAG="${DOM}_rollout_${arm}_x1seed${sd}"
     [ -f "$MDIR/${TAG}.done" ] && { log "$TAG: done, skip"; continue; }
-    log "ROLLOUT $TAG ($(echo $IDS|wc -w) tasks x 1) <- $CK"
+    log "ROLLOUT $TAG ($(echo $IDS|wc -w) tasks x 1, seed=$sd) <- $CK"
     wait_gpu_free
     ./scripts/train_rl_from_sft.sh "$DOM" "$CK" --run_tag "$TAG" \
         --generator_config hf_rlvr --env_config "tau2bench/${DOM}_rlvr" \
         --no_train --num_batches 1 --eval_every 1 --group_size 2 --batch_size 1 \
-        --eval_group_size 1 \
+        --eval_group_size 1 --seed "$sd" \
         --max_turns 20 --max_tokens 2048 --discount_factor 1.0 --hide_observations \
         --train_task_ids "$TID" --eval_task_ids $IDS > "$MDIR/${TAG}.log" 2>&1 \
       || { _fail=$((_fail+1)); log "$TAG: FAILED"; continue; }
