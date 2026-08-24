@@ -38,7 +38,7 @@ if pgrep -f '[m]ain_pytorch.py' >/dev/null 2>&1; then exit 0; fi
 # Any of OUR driver shells mid-launch -> let it be. This list must include every driver
 # the guard can start; omitting one (run_matched_control) let cron launch a SECOND copy
 # of a control run that was already going, and both appended to the same metrics.jsonl.
-if ps -eo args | grep -qE 'scripts/(run_sft_lr_matrix|run_sft_sweep|probe_sft_lr|run_matched_control|run_expert_all|run_sft_rollout_eval|run_finance_v3|run_finance_rollout|run_bestgen_sft|run_multirollout|run_base_rollout|run_insurance_pipeline)\.sh'; then exit 0; fi
+if ps -eo args | grep -qE 'scripts/(run_sft_lr_matrix|run_sft_sweep|probe_sft_lr|run_matched_control|run_expert_all|run_sft_rollout_eval|run_finance_v3|run_finance_rollout|run_bestgen_sft|run_multirollout|run_base_rollout|run_insurance_pipeline|run_x1_replicate)\.sh'; then exit 0; fi
 
 # 2. thoughts_base LR probe (once)
 if [ ! -f "$G/lrprobe/thoughts_base.done" ]; then
@@ -182,11 +182,24 @@ if [ -f "$G/finance_rollout/ALLDONE" ] && [ ! -f "$G/multirollout/ALLDONE" ]; th
   exit 0
 fi
 
+# 2h1. X1 REPLICATE. Airline thoughts_policy scored 72.2% at 1 rollout/task but 55.6/38.9/
+# 50.0 at 3 -- x1 sits ~2.9 SD above its own x3 samples (~0.4% if one distribution), and all
+# three x3 streams used more tool calls than x1 did. Batch truncation, differing configs and
+# a positional padding artifact are all ruled out, so either x1 was a lucky draw or the
+# batched path depresses scores. That distinction decides whether the 3-rollout null is a
+# real result or an artifact, so it runs BEFORE the new domain. ~2.5h for 2 arms x 2 reps.
+if [ -f "$G/multirollout/ALLDONE" ] && [ ! -f "$G/x1replicate/ALLDONE" ]; then
+  log "advancing the x1 replicate (is the batched eval path depressing scores?)"
+  mkdir -p "$G/x1replicate"
+  ./scripts/run_x1_replicate.sh >> "$G/x1replicate/driver.log" 2>&1
+  exit 0
+fi
+
 # 2i. INSURANCE: the full pipeline on a fourth domain (Stage-1 EM -> Stage-2 SFT ->
 # rollout on 41 held-out questions). Ordered after the multi-rollout because that stage is
 # what makes the EXISTING result reportable, whereas this adds a new domain; a fourth
 # domain is worth much less if the three we have cannot clear the noise floor.
-if [ -f "$G/multirollout/ALLDONE" ] && [ ! -f "$G/insurance/ALLDONE" ]; then
+if [ -f "$G/x1replicate/ALLDONE" ] && [ ! -f "$G/insurance/ALLDONE" ]; then
   log "advancing the insurance pipeline (stage 1 -> 2 -> 3)"
   mkdir -p "$G/insurance"
   ./scripts/run_insurance_pipeline.sh >> "$G/insurance/driver.log" 2>&1
