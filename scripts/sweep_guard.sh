@@ -158,9 +158,27 @@ fi
 # best-gen because it is the only stage that can make the headline result significant
 # (pooled McNemar is currently p=0.077); every other pending stage adds interpretation,
 # not evidence.
+# expert_thoughts was ADDED to the set on 08-24. The base-model control showed it is the
+# WORST arm -- -8.3pp vs base pooled, -22.2pp on airline -- which makes it the largest
+# effect in the project, and it rested on ONE rollout per task against a measured 22.2pp
+# replicate floor. The originally-queued pair (actions_only vs thoughts_policy) came back
+# null on retail at 3 rollouts (+3.2pp, p=0.28), so the unverified arm now carries more
+# weight than the verified one.
+MR_ARMS="actions_only thoughts_policy expert_thoughts"
+# Retract ALLDONE if any (arm, domain) marker is missing, so adding an arm re-invokes the
+# driver; its per-run .done files make the finished runs no-ops.
+if [ -f "$G/multirollout/ALLDONE" ]; then
+  for _a in $MR_ARMS; do
+    for _d in retail airline; do
+      [ -f "$G/multirollout/${_d}_rollout_${_a}_x3.done" ] || {
+        log "multirollout: ${_d}/${_a} missing -- retracting ALLDONE to cover the added arm"
+        rm -f "$G/multirollout/ALLDONE"; break 2; }
+    done
+  done
+fi
 if [ -f "$G/finance_rollout/ALLDONE" ] && [ ! -f "$G/multirollout/ALLDONE" ]; then
-  log "advancing the multi-rollout (3 per task)"
-  ./scripts/run_multirollout.sh >> "$G/multirollout/driver.log" 2>&1
+  log "advancing the multi-rollout (3 per task, arms: $MR_ARMS)"
+  ARMS="$MR_ARMS" ./scripts/run_multirollout.sh >> "$G/multirollout/driver.log" 2>&1
   exit 0
 fi
 
