@@ -21,8 +21,9 @@
 # least one reasoning step, so the filter that arm applies is inert on this domain.
 #
 # Stages:
-#   1  EM thought generation over the 180 train questions, twice (policy- and base-scored),
-#      exported to SFT corpora.  --no_train: this is a generate-only relabel pass.
+#   1  EM thought generation over the 180 train questions, twice (policy- and base-scored):
+#      1a EM training -> step_best, then 1b a relabel pass from that checkpoint that commits
+#      the best-scored thought per logged step, exported to an SFT corpus.
 #   2  SFT per arm, hide-observations, lr 3e-3, tracking train + eval action-span PPL and
 #      accuracy. Uses the SAME lr the other three domains converged at (probed: 1e-4 dead,
 #      1e-3 +1.19%, 3e-3 +6.94% over 30 batches).
@@ -54,28 +55,74 @@ wait_gpu_free(){ while pgrep -f '[m]ain_pytorch.py' >/dev/null 2>&1; do sleep 60
 newest(){ ls -dt $1 2>/dev/null | head -1; }
 has(){ case " $STAGES " in *" $1 "*) return 0;; *) return 1;; esac; }
 
-# ---------------------------------------------------------------- Stage 1: EM relabel
+# ---------------------------------------------------------------- Stage 1: EM + relabel
+# TWO passes per scorer, matching what retail/airline/finance did:
+#   1a EM TRAINING   (nb=25 bs=4 gs=4, save_generations) -> step_best checkpoint
+#   1b RELABEL       (--no_train --resume_from step_best --advantage_mode best) -> commits
+#      thoughts[best] per logged step -> generations.jsonl -> export_sft_corpus.py
+# A single no-train pass from the BASE model is NOT the same experiment: the thoughts would
+# come from an untrained policy, so thoughts_policy would no longer be policy-scored.
+#
+# Relabel coverage: nb*bs must reach every train trajectory. 180 train / bs 4 = 45 batches
+# (the other domains used nb=20 because retail had 49 train trajectories and finance 116).
+CKROOT="checkpoints_lora/act_prm_snorkel_insurance/$MODEL"
+LOGROOT="logs/act_prm_snorkel_insurance/$MODEL"
+EM_NB="${EM_NB:-25}"
+RELABEL_NB="${RELABEL_NB:-45}"
+n_rows(){ uv run --no-project python -c "import json;print(len(json.load(open('$1'))))" 2>/dev/null || echo 0; }
+
 if has 1; then
 for scorer in policy base; do
-  TAG="insurance_s1_${scorer}"
   CORPUS="data/sft_corpus/snorkel_insurance/${scorer}"
-  if [ -s "$CORPUS/train.json" ]; then log "$TAG: corpus exists, skip"; continue; fi
-  if [ -f "$MDIR/${TAG}.done" ]; then log "$TAG: done, skip"; continue; fi
-  SCORE_FLAG=--score_with_base; [ "$scorer" = policy ] && SCORE_FLAG=--no-score_with_base
-  log "STAGE-1 EM $TAG (180 train questions, ${scorer}-scored)"
+  if [ -s "$CORPUS/train.json" ] && [ "$(n_rows "$CORPUS/train.json")" -gt 0 ]; then
+    log "stage1/$scorer: corpus exists ($(n_rows "$CORPUS/train.json") train / $(n_rows "$CORPUS/eval.json") eval), skip"
+    continue
+  fi
+  SWB=--no-score_with_base; SWBV=0
+  [ "$scorer" = base ] && { SWB=--score_with_base; SWBV=1; }
+
+  # -- 1a. EM training
+  EMTAG="insurance_s1em_${scorer}"
+  if [ ! -f "$MDIR/${EMTAG}.done" ]; then
+    log "STAGE-1a EM training $EMTAG (${scorer}-scored, nb=$EM_NB bs=4 gs=4)"
+    wait_gpu_free
+    ./scripts/train.sh --env_config "$ENVCFG" --generator_config act_prm --trainer_config pg \
+        --model_config "$MODEL" --lora_config r8_a16_linear --replay_buffer_config default \
+        $SWB --run_tag "$EMTAG" --group_size 4 --batch_size 4 --num_batches "$EM_NB" \
+        --length_penalty 0.15 --save_generations --verbose \
+        > "$MDIR/${EMTAG}.log" 2>&1 \
+      || { _fail=$((_fail+1)); log "$EMTAG: FAILED (see $MDIR/${EMTAG}.log)"; continue; }
+    touch "$MDIR/${EMTAG}.done"; log "$EMTAG: done"
+  fi
+
+  # -- 1b. relabel from the EM checkpoint, then export the corpus
+  CK=$(ls -dt "$CKROOT"/*swb=${SWBV}-*/step_best 2>/dev/null | head -1)
+  [ -z "$CK" ] && { _fail=$((_fail+1)); log "stage1/$scorer: no EM step_best under $CKROOT, skip"; continue; }
+  RTAG="insurance_s1relabel_${scorer}"
+  log "STAGE-1b relabel $RTAG from $CK (nb=$RELABEL_NB bs=4 -> $((RELABEL_NB*4)) trajectories)"
   wait_gpu_free
   ./scripts/train.sh --env_config "$ENVCFG" --generator_config act_prm --trainer_config pg \
-      --run_tag "$TAG" --no_train "$SCORE_FLAG" \
-      --group_size 4 --batch_size 2 --length_penalty 0.15 \
-      > "$MDIR/${TAG}.log" 2>&1 \
-    || { _fail=$((_fail+1)); log "$TAG: FAILED (see $MDIR/${TAG}.log)"; continue; }
-  GEN=$(newest "logs/act_prm_snorkel_insurance/$MODEL/${TAG}-*/generations.jsonl")
-  [ -z "$GEN" ] && { _fail=$((_fail+1)); log "$TAG: no generations.jsonl"; continue; }
+      --model_config "$MODEL" --lora_config r8_a16_linear --replay_buffer_config default \
+      $SWB --no_train --resume_from "$CK" --advantage_mode best \
+      --group_size 4 --batch_size 4 --num_batches "$RELABEL_NB" --no_initial_eval \
+      --length_penalty 0.15 --save_generations --run_tag "$RTAG" --verbose \
+      > "$MDIR/${RTAG}.log" 2>&1 \
+    || { _fail=$((_fail+1)); log "$RTAG: FAILED (see $MDIR/${RTAG}.log)"; continue; }
+  GEN=$(newest "$LOGROOT/${RTAG}-*/generations.jsonl")
+  [ -z "$GEN" ] && { _fail=$((_fail+1)); log "$RTAG: no generations.jsonl (--save_generations?)"; continue; }
+  # No --advantage_mode here: that is a main_pytorch flag, not an export one. The exporter
+  # already commits thoughts[best] (the candidate index the EM generator marked) per step.
   uv run --no-project python scripts/export_sft_corpus.py \
       --generations "$GEN" --source-pools data/snorkel_insurance_split \
-      --out "$CORPUS" --advantage_mode best >> "$MDIR/${TAG}.log" 2>&1 \
-    || { _fail=$((_fail+1)); log "$TAG: corpus export FAILED"; continue; }
-  touch "$MDIR/${TAG}.done"; log "$TAG: done -> $CORPUS"
+      --out "$CORPUS" >> "$MDIR/${RTAG}.log" 2>&1 \
+    || { _fail=$((_fail+1)); log "$RTAG: corpus export FAILED"; continue; }
+  NT=$(n_rows "$CORPUS/train.json"); NE=$(n_rows "$CORPUS/eval.json")
+  # An empty or short corpus is the failure that silently produced train:0 corpora before.
+  if [ "$NT" -lt 90 ]; then
+    _fail=$((_fail+1)); log "$RTAG: corpus only $NT/180 train trajectories -- raise RELABEL_NB; not marking done"
+  else
+    log "$RTAG: done -> $CORPUS ($NT train / $NE eval of 180/40)"
+  fi
 done
 fi
 
