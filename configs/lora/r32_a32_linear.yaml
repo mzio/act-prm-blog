@@ -1,0 +1,19 @@
+# Rank-32 LoRA on all linear projections, alpha = r (scaling alpha/r = 1.0).
+#
+# Deliberately NOT the 2r convention the other configs use. Paired with r32_a64_linear
+# (scaling 2.0, matching r8_a16_linear) this separates two things that are otherwise
+# confounded when raising the rank:
+#   r8_a16  -> r32_a64 : rank changes,   scaling held at 2.0
+#   r32_a64 -> r32_a32 : scaling changes, rank held at 32
+# so the probe can attribute any change in adapter movement to rank or to scaling.
+r: 32
+lora_alpha: 32
+lora_dropout: 0.05
+target_modules:
+  - "self_attn.q_proj"
+  - "self_attn.k_proj"
+  - "self_attn.v_proj"
+  - "self_attn.o_proj"
+  - "mlp.down_proj"
+  - "mlp.gate_proj"
+  - "mlp.up_proj"

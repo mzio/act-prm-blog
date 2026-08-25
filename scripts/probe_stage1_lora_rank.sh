@@ -20,9 +20,13 @@
 # DESIGN: short probes (default 5 batches, ~50 min each) then measure the adapter, rather
 # than a 4.4h full EM run per arm. The question is "does it move", which 5 batches answers.
 # Arms, all on insurance (its pool is already built and its no-op is measured):
-#   r8  @ 4e-5  -- reproduce the known no-op as a control
-#   r32 @ 4e-5  -- the hypothesis
-#   r8  @ 3e-3  -- the LR fix, for reference on what "moving" looks like
+#   r8/a16  @ 4e-5  -- reproduce the known no-op as a control        (scaling 2.0)
+#   r32/a64 @ 4e-5  -- the hypothesis, scaling held at the baseline   (scaling 2.0)
+#   r32/a32 @ 4e-5  -- same rank, HALF the scaling                    (scaling 1.0)
+#   r8/a16  @ 3e-3  -- the LR fix, reference for what "moving" means  (scaling 2.0)
+# The two r32 arms separate rank from scaling, which are otherwise confounded: comparing
+# r8/a16 to r32/a64 varies rank at fixed scaling, and r32/a64 to r32/a32 varies scaling at
+# fixed rank.
 #
 # Usage: ./scripts/probe_stage1_lora_rank.sh
 set -uo pipefail
@@ -40,8 +44,11 @@ ENVCFG=act_prm/snorkel_insurance
 log(){ echo "[$(date '+%m-%d %H:%M:%S')] $*" | tee -a "$MDIR/lorarank.log"; }
 wait_gpu_free(){ while pgrep -f '[m]ain_pytorch.py' >/dev/null 2>&1; do sleep 60; done; sleep 10; }
 
-# arm : lora_config : lr
-ARMS=("r8_lr4e5:r8_a16_linear:4e-5" "r32_lr4e5:r32_a64_linear:4e-5" "r8_lr3e3:r8_a16_linear:3e-3")
+# name : lora_config : lr        (scaling = alpha/r shown for reference)
+ARMS=("r8_lr4e5:r8_a16_linear:4e-5"      # scaling 2.0 -- control, the known no-op
+      "r32a64_lr4e5:r32_a64_linear:4e-5" # scaling 2.0 -- rank varies, scaling held
+      "r32a32_lr4e5:r32_a32_linear:4e-5" # scaling 1.0 -- scaling varies, rank held
+      "r8_lr3e3:r8_a16_linear:3e-3")     # scaling 2.0 -- the LR fix, reference for "moved"
 
 log "=== Stage-1 LoRA-rank probe: $NB batches per arm, insurance ==="
 for spec in "${ARMS[@]}"; do
