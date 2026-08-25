@@ -27,7 +27,13 @@ keep_expert_thoughts: false  # true -> expert reasoning+action targets; pair wit
 num_trajectories: null       # all 180 train questions
 eval_trajectories: null      # all 40 eval questions
 max_steps_per_traj: null     # infer a thought for every logged action
-obs_max_chars: null          # full observations (cap with an int if VRAM-constrained)
+obs_max_chars: 4000          # REQUIRED here, not optional. Insurance tool calls return whole
+                             # SQL tables: observations run to p99=48,995 and max=56,543 chars,
+                             # and full trajectories to 99,177 chars (~25k tokens). Uncapped,
+                             # the EM M-step OOMed on 08-24 (817 MiB free of 95 GiB). A 4000
+                             # cap leaves 93% of observations untouched and brings the worst
+                             # trajectory to ~6.6k tokens. Applied via the env, so every arm
+                             # sees the same truncation and the comparison stays fair.
 
 # Observation hiding OFF for thought generation (reserved for downstream SFT/RL).
 hide_observations: false

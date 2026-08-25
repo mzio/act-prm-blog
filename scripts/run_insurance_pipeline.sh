@@ -67,6 +67,10 @@ has(){ case " $STAGES " in *" $1 "*) return 0;; *) return 1;; esac; }
 # (the other domains used nb=20 because retail had 49 train trajectories and finance 116).
 CKROOT="checkpoints_lora/act_prm_snorkel_insurance/$MODEL"
 LOGROOT="logs/act_prm_snorkel_insurance/$MODEL"
+# --no_initial_eval: the batch-0 eval over the 40 eval trajectories took 2932s (49 min)
+# before a single training step ran. --eval_every EM_NB: one eval at the end, enough to
+# write step_best, which is all Stage 1b needs. --gradient_checkpointing: the M-step
+# backward is what OOMed; ~30% slower but it is the pass that failed.
 EM_NB="${EM_NB:-25}"
 RELABEL_NB="${RELABEL_NB:-45}"
 n_rows(){ uv run --no-project python -c "import json;print(len(json.load(open('$1'))))" 2>/dev/null || echo 0; }
@@ -95,6 +99,7 @@ for scorer in policy base; do
         --model_config "$MODEL" --lora_config r8_a16_linear --replay_buffer_config default \
         $SWB --run_tag "$EMTAG" --group_size 4 --batch_size 4 --num_batches "$EM_NB" \
         --length_penalty 0.15 --save_generations --verbose \
+        --no_initial_eval --eval_every "$EM_NB" --gradient_checkpointing \
         > "$MDIR/${EMTAG}.log" 2>&1 \
       || { _fail=$((_fail+1)); log "$EMTAG: FAILED (see $MDIR/${EMTAG}.log)"; continue; }
     _el=$(( $(date +%s) - _t0 ))
