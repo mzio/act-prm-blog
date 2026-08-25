@@ -105,6 +105,28 @@ trajectories cost `time/run_evals_eval: 2932s`.
 - Rejected (b): shrinking the eval set would have made the Stage-2 curves less comparable to
   the other domains for no compute saving in Stage 2 itself.
 
+**(ii-b) LIMITATION accepted: no Stage-1 eval CURVE.** `--eval_every EM_NB` means exactly
+one eval point, at the final batch. I made that trade to kill the 49-min batch-0 eval
+without flagging that it also destroys the eval curve — that was the wrong call to make
+silently.
+- The assumption behind it was also wrong: with `obs_max_chars: 4000` the eval STILL cost
+  2,893s vs 2,932s uncapped, so eval time is dominated by generating over the 540 eval
+  steps, not by context length. Each additional eval point costs ~48 min.
+- **What we have:** the TRAIN curve is complete — 25 rows, one per batch, with
+  `train/try_0/{final_reward, likelihood, penalized, thought_tokens}`. Reward-over-steps is
+  plottable for Stage 1 training. The eval side is a single point (batch 24):
+  likelihood 0.3377 (sd 0.26, max 0.9945), penalized 0.2138, thought_tokens 79.3.
+- **Decision (MZ, 08-25):** leave the BASE scorer at `eval_every 25` too, so the two scorers
+  stay comparable, and record this as a known limitation rather than giving one arm a denser
+  curve than the other.
+- **If a Stage-1 eval curve is wanted later:** add `--save_every 5` to the EM run so
+  intermediate checkpoints exist, then score them offline against the eval pool. Re-running
+  with a denser `eval_every` is the expensive way (+3.2h for 5 points) and would break
+  comparability with the policy run already finished.
+- Note `eval/try_0/correct` and `accuracy` are 0 in these EM logs and that is EXPECTED:
+  "correct" means exact action-string match in the Act-PRM generator. The meaningful
+  quantities are `likelihood` and `penalized`. Do not read those zeros as a failure.
+
 **(iii) The driver marked a crashed arm as complete and moved on.** After the OOM it logged
 `FAILED` and immediately started the base scorer, which would have repeated both mistakes.
 - **What worked:** failure counting + conditional ALLDONE in every driver, plus a guard-side
