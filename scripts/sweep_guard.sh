@@ -181,6 +181,17 @@ if [ -f "$G/finance_rollout/ALLDONE" ] && [ ! -f "$G/x1replicate/ALLDONE" ]; the
   exit 0
 fi
 
+# 2f2. INSURANCE: the full pipeline on a fourth domain (Stage-1 EM -> Stage-2 SFT ->
+# rollout on 41 held-out questions). Ordered after the multi-rollout because that stage is
+# what makes the EXISTING result reportable, whereas this adds a new domain; a fourth
+# domain is worth much less if the three we have cannot clear the noise floor.
+if [ ! -f "$G/insurance/ALLDONE" ]; then
+  log "advancing the insurance pipeline (stage 1 -> 2 -> 3)"
+  mkdir -p "$G/insurance"
+  ./scripts/run_insurance_pipeline.sh >> "$G/insurance/driver.log" 2>&1
+  exit 0
+fi
+
 # 2g2. 3 rollouts per task for the key arms. Ordered AFTER the finance work and BEFORE
 # best-gen because it is the only stage that can make the headline result significant
 # (pooled McNemar is currently p=0.077); every other pending stage adds interpretation,
@@ -206,17 +217,6 @@ fi
 if [ -f "$G/x1replicate/ALLDONE" ] && [ ! -f "$G/multirollout/ALLDONE" ]; then
   log "advancing the multi-rollout (3 per task, arms: $MR_ARMS)"
   ARMS="$MR_ARMS" ./scripts/run_multirollout.sh >> "$G/multirollout/driver.log" 2>&1
-  exit 0
-fi
-
-# 2i. INSURANCE: the full pipeline on a fourth domain (Stage-1 EM -> Stage-2 SFT ->
-# rollout on 41 held-out questions). Ordered after the multi-rollout because that stage is
-# what makes the EXISTING result reportable, whereas this adds a new domain; a fourth
-# domain is worth much less if the three we have cannot clear the noise floor.
-if [ -f "$G/multirollout/ALLDONE" ] && [ ! -f "$G/insurance/ALLDONE" ]; then
-  log "advancing the insurance pipeline (stage 1 -> 2 -> 3)"
-  mkdir -p "$G/insurance"
-  ./scripts/run_insurance_pipeline.sh >> "$G/insurance/driver.log" 2>&1
   exit 0
 fi
 
