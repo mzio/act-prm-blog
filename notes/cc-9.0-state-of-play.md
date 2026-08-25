@@ -170,6 +170,22 @@ insurance EM runs all record `lr=4e-05`.
 `lora_B` is zero-initialised, so `B@A` IS the adapter. At 2.8e-06 against 1e-2 the "trained"
 EM policy is the base model to ~0.03% at its most-updated position.
 
+**Confirmed across domains (08-25), measured on EXISTING checkpoints — no GPU, no re-run:**
+
+| domain | Stage-1 EM adapter, max abs B@A | verdict |
+|---|---|---|
+| retail (policy, step_best) | 6.7e-07 | NO-OP |
+| retail (base, step_best) | 6.7e-07 | NO-OP |
+| retail (step_last variants) | 3.1e-06 | NO-OP |
+| finance | 4.1e-07 | NO-OP |
+| insurance | 2.8e-06 | NO-OP |
+| airline | no EM checkpoint survived the box recovery | unverifiable |
+
+Base weights are order 1e-2, so every one of these is 4-5 orders of magnitude too small.
+The flat EM reward curve in every domain has a single measured cause. Worth noting this
+check costs nothing: `scripts/report_lora_movement.py` reads the saved adapters directly,
+so "did training do anything" never needs a re-run to answer.
+
 **How I got here — three readings, two wrong:**
 1. "Insurance's flat EM curve = under-training at 0.56 epochs." WRONG. Refuted by the
    cross-domain table: finance ran 2.00 epochs (58 batches) and its policy curve moved
