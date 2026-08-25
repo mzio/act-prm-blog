@@ -38,7 +38,7 @@ if pgrep -f '[m]ain_pytorch.py' >/dev/null 2>&1; then exit 0; fi
 # Any of OUR driver shells mid-launch -> let it be. This list must include every driver
 # the guard can start; omitting one (run_matched_control) let cron launch a SECOND copy
 # of a control run that was already going, and both appended to the same metrics.jsonl.
-if ps -eo args | grep -qE 'scripts/(run_sft_lr_matrix|run_sft_sweep|probe_sft_lr|run_matched_control|run_expert_all|run_sft_rollout_eval|run_finance_v3|run_finance_rollout|run_bestgen_sft|run_multirollout|run_base_rollout|run_insurance_pipeline|run_x1_replicate)\.sh'; then exit 0; fi
+if ps -eo args | grep -qE 'scripts/(run_sft_lr_matrix|run_sft_sweep|probe_sft_lr|run_matched_control|run_expert_all|run_sft_rollout_eval|run_finance_v3|run_finance_rollout|run_bestgen_sft|run_multirollout|run_base_rollout|run_insurance_pipeline|run_x1_replicate|probe_stage1_lora_rank)\.sh'; then exit 0; fi
 
 # 2. thoughts_base LR probe (once)
 if [ ! -f "$G/lrprobe/thoughts_base.done" ]; then
@@ -189,6 +189,19 @@ if [ ! -f "$G/insurance/ALLDONE" ]; then
   log "advancing the insurance pipeline (stage 1 -> 2 -> 3)"
   mkdir -p "$G/insurance"
   ./scripts/run_insurance_pipeline.sh >> "$G/insurance/driver.log" 2>&1
+  exit 0
+fi
+
+# 2f3. STAGE-1 LoRA-RANK PROBE. Every Stage-1 EM run in every domain used lr=4e-5 with
+# r8_a16_linear, and the adapter is a measured no-op (insurance max|B@A| = 2.8e-06 vs base
+# weights ~1e-2), which is why the EM reward curve is flat everywhere. MZ's hypothesis: keep
+# lr=4e-5 but raise the rank to 32. Three 5-batch probes (r8@4e-5 control, r32@4e-5 the
+# hypothesis, r8@3e-3 the LR fix for reference) then measure adapter movement -- ~2.5h total
+# instead of 4.4h per full EM run, because "does it move" is answerable in 5 batches.
+if [ -f "$G/insurance/ALLDONE" ] && [ ! -f "$G/lorarank/ALLDONE" ]; then
+  log "advancing the Stage-1 LoRA-rank probe (r8 vs r32 at lr 4e-5)"
+  mkdir -p "$G/lorarank"
+  ./scripts/probe_stage1_lora_rank.sh >> "$G/lorarank/driver.log" 2>&1
   exit 0
 fi
 

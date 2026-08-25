@@ -1,0 +1,17 @@
+# Rank-32 LoRA on all linear projections (attn + MLP).
+#
+# alpha = 64 = 2r deliberately. PEFT scales the adapter by alpha/r, so the repo's other
+# configs (r8/a16, r16/a32) both hold that ratio at 2.0. Pairing r=32 with alpha=16 would
+# drop the scaling to 0.5 -- a 4x SMALLER effective update than r8_a16_linear -- which is
+# the opposite of the intent when testing whether more rank helps the adapter move.
+r: 32
+lora_alpha: 64
+lora_dropout: 0.05
+target_modules:
+  - "self_attn.q_proj"
+  - "self_attn.k_proj"
+  - "self_attn.v_proj"
+  - "self_attn.o_proj"
+  - "mlp.down_proj"
+  - "mlp.gate_proj"
+  - "mlp.up_proj"
