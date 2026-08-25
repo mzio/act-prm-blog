@@ -181,6 +181,33 @@ if [ -f "$G/finance_rollout/ALLDONE" ] && [ ! -f "$G/x1replicate/ALLDONE" ]; the
   exit 0
 fi
 
+# 2f2b. Back-fill insurance Stage-1a .done markers. The insurance driver writes a marker
+# only after its train.sh call RETURNS, so stopping the driver to reorder work leaves a
+# completed EM run unmarked and the gates below never fire. Derive the marker from the run's
+# own metrics instead: if it reached its final batch, it is done.
+uv run --no-project python - <<'INSBF' >> "$G/guard.log" 2>&1 || true
+import glob, json, os, re
+for scorer in ("policy", "base"):
+    marker = f"/tmp/aprm/insurance/insurance_s1em_{scorer}.done"
+    if os.path.exists(marker):
+        continue
+    for d in glob.glob(f"logs/act_prm_snorkel_insurance/hf_qwen3_4b_instruct/insurance_s1em_{scorer}-*/"):
+        m = re.search(r"-nb=(\d+)", d)
+        f = d + "metrics.jsonl"
+        if not m or not os.path.exists(f):
+            continue
+        nb = int(m.group(1))
+        try:
+            rows = [json.loads(l) for l in open(f) if l.strip()]
+        except Exception:
+            continue
+        last = max((r.get("progress/batch", -1) for r in rows), default=-1)
+        if last >= nb - 1:
+            open(marker, "w").close()
+            print(f"back-filled insurance EM marker: {scorer} (reached b{last}/{nb})")
+            break
+INSBF
+
 # 2f3. STAGE-1 @ RANK 32, all domains, regenerating the Act-PRM corpora. Every Stage-1 EM
 # run to date used lr=4e-5 / r8_a16_linear and the adapter is a MEASURED no-op in every
 # domain with a surviving checkpoint (retail 6.7e-07, finance 4.1e-07, insurance 2.8e-06 vs
