@@ -181,17 +181,6 @@ if [ -f "$G/finance_rollout/ALLDONE" ] && [ ! -f "$G/x1replicate/ALLDONE" ]; the
   exit 0
 fi
 
-# 2f2. INSURANCE: the full pipeline on a fourth domain (Stage-1 EM -> Stage-2 SFT ->
-# rollout on 41 held-out questions). Ordered after the multi-rollout because that stage is
-# what makes the EXISTING result reportable, whereas this adds a new domain; a fourth
-# domain is worth much less if the three we have cannot clear the noise floor.
-if [ ! -f "$G/insurance/ALLDONE" ]; then
-  log "advancing the insurance pipeline (stage 1 -> 2 -> 3)"
-  mkdir -p "$G/insurance"
-  ./scripts/run_insurance_pipeline.sh >> "$G/insurance/driver.log" 2>&1
-  exit 0
-fi
-
 # 2f3. STAGE-1 @ RANK 32, all domains, regenerating the Act-PRM corpora. Every Stage-1 EM
 # run to date used lr=4e-5 / r8_a16_linear and the adapter is a MEASURED no-op in every
 # domain with a surviving checkpoint (retail 6.7e-07, finance 4.1e-07, insurance 2.8e-06 vs
@@ -202,11 +191,26 @@ fi
 # (--save_every) and measures max|B@A| there, aborting the whole sweep if it is still a
 # no-op. That buys the same de-risking for ~50 min of a run we want anyway, instead of 2.5h
 # of probes. Full sweep is ~35h for the policy scorer, ~70h for both.
-if [ -f "$G/insurance/ALLDONE" ] && [ ! -f "$G/stage1_r32/ALLDONE" ] \
+# Gated on insurance's Stage-1a BASE EM only, not the whole insurance pipeline: that EM
+# completes the 4e-5 parity set, but the 8.5h relabel that follows it is worth deferring
+# until we know whether rank 32 works. Insurance's Stage-1a .done is already written, so
+# re-invoking its driver later resumes cleanly at Stage-1b.
+if [ -f "$G/insurance/insurance_s1em_base.done" ] && [ ! -f "$G/stage1_r32/ALLDONE" ] \
    && [ ! -f "$G/stage1_r32/ABORTED" ]; then
   log "advancing Stage-1 @ rank32 (early-abort check at batch 5)"
   mkdir -p "$G/stage1_r32"
   ./scripts/run_stage1_r32.sh >> "$G/stage1_r32/driver.log" 2>&1
+  exit 0
+fi
+
+# 2f2. INSURANCE: the full pipeline on a fourth domain (Stage-1 EM -> Stage-2 SFT ->
+# rollout on 41 held-out questions). Ordered after the multi-rollout because that stage is
+# what makes the EXISTING result reportable, whereas this adds a new domain; a fourth
+# domain is worth much less if the three we have cannot clear the noise floor.
+if [ ! -f "$G/insurance/ALLDONE" ]; then
+  log "advancing the insurance pipeline (stage 1 -> 2 -> 3)"
+  mkdir -p "$G/insurance"
+  ./scripts/run_insurance_pipeline.sh >> "$G/insurance/driver.log" 2>&1
   exit 0
 fi
 
