@@ -1,5 +1,15 @@
 # cc-5.0 — Stage-2 SFT never trained: diagnosis, fix, and the re-run
 
+> **RETRACTION (08-24) — rollout/completion numbers only.** All task-completion figures
+> below are superseded; see [cc-8.0](cc-8.0-rollout-confound.md). The airline
+> `thoughts_policy` 72.2% (+22.2pp) did not replicate — 55.6% re-running the SAME seed,
+> 44.4–50.0% at seeds 0/1/7 — and at 3 rollouts/task the pooled difference is +0.6pp
+> (p=0.765). The harness also confounds arm with measurement time (`actions_only` scored
+> 53.7% at 09:39 and 33–39% at 17:50 the same day). Teacher-forced Stage-2 PPL/accuracy in
+> this note are computed offline from fixed checkpoints and are NOT affected.
+
+
+
 Running log. The results table near the bottom is refreshed automatically every 20 min
 by `scripts/snapshot_results.sh` (cron).
 

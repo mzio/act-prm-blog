@@ -4,6 +4,17 @@ Companion to [cc-5.0](cc-5.0-sft-lr-investigation.md), which holds the running n
 This note is the narrative: what was done, what it found, what broke, and how each break
 was diagnosed and fixed.
 
+> **RETRACTION (08-24).** Every task-completion number in this note is superseded. The
+> rollout harness confounds arm with measurement time and its outcomes are not reproducible
+> even at a fixed seed — see [cc-8.0](cc-8.0-rollout-confound.md). Specifically:
+> the airline `thoughts_policy` **72.2% (+22.2pp)** headline below did not replicate (55.6%
+> on re-run at the *same* seed, 44.4–50.0% at seeds 0/1/7), and at 3 rollouts/task the
+> pooled Act-PRM-vs-baseline difference is **+0.6pp, p=0.765**. The pooled McNemar p=0.077
+> was an artifact of one sample per task. Section 2's rollout table and section 6's
+> significance discussion should be read as *what we believed on 08-22*, not as results.
+> The teacher-forced Stage-2 numbers in this note are unaffected and still stand.
+
+
 ---
 
 ## 1. The headline
