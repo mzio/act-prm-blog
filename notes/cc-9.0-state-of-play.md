@@ -150,6 +150,62 @@ silently.
 Measured: EM 9.0 min/batch. uid -> gym `company_task_id` mapping is 261/261, 0 ambiguous,
 sets disjoint (`data/splits/snorkel_insurance_uid_to_task.json`).
 
+## 3b. FINDING (08-25): Stage-1 EM has been running at the BROKEN learning rate, in every domain
+
+**The M-step is a numerical no-op and always has been.** The 08-22 LR fix was applied to
+Stage 2 (`--learning_rate 3e-3`) and never to Stage 1. `configs/trainer/pg.yaml` still has
+`learning_rate: 4e-5`, and neither `train.sh` nor `run_relabel.sh` nor the Stage-1a call in
+`run_insurance_pipeline.sh` overrides it. Confirmed on the run configs: retail, finance and
+insurance EM runs all record `lr=4e-05`.
+
+**Measured on the weights, not inferred from curves** (insurance policy EM, 25 batches):
+
+| measurement | value |
+|---|---|
+| max abs lora_B | 5.9e-05 |
+| mean abs lora_B | 1.1e-07 |
+| max abs B@A (the whole adapter contribution) | **2.8e-06** |
+| base weight scale | ~1e-2 |
+
+`lora_B` is zero-initialised, so `B@A` IS the adapter. At 2.8e-06 against 1e-2 the "trained"
+EM policy is the base model to ~0.03% at its most-updated position.
+
+**How I got here — three readings, two wrong:**
+1. "Insurance's flat EM curve = under-training at 0.56 epochs." WRONG. Refuted by the
+   cross-domain table: finance ran 2.00 epochs (58 batches) and its policy curve moved
+   **-0.0186**, worse than insurance's +0.0123 at 0.56 epochs.
+2. "Flat EM curves are just normal for this method." WRONG, and worse — it rationalised the
+   symptom instead of diagnosing it. Every domain being flat should have prompted "what is
+   common to every domain?", not "flatness is inherent".
+3. **CORRECT, after MZ asked what the learning rate was:** the LR is 4e-5 everywhere in
+   Stage 1, the same value proven in cc-5.0/6.0 to leave adapters indistinguishable from
+   base. Every symptom follows: flat reward in all domains, `train/loss = -0.0000` batches,
+   |delta|/sd < 1 universally, and 2 epochs helping no more than 0.56.
+
+**What this does and does not invalidate:**
+- Stage-2 teacher-forced results STAND as measured. Act-PRM corpora do beat baseline (and
+  beat expert thoughts on finance). That benefit is real.
+- But it comes ENTIRELY from the **E-step** — sample `group_size` thoughts per logged action,
+  keep the best by length-penalised likelihood — with zero contribution from EM policy
+  improvement. "Act-PRM works" is currently a claim about best-of-4 rejection sampling.
+- It explains an oddity noted earlier and left unexplained: `thoughts_policy` and
+  `thoughts_base` track each other closely everywhere (retail 2.2059 vs 2.2003, finance
+  1.7919 vs 1.7954). If the proposing model is the base model in both, they differ only in
+  which model SCORES the candidates — a much smaller difference than intended.
+
+**Decision (autonomous, 08-25 12:30):** let the insurance base-scorer EM finish at 4e-5.
+Rationale: parity. Insurance's value is as a fourth COMPARABLE domain, and retail/airline/
+finance all ran Stage 1 at 4e-5; switching insurance mid-pipeline would make it the only
+domain trained differently, which costs more than the ~3.5h it would save. Flagging rather
+than unilaterally re-running everything.
+
+**Recommended next experiment (NOT auto-launched — needs a decision):** re-run Stage 1 for
+one domain at `--learning_rate 3e-3`, relabel, and compare the resulting Stage-2 numbers
+against the 4e-5 corpus. That is the first real test of whether the M-step adds anything
+over best-of-4 sampling. ~9h for EM + relabel, plus ~2.5h for one Stage-2 arm. If it makes
+no difference, the honest framing of the method changes (and gets cheaper); if it does, all
+four domains' Act-PRM numbers are a lower bound.
+
 ## 4. Queue (cron-driven, `sweep_guard.sh` every 5 min)
 
 Gate order, top-down; earlier gates are satisfied and no-op:

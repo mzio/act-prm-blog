@@ -1,0 +1,173 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Act-PRM Stage-1 EM curve — insurance (policy-scored)</title><style>
+:root{--bg:#fbfbfa;--surface:#fff;--ink:#1b1b1a;--ink2:#4a4a48;--ink3:#77776f;--line:#e4e4e0}
+@media(prefers-color-scheme:dark){:root{--bg:#16171a;--surface:#1e2024;--ink:#ececeb;--ink2:#b9b9b5;--ink3:#8b8b85;--line:#31333a}}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif}
+.wrap{max-width:900px;margin:0 auto;padding:32px 24px 64px}
+h1{font-size:21px;margin:0 0 4px;letter-spacing:-.01em}
+.sub{color:var(--ink3);font-size:13px;margin-bottom:22px}
+.stats{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:20px}
+.stat{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:10px 14px;min-width:126px}
+.stat b{display:block;font-size:20px;font-variant-numeric:tabular-nums;letter-spacing:-.02em}
+.stat span{color:var(--ink3);font-size:11px;text-transform:uppercase;letter-spacing:.05em}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:8px 4px 4px}
+text.t{fill:var(--ink);font-size:13.5px;font-weight:600}
+text.s{fill:var(--ink3);font-size:11.5px}
+text.ax{fill:var(--ink3);font-size:10.5px}
+text.dl{font-size:11.5px;font-weight:600}
+line.g{stroke:var(--line);stroke-width:1}
+table{border-collapse:collapse;width:100%;margin:10px 0 4px;font-size:13px}
+th,td{text-align:left;padding:7px 10px;border-bottom:1px solid var(--line)}
+th{color:var(--ink3);font-size:11px;text-transform:uppercase;letter-spacing:.05em;font-weight:700}
+td.n{text-align:right;font-variant-numeric:tabular-nums}
+.note{font-size:13px;color:var(--ink2);margin-top:18px;background:var(--surface);
+  border:1px solid var(--line);border-left:3px solid #c26a3d;border-radius:8px;padding:12px 16px}
+</style></head><body><div class="wrap">
+<h1>Act-PRM Stage-1 EM — insurance, policy-scored</h1>
+<div class="sub">25 training batches · group_size 4 · 180 train trajectories · run <code>insurance_s1em_policy</code></div>
+<div class="stats">
+  <div class="stat"><b>0.4085</b><span>first 5 batches</span></div>
+  <div class="stat"><b>0.4208</b><span>last 5 batches</span></div>
+  <div class="stat"><b>+0.0123</b><span>change</span></div>
+  <div class="stat"><b>0.354–0.491</b><span>batch-to-batch range</span></div>
+  <div class="stat"><b>0.56×</b><span>epochs over the pool</span></div>
+</div>
+<div class="card"><svg viewBox="0 0 780 530" width="100%" role="img"
+ aria-label="Stage-1 EM reward and thought length over 25 training batches, both flat">
+<text x="70" y="44" class="t">Length-penalised action likelihood</text>
+<text x="70" y="60" class="s">the quantity EM optimises — flat means the policy is not improving</text>
+<line x1="70" y1="270.0" x2="710" y2="270.0" class="g"/>
+<text x="62" y="274.0" class="ax" text-anchor="end">0.193</text>
+<line x1="70" y1="220.0" x2="710" y2="220.0" class="g"/>
+<text x="62" y="224.0" class="ax" text-anchor="end">0.279</text>
+<line x1="70" y1="170.0" x2="710" y2="170.0" class="g"/>
+<text x="62" y="174.0" class="ax" text-anchor="end">0.365</text>
+<line x1="70" y1="120.0" x2="710" y2="120.0" class="g"/>
+<text x="62" y="124.0" class="ax" text-anchor="end">0.451</text>
+<line x1="70" y1="70.0" x2="710" y2="70.0" class="g"/>
+<text x="62" y="74.0" class="ax" text-anchor="end">0.537</text>
+<path d="M70.0,134.2 L96.7,142.1 L123.3,176.5 L150.0,162.9 L176.7,108.0 L203.3,142.9 L230.0,124.7 L256.7,136.8 L283.3,141.0 L310.0,136.9 L336.7,126.4 L363.3,170.9 L390.0,168.6 L416.7,158.6 L443.3,151.5 L470.0,113.1 L496.7,156.1 L523.3,124.7 L550.0,172.6 L576.7,119.7 L603.3,169.1 L630.0,96.5 L656.7,123.9 L683.3,147.5 L710.0,150.9" fill="none" stroke="#2d6ca8" stroke-width="2" stroke-linejoin="round"/>
+<circle cx="70.0" cy="134.2" r="3.2" fill="#2d6ca8" stroke="var(--surface)" stroke-width="1.6"><title>batch 0 · reward 0.4267</title></circle>
+<circle cx="96.7" cy="142.1" r="3.2" fill="#2d6ca8" stroke="var(--surface)" stroke-width="1.6"><title>batch 1 · reward 0.4131</title></circle>
+<circle cx="123.3" cy="176.5" r="3.2" fill="#2d6ca8" stroke="var(--surface)" stroke-width="1.6"><title>batch 2 · reward 0.3540</title></circle>
+<circle cx="150.0" cy="162.9" r="3.2" fill="#2d6ca8" stroke="var(--surface)" stroke-width="1.6"><title>batch 3 · reward 0.3773</title></circle>
+<circle cx="176.7" cy="108.0" r="3.2" fill="#2d6ca8" stroke="var(--surface)" stroke-width="1.6"><title>batch 4 · reward 0.4716</title></circle>
+<circle cx="203.3" cy="142.9" r="3.2" fill="#2d6ca8" stroke="var(--surface)" stroke-width="1.6"><title>batch 5 · reward 0.4117</title></circle>
+<circle cx="230.0" cy="124.7" r="3.2" fill="#2d6ca8" stroke="var(--surface)" stroke-width="1.6"><title>batch 6 · reward 0.4430</title></circle>
+<circle cx="256.7" cy="136.8" r="3.2" fill="#2d6ca8" stroke="var(--surface)" stroke-width="1.6"><title>batch 7 · reward 0.4221</title></circle>
+<circle cx="283.3" cy="141.0" r="3.2" fill="#2d6ca8" stroke="var(--surface)" stroke-width="1.6"><title>batch 8 · reward 0.4150</title></circle>
+<circle cx="310.0" cy="136.9" r="3.2" fill="#2d6ca8" stroke="var(--surface)" stroke-width="1.6"><title>batch 9 · reward 0.4219</title></circle>
+<circle cx="336.7" cy="126.4" r="3.2" fill="#2d6ca8" stroke="var(--surface)" stroke-width="1.6"><title>batch 10 · reward 0.4399</title></circle>
+<circle cx="363.3" cy="170.9" r="3.2" fill="#2d6ca8" stroke="var(--surface)" stroke-width="1.6"><title>batch 11 · reward 0.3636</title></circle>
+<circle cx="390.0" cy="168.6" r="3.2" fill="#2d6ca8" stroke="var(--surface)" stroke-width="1.6"><title>batch 12 · reward 0.3675</title></circle>
+<circle cx="416.7" cy="158.6" r="3.2" fill="#2d6ca8" stroke="var(--surface)" stroke-width="1.6"><title>batch 13 · reward 0.3847</title></circle>
+<circle cx="443.3" cy="151.5" r="3.2" fill="#2d6ca8" stroke="var(--surface)" stroke-width="1.6"><title>batch 14 · reward 0.3968</title></circle>
+<circle cx="470.0" cy="113.1" r="3.2" fill="#2d6ca8" stroke="var(--surface)" stroke-width="1.6"><title>batch 15 · reward 0.4629</title></circle>
+<circle cx="496.7" cy="156.1" r="3.2" fill="#2d6ca8" stroke="var(--surface)" stroke-width="1.6"><title>batch 16 · reward 0.3890</title></circle>
+<circle cx="523.3" cy="124.7" r="3.2" fill="#2d6ca8" stroke="var(--surface)" stroke-width="1.6"><title>batch 17 · reward 0.4429</title></circle>
+<circle cx="550.0" cy="172.6" r="3.2" fill="#2d6ca8" stroke="var(--surface)" stroke-width="1.6"><title>batch 18 · reward 0.3606</title></circle>
+<circle cx="576.7" cy="119.7" r="3.2" fill="#2d6ca8" stroke="var(--surface)" stroke-width="1.6"><title>batch 19 · reward 0.4514</title></circle>
+<circle cx="603.3" cy="169.1" r="3.2" fill="#2d6ca8" stroke="var(--surface)" stroke-width="1.6"><title>batch 20 · reward 0.3667</title></circle>
+<circle cx="630.0" cy="96.5" r="3.2" fill="#2d6ca8" stroke="var(--surface)" stroke-width="1.6"><title>batch 21 · reward 0.4914</title></circle>
+<circle cx="656.7" cy="123.9" r="3.2" fill="#2d6ca8" stroke="var(--surface)" stroke-width="1.6"><title>batch 22 · reward 0.4442</title></circle>
+<circle cx="683.3" cy="147.5" r="3.2" fill="#2d6ca8" stroke="var(--surface)" stroke-width="1.6"><title>batch 23 · reward 0.4039</title></circle>
+<circle cx="710.0" cy="150.9" r="3.2" fill="#2d6ca8" stroke="var(--surface)" stroke-width="1.6"><title>batch 24 · reward 0.3979</title></circle>
+<text x="718" y="154.9" class="dl" fill="#2d6ca8">reward</text>
+<path d="M70.0,202.2 L96.7,208.7 L123.3,243.5 L150.0,237.3 L176.7,165.8 L203.3,214.7 L230.0,192.2 L256.7,205.7 L283.3,205.0 L310.0,199.7 L336.7,190.1 L363.3,239.1 L390.0,240.1 L416.7,226.8 L443.3,208.0 L470.0,176.5 L496.7,222.6 L523.3,194.6 L550.0,241.8 L576.7,180.8 L603.3,238.3 L630.0,160.3 L656.7,186.9 L683.3,214.6 L710.0,217.8" fill="none" stroke="#c26a3d" stroke-width="2" stroke-linejoin="round"/>
+<circle cx="70.0" cy="202.2" r="3.2" fill="#c26a3d" stroke="var(--surface)" stroke-width="1.6"><title>batch 0 · penalized 0.3099</title></circle>
+<circle cx="96.7" cy="208.7" r="3.2" fill="#c26a3d" stroke="var(--surface)" stroke-width="1.6"><title>batch 1 · penalized 0.2988</title></circle>
+<circle cx="123.3" cy="243.5" r="3.2" fill="#c26a3d" stroke="var(--surface)" stroke-width="1.6"><title>batch 2 · penalized 0.2389</title></circle>
+<circle cx="150.0" cy="237.3" r="3.2" fill="#c26a3d" stroke="var(--surface)" stroke-width="1.6"><title>batch 3 · penalized 0.2496</title></circle>
+<circle cx="176.7" cy="165.8" r="3.2" fill="#c26a3d" stroke="var(--surface)" stroke-width="1.6"><title>batch 4 · penalized 0.3723</title></circle>
+<circle cx="203.3" cy="214.7" r="3.2" fill="#c26a3d" stroke="var(--surface)" stroke-width="1.6"><title>batch 5 · penalized 0.2885</title></circle>
+<circle cx="230.0" cy="192.2" r="3.2" fill="#c26a3d" stroke="var(--surface)" stroke-width="1.6"><title>batch 6 · penalized 0.3269</title></circle>
+<circle cx="256.7" cy="205.7" r="3.2" fill="#c26a3d" stroke="var(--surface)" stroke-width="1.6"><title>batch 7 · penalized 0.3038</title></circle>
+<circle cx="283.3" cy="205.0" r="3.2" fill="#c26a3d" stroke="var(--surface)" stroke-width="1.6"><title>batch 8 · penalized 0.3051</title></circle>
+<circle cx="310.0" cy="199.7" r="3.2" fill="#c26a3d" stroke="var(--surface)" stroke-width="1.6"><title>batch 9 · penalized 0.3141</title></circle>
+<circle cx="336.7" cy="190.1" r="3.2" fill="#c26a3d" stroke="var(--surface)" stroke-width="1.6"><title>batch 10 · penalized 0.3307</title></circle>
+<circle cx="363.3" cy="239.1" r="3.2" fill="#c26a3d" stroke="var(--surface)" stroke-width="1.6"><title>batch 11 · penalized 0.2466</title></circle>
+<circle cx="390.0" cy="240.1" r="3.2" fill="#c26a3d" stroke="var(--surface)" stroke-width="1.6"><title>batch 12 · penalized 0.2448</title></circle>
+<circle cx="416.7" cy="226.8" r="3.2" fill="#c26a3d" stroke="var(--surface)" stroke-width="1.6"><title>batch 13 · penalized 0.2677</title></circle>
+<circle cx="443.3" cy="208.0" r="3.2" fill="#c26a3d" stroke="var(--surface)" stroke-width="1.6"><title>batch 14 · penalized 0.2999</title></circle>
+<circle cx="470.0" cy="176.5" r="3.2" fill="#c26a3d" stroke="var(--surface)" stroke-width="1.6"><title>batch 15 · penalized 0.3539</title></circle>
+<circle cx="496.7" cy="222.6" r="3.2" fill="#c26a3d" stroke="var(--surface)" stroke-width="1.6"><title>batch 16 · penalized 0.2748</title></circle>
+<circle cx="523.3" cy="194.6" r="3.2" fill="#c26a3d" stroke="var(--surface)" stroke-width="1.6"><title>batch 17 · penalized 0.3228</title></circle>
+<circle cx="550.0" cy="241.8" r="3.2" fill="#c26a3d" stroke="var(--surface)" stroke-width="1.6"><title>batch 18 · penalized 0.2418</title></circle>
+<circle cx="576.7" cy="180.8" r="3.2" fill="#c26a3d" stroke="var(--surface)" stroke-width="1.6"><title>batch 19 · penalized 0.3466</title></circle>
+<circle cx="603.3" cy="238.3" r="3.2" fill="#c26a3d" stroke="var(--surface)" stroke-width="1.6"><title>batch 20 · penalized 0.2478</title></circle>
+<circle cx="630.0" cy="160.3" r="3.2" fill="#c26a3d" stroke="var(--surface)" stroke-width="1.6"><title>batch 21 · penalized 0.3818</title></circle>
+<circle cx="656.7" cy="186.9" r="3.2" fill="#c26a3d" stroke="var(--surface)" stroke-width="1.6"><title>batch 22 · penalized 0.3362</title></circle>
+<circle cx="683.3" cy="214.6" r="3.2" fill="#c26a3d" stroke="var(--surface)" stroke-width="1.6"><title>batch 23 · penalized 0.2886</title></circle>
+<circle cx="710.0" cy="217.8" r="3.2" fill="#c26a3d" stroke="var(--surface)" stroke-width="1.6"><title>batch 24 · penalized 0.2831</title></circle>
+<text x="718" y="221.8" class="dl" fill="#c26a3d">penalized</text>
+<text x="70.0" y="288" class="ax" text-anchor="middle">0</text>
+<text x="176.7" y="288" class="ax" text-anchor="middle">4</text>
+<text x="283.3" y="288" class="ax" text-anchor="middle">8</text>
+<text x="390.0" y="288" class="ax" text-anchor="middle">12</text>
+<text x="496.7" y="288" class="ax" text-anchor="middle">16</text>
+<text x="603.3" y="288" class="ax" text-anchor="middle">20</text>
+<text x="710.0" y="288" class="ax" text-anchor="middle">24</text>
+<text x="390.0" y="308" class="ax" text-anchor="middle">training batch</text><text x="70" y="334" class="t">Thought length</text>
+<text x="70" y="350" class="s">tokens per inferred thought — also static</text>
+<line x1="70" y1="500.0" x2="710" y2="500.0" class="g"/>
+<text x="62" y="504.0" class="ax" text-anchor="end">58</text>
+<line x1="70" y1="465.0" x2="710" y2="465.0" class="g"/>
+<text x="62" y="469.0" class="ax" text-anchor="end">65</text>
+<line x1="70" y1="430.0" x2="710" y2="430.0" class="g"/>
+<text x="62" y="434.0" class="ax" text-anchor="end">72</text>
+<line x1="70" y1="395.0" x2="710" y2="395.0" class="g"/>
+<text x="62" y="399.0" class="ax" text-anchor="end">79</text>
+<line x1="70" y1="360.0" x2="710" y2="360.0" class="g"/>
+<text x="62" y="364.0" class="ax" text-anchor="end">85</text>
+<path d="M70.0,415.2 L96.7,423.4 L123.3,420.6 L150.0,378.5 L176.7,473.5 L203.3,393.6 L230.0,417.7 L256.7,409.9 L283.3,438.2 L310.0,445.2 L336.7,440.3 L363.3,414.4 L390.0,395.2 L416.7,414.5 L443.3,481.5 L470.0,441.2 L496.7,423.7 L523.3,404.2 L550.0,408.4 L576.7,455.2 L603.3,408.0 L630.0,439.0 L656.7,444.3 L683.3,420.3 L710.0,421.7" fill="none" stroke="#3f7d55" stroke-width="2" stroke-linejoin="round"/>
+<circle cx="70.0" cy="415.2" r="3.2" fill="#3f7d55" stroke="var(--surface)" stroke-width="1.6"><title>batch 0 · tokens 74.7287</title></circle>
+<circle cx="96.7" cy="423.4" r="3.2" fill="#3f7d55" stroke="var(--surface)" stroke-width="1.6"><title>batch 1 · tokens 73.1436</title></circle>
+<circle cx="123.3" cy="420.6" r="3.2" fill="#3f7d55" stroke="var(--surface)" stroke-width="1.6"><title>batch 2 · tokens 73.6824</title></circle>
+<circle cx="150.0" cy="378.5" r="3.2" fill="#3f7d55" stroke="var(--surface)" stroke-width="1.6"><title>batch 3 · tokens 81.7538</title></circle>
+<circle cx="176.7" cy="473.5" r="3.2" fill="#3f7d55" stroke="var(--surface)" stroke-width="1.6"><title>batch 4 · tokens 63.5365</title></circle>
+<circle cx="203.3" cy="393.6" r="3.2" fill="#3f7d55" stroke="var(--surface)" stroke-width="1.6"><title>batch 5 · tokens 78.8611</title></circle>
+<circle cx="230.0" cy="417.7" r="3.2" fill="#3f7d55" stroke="var(--surface)" stroke-width="1.6"><title>batch 6 · tokens 74.2457</title></circle>
+<circle cx="256.7" cy="409.9" r="3.2" fill="#3f7d55" stroke="var(--surface)" stroke-width="1.6"><title>batch 7 · tokens 75.7311</title></circle>
+<circle cx="283.3" cy="438.2" r="3.2" fill="#3f7d55" stroke="var(--surface)" stroke-width="1.6"><title>batch 8 · tokens 70.3163</title></circle>
+<circle cx="310.0" cy="445.2" r="3.2" fill="#3f7d55" stroke="var(--surface)" stroke-width="1.6"><title>batch 9 · tokens 68.9657</title></circle>
+<circle cx="336.7" cy="440.3" r="3.2" fill="#3f7d55" stroke="var(--surface)" stroke-width="1.6"><title>batch 10 · tokens 69.9113</title></circle>
+<circle cx="363.3" cy="414.4" r="3.2" fill="#3f7d55" stroke="var(--surface)" stroke-width="1.6"><title>batch 11 · tokens 74.8800</title></circle>
+<circle cx="390.0" cy="395.2" r="3.2" fill="#3f7d55" stroke="var(--surface)" stroke-width="1.6"><title>batch 12 · tokens 78.5500</title></circle>
+<circle cx="416.7" cy="414.5" r="3.2" fill="#3f7d55" stroke="var(--surface)" stroke-width="1.6"><title>batch 13 · tokens 74.8537</title></circle>
+<circle cx="443.3" cy="481.5" r="3.2" fill="#3f7d55" stroke="var(--surface)" stroke-width="1.6"><title>batch 14 · tokens 62.0163</title></circle>
+<circle cx="470.0" cy="441.2" r="3.2" fill="#3f7d55" stroke="var(--surface)" stroke-width="1.6"><title>batch 15 · tokens 69.7450</title></circle>
+<circle cx="496.7" cy="423.7" r="3.2" fill="#3f7d55" stroke="var(--surface)" stroke-width="1.6"><title>batch 16 · tokens 73.1000</title></circle>
+<circle cx="523.3" cy="404.2" r="3.2" fill="#3f7d55" stroke="var(--surface)" stroke-width="1.6"><title>batch 17 · tokens 76.8396</title></circle>
+<circle cx="550.0" cy="408.4" r="3.2" fill="#3f7d55" stroke="var(--surface)" stroke-width="1.6"><title>batch 18 · tokens 76.0272</title></circle>
+<circle cx="576.7" cy="455.2" r="3.2" fill="#3f7d55" stroke="var(--surface)" stroke-width="1.6"><title>batch 19 · tokens 67.0588</title></circle>
+<circle cx="603.3" cy="408.0" r="3.2" fill="#3f7d55" stroke="var(--surface)" stroke-width="1.6"><title>batch 20 · tokens 76.0972</title></circle>
+<circle cx="630.0" cy="439.0" r="3.2" fill="#3f7d55" stroke="var(--surface)" stroke-width="1.6"><title>batch 21 · tokens 70.1538</title></circle>
+<circle cx="656.7" cy="444.3" r="3.2" fill="#3f7d55" stroke="var(--surface)" stroke-width="1.6"><title>batch 22 · tokens 69.1508</title></circle>
+<circle cx="683.3" cy="420.3" r="3.2" fill="#3f7d55" stroke="var(--surface)" stroke-width="1.6"><title>batch 23 · tokens 73.7381</title></circle>
+<circle cx="710.0" cy="421.7" r="3.2" fill="#3f7d55" stroke="var(--surface)" stroke-width="1.6"><title>batch 24 · tokens 73.4706</title></circle>
+<text x="718" y="425.7" class="dl" fill="#3f7d55">tokens</text>
+<text x="70.0" y="518" class="ax" text-anchor="middle">0</text>
+<text x="176.7" y="518" class="ax" text-anchor="middle">4</text>
+<text x="283.3" y="518" class="ax" text-anchor="middle">8</text>
+<text x="390.0" y="518" class="ax" text-anchor="middle">12</text>
+<text x="496.7" y="518" class="ax" text-anchor="middle">16</text>
+<text x="603.3" y="518" class="ax" text-anchor="middle">20</text>
+<text x="710.0" y="518" class="ax" text-anchor="middle">24</text>
+<text x="390.0" y="538" class="ax" text-anchor="middle">training batch</text>
+</svg></div>
+<h2 style="font-size:16px;margin:30px 0 4px">How this compares to the other domains</h2>
+<div class="sub">Same measure, every Act-PRM EM training run on disk. |delta| / sd &lt; 1 means the
+change over training is smaller than the batch-to-batch swing.</div>
+<table><thead><tr><th>domain / scorer</th><th>batches</th><th>epochs</th><th>delta</th><th>batch sd</th><th>|d|/sd</th></tr></thead>
+<tbody><tr><td>retail / base</td><td class="n">27</td><td class="n">2.20x</td><td class="n">+0.0329</td><td class="n">0.0410</td><td class="n">0.80</td></tr><tr><td>retail / policy</td><td class="n">25</td><td class="n">2.04x</td><td class="n">+0.0293</td><td class="n">0.0484</td><td class="n">0.61</td></tr><tr><td>finance / policy</td><td class="n">58</td><td class="n">2.00x</td><td class="n">-0.0186</td><td class="n">0.0535</td><td class="n">0.35</td></tr><tr><td>finance / base</td><td class="n">58</td><td class="n">2.00x</td><td class="n">+0.0060</td><td class="n">0.0514</td><td class="n">0.12</td></tr><tr><td>insurance / policy</td><td class="n">25</td><td class="n">0.56x</td><td class="n">+0.0123</td><td class="n">0.0373</td><td class="n">0.33</td></tr></tbody></table>
+<div class="note"><b>Reading:</b> the curve is flat. The +0.0123 drift between the first and last
+five batches is dwarfed by the ±0.05 batch-to-batch swing, and batch 24 (0.3979) sits below
+batch 0 (0.4267). The E-step works — likelihoods reach 0.99 on individual steps and the
+exported corpus has coherent thoughts on 100% of 2,273 targets — but the M-step is not making
+the policy better at proposing them. My initial reading was under-training (0.56 epochs
+vs retail's 2.0×). The table above refutes it: finance ran 2.00 epochs and moved
+<b>-0.0186</b>, and every |delta| is under 1 batch-sd. Flat is the norm here.
+Secondary signal: <code>train/loss</code> was exactly 0 on batches 8, 10, 14, 20,
+meaning all four candidate thoughts scored alike and the group carried no gradient.</div>
+</div></body></html>
