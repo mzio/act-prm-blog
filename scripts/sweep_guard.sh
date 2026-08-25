@@ -25,6 +25,23 @@ G=/tmp/aprm; mkdir -p "$G"
 # (verified: FAILED(None) under `env -i`, OK with the snapshot).
 # Refresh with:  env | grep -vE "^(_|PWD|OLDPWD|SHLVL)=" > /tmp/aprm/agent_env.sh
 [ -f "$G/agent_env.sh" ] && { set -a; . "$G/agent_env.sh" 2>/dev/null; set +a; }
+# /tmp REAPING. Completion markers live under /tmp/aprm and the system reaps old files
+# there: on 08-25 the whole /tmp/aprm/lrprobe dir vanished, so the thoughts_base LR probe
+# marker from 08-22 was gone, gate 2 re-fired, and it started re-running a probe finished
+# three days earlier -- burning GPU AND blocking every gate below it (including a completed
+# insurance EM waiting to hand off). Refresh every marker's mtime each tick so they never
+# age out, and keep a durable copy under the repo's state dir as a backstop.
+find "$G" -name '*.done' -o -name 'ALLDONE' 2>/dev/null | xargs -r touch 2>/dev/null || true
+mkdir -p .guard_markers 2>/dev/null
+( cd "$G" 2>/dev/null && find . \( -name '*.done' -o -name 'ALLDONE' \) -print0 2>/dev/null ) \
+  | ( cd "$G" 2>/dev/null && xargs -0 -r -I{} sh -c 'mkdir -p "$OLDPWD/.guard_markers/$(dirname {})"; touch "$OLDPWD/.guard_markers/{}"' ) 2>/dev/null || true
+# Restore any marker that exists in the durable copy but was reaped from /tmp.
+if [ -d .guard_markers ]; then
+  ( cd .guard_markers && find . \( -name '*.done' -o -name 'ALLDONE' \) -print ) 2>/dev/null | while read -r m; do
+    [ -f "$G/$m" ] || { mkdir -p "$G/$(dirname "$m")"; touch "$G/$m"; echo "[$(date '+%m-%d %H:%M:%S')] restored reaped marker: $m" >> "$G/guard.log"; }
+  done
+fi
+
 LOCK="$G/guard.lock"
 log(){ echo "[$(date '+%m-%d %H:%M:%S')] $*" >> "$G/guard.log"; }
 
