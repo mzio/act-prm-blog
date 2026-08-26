@@ -333,8 +333,16 @@ def get_args() -> argparse.Namespace:
         "--advantage_mode",
         type=str,
         default=None,
-        choices=["em", "best", "top_half", "uniform", "grpo"],
-        help="How per-candidate rewards become advantages (em=EM weights, best=argmax, top_half, uniform, grpo=mean-centered)",
+        choices=["em", "best", "top_half", "uniform", "grpo", "action_probs", "clamped"],
+        help=(
+            "How per-candidate rewards become advantages. em=group-normalised EM weights "
+            "(the published method: notebooks/act_prm_tinker.ipynb normalises r/sum(r)); "
+            "best=argmax; top_half; uniform; grpo=mean-centered; "
+            "action_probs=RAW length-normalised p(x|s,z) with NO group normalisation (the "
+            "Tinker aprm_qwen3_ap config -- pair with --length_penalty 0, since in this mode "
+            "the penalty affects best-SELECTION only, not the advantage); "
+            "clamped=max(penalised reward,0) unnormalised (keeps the penalty in the advantage)."
+        ),
     )
     parser.add_argument(
         "--grpo_normalize",
