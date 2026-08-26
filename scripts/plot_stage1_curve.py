@@ -112,8 +112,12 @@ def all_domains():
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--out", default="stage1_curve.html")
+    ap.add_argument("--run", default="logs/act_prm_snorkel_insurance/hf_qwen3_4b_instruct/insurance_s1em_policy-*/",
+                    help="glob for the run dir to plot")
+    ap.add_argument("--growth", default="", help="comma-separated batch:max|B@A| adapter measurements")
+    ap.add_argument("--title", default="Act-PRM Stage-1 EM")
     args = ap.parse_args()
-    d, tr = series("logs/act_prm_snorkel_insurance/hf_qwen3_4b_instruct/insurance_s1em_policy-*/")
+    d, tr = series(args.run)
     n = len(tr)
     rw = [r["train/try_0/final_reward"] for r in tr]
     f5, l5 = sum(rw[:5]) / 5, sum(rw[-5:]) / 5
@@ -160,7 +164,7 @@ td.n{{text-align:right;font-variant-numeric:tabular-nums}}
 .note{{font-size:13px;color:var(--ink2);margin-top:18px;background:var(--surface);
   border:1px solid var(--line);border-left:3px solid {ORANGE};border-radius:8px;padding:12px 16px}}
 </style></head><body><div class="wrap">
-<h1>Act-PRM Stage-1 EM — insurance, policy-scored</h1>
+<h1>{args.title}</h1>
 <div class="sub">{n} training batches · group_size 4 · 180 train trajectories · run <code>insurance_s1em_policy</code></div>
 <div class="stats">
   <div class="stat"><b>{f5:.4f}</b><span>first 5 batches</span></div>
