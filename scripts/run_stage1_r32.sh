@@ -8,6 +8,16 @@
 # model, and Act-PRM's measured benefit comes from the E-step (best-of-G by length-penalised
 # likelihood) alone. MZ's hypothesis: keep lr=4e-5 but raise the LoRA rank to 32.
 #
+# BUG FOUND 08-25: the abort check below sits AFTER the EM block, so it only fires once the
+# full 25-batch run finishes -- ~4h, not the ~50 min intended. The --save_every checkpoint IS
+# written on schedule, so the check was run manually against it instead. To make it genuinely
+# early the check must poll for the step_last checkpoint while the run is in flight.
+#
+# RESULT 08-25: ABORTED. r32_a32 @ lr=4e-5 gave max|B@A| = 8.6e-07 at batch 5 on airline --
+# the same order as every r8 run (retail 6.7e-07, finance 4.1e-07, insurance 2.8e-06) and two
+# orders below the ~1e-4 that would count as marginal movement. Rank does not escape the
+# zero-init cold start; the learning rate is the only lever.
+#
 # EARLY ABORT. The full sweep is ~35h for one scorer and ~70h for both, and it is worthless
 # if rank does not escape the zero-init cold start (lora_B starts at 0, so dL/dA ~ B^T ~ 0).
 # So the FIRST domain writes a checkpoint at batch ABORT_AT (--save_every) and the adapter is
