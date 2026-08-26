@@ -91,6 +91,10 @@ DOMAINS=(
 log "=== Stage-1 @ $LORA lr=$LR adv=$ADV_MODE lp=$LENGTH_PENALTY, scorers='$SCORERS', abort-check at batch $ABORT_AT ==="
 for spec in "${DOMAINS[@]}"; do
   IFS=":" read -r dom env pool rnb corpus <<< "$spec"
+  # ONLY_DOMAINS="airline" restricts the sweep to a subset without editing the array --
+  # useful when a formulation has been shown not to work and the remaining domains would
+  # just reproduce it (lr 4e-5 across retail/finance/insurance = ~30h of known no-op).
+  case " ${ONLY_DOMAINS:-airline retail finance insurance} " in *" $dom "*) ;; *) continue ;; esac
   ENVDIR="${env//\//_}"
   for scorer in $SCORERS; do
     SWB=--no-score_with_base; SWBV=0
