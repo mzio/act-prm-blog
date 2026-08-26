@@ -50,7 +50,16 @@ LR="${LR:-4e-5}"
 EM_NB="${EM_NB:-25}"
 ABORT_AT="${ABORT_AT:-5}"        # measure the adapter after this many batches; 0 disables
 SCORERS="${SCORERS:-policy}"     # add "base" for the thoughts_base arm (doubles the cost)
-TAGSFX="${TAGSFX:-_r32}"
+TAGSFX="${TAGSFX:-_tinker}"
+# Reward/advantage formulation. Default reproduces the TINKER reference as actually run
+# (configs/generator/aprm_qwen3_ap.yaml -> reward_method "action_probs"), which the
+# documented commands in act_prm_sft_rl.py / act_prm_joint.py use:
+#   * advantage = RAW length-normalised p(x|s,z), no group normalisation
+#   * length handled by normalising the logprob sum by token count (already in
+#     `likelihoods`), NOT by our extra subtractive penalty -> LENGTH_PENALTY=0
+#   * lora_rank 32 (Tinker's trainer configs all set lora_rank: 32)
+ADV_MODE="${ADV_MODE:-action_probs}"
+LENGTH_PENALTY="${LENGTH_PENALTY:-0}"
 log(){ echo "[$(date '+%m-%d %H:%M:%S')] $*" | tee -a "$MDIR/stage1_r32.log"; }
 wait_gpu_free(){ while pgrep -f '[m]ain_pytorch.py' >/dev/null 2>&1; do sleep 60; done; sleep 10; }
 newest(){ ls -dt $1 2>/dev/null | head -1; }
@@ -64,7 +73,7 @@ DOMAINS=(
   "insurance:act_prm/snorkel_insurance:data/snorkel_insurance_split:45:data/sft_corpus/snorkel_insurance"
 )
 
-log "=== Stage-1 @ $LORA lr=$LR, scorers='$SCORERS', early-abort at batch $ABORT_AT ==="
+log "=== Stage-1 @ $LORA lr=$LR adv=$ADV_MODE lp=$LENGTH_PENALTY, scorers='$SCORERS', abort-check at batch $ABORT_AT ==="
 for spec in "${DOMAINS[@]}"; do
   IFS=":" read -r dom env pool rnb corpus <<< "$spec"
   ENVDIR="${env//\//_}"
@@ -85,7 +94,8 @@ for spec in "${DOMAINS[@]}"; do
       ./scripts/train.sh --env_config "$env" --generator_config act_prm --trainer_config pg \
           --model_config "$MODEL" --lora_config "$LORA" --replay_buffer_config default \
           $SWB --run_tag "$EMTAG" --group_size 4 --batch_size 4 --num_batches "$EM_NB" \
-          --learning_rate "$LR" --length_penalty 0.15 --save_generations \
+          --learning_rate "$LR" --length_penalty "$LENGTH_PENALTY" \
+          --advantage_mode "$ADV_MODE" --save_generations \
           --no_initial_eval --eval_every "$EM_NB" --gradient_checkpointing "${SAVE[@]}" --verbose \
           > "$MDIR/${EMTAG}.log" 2>&1 \
         || { _fail=$((_fail+1)); log "$EMTAG: FAILED"; continue; }
@@ -115,7 +125,7 @@ for spec in "${DOMAINS[@]}"; do
         --model_config "$MODEL" --lora_config "$LORA" --replay_buffer_config default \
         $SWB --no_train --resume_from "$CK" --advantage_mode best \
         --group_size 4 --batch_size 4 --num_batches "$rnb" --no_initial_eval \
-        --length_penalty 0.15 --save_generations --run_tag "$RTAG" --verbose \
+        --length_penalty "$LENGTH_PENALTY" --save_generations --run_tag "$RTAG" --verbose \
         > "$MDIR/${RTAG}.log" 2>&1 \
       || { _fail=$((_fail+1)); log "$RTAG: FAILED"; continue; }
     GEN=$(newest "logs/$ENVDIR/$MODEL/${RTAG}-*/generations.jsonl")

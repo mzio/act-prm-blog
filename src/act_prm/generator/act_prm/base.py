@@ -79,6 +79,8 @@ class ActPrmGenerator(HuggingFaceGenerator):
         #   "top_half" — 1.0 on the better half by reward, else 0
         #   "uniform"  — 1.0 on every thought
         #   "grpo"     — mean-centered reward (r - mean), optionally /std; can be negative
+        #   "action_probs" — RAW length-normalised p(x|s,z), no group normalisation
+        #                    (the Tinker reference's default; use with --length_penalty 0)
         advantage_mode: str = "em",
         grpo_normalize: bool = True,
         # Score p(x|s,z) with the frozen BASE model (LoRA disabled) instead of the
@@ -369,6 +371,21 @@ class ActPrmGenerator(HuggingFaceGenerator):
             a = np.zeros(g, dtype=np.float64)
             a[top] = 1.0
             return a
+        if mode == "action_probs":
+            # The Tinker reference's `reward_method: "action_probs"` -- the RAW
+            # length-normalised likelihood p(x|s,z) per candidate, with NO group
+            # normalisation. This is what the documented Tinker runs actually used
+            # (configs/generator/aprm_qwen3_ap.yaml, referenced by act_prm_sft_rl.py and
+            # act_prm_joint.py); its `em` config exists but no run command references it.
+            #
+            # Differs from "em" in what it preserves: "em" gives every logged action the
+            # same total weight 1.0, so a step where all G thoughts are poor trains just as
+            # hard as one where the best thought scores 0.99. Unnormalised keeps that
+            # absolute quality, so hopeless steps contribute proportionally less.
+            # Pair with --length_penalty 0 to match Tinker exactly: Tinker handles length by
+            # normalising the logprob SUM by token count (already done in `likelihoods`),
+            # not by our additional subtractive penalty.
+            return np.array(likelihoods, dtype=np.float64)
         if mode == "grpo":
             adv = r - r.mean()
             if self.grpo_normalize:
