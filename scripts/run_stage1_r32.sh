@@ -18,7 +18,12 @@
 # orders below the ~1e-4 that would count as marginal movement. Rank does not escape the
 # zero-init cold start; the learning rate is the only lever.
 #
-# EARLY ABORT. The full sweep is ~35h for one scorer and ~70h for both, and it is worthless
+# ABORT DISABLED (MZ, 08-25): ABORT_AT now defaults to 0, so the sweep runs to completion
+# regardless of what the adapter measurement says. The measurement is still worth taking --
+# it is what told us r8/em, r32/em and r32/action_probs are all no-ops at lr 4e-5 -- but it
+# no longer gates anything. Set ABORT_AT=5 to re-enable.
+#
+# (historical) EARLY ABORT. The full sweep is ~35h for one scorer and ~70h for both, and it is worthless
 # if rank does not escape the zero-init cold start (lora_B starts at 0, so dL/dA ~ B^T ~ 0).
 # So the FIRST domain writes a checkpoint at batch ABORT_AT (--save_every) and the adapter is
 # measured there. If it is still a no-op, the sweep stops and nothing further is spent. This
@@ -48,7 +53,7 @@ _fail=0
 LORA="${LORA:-r32_a32_linear}"
 LR="${LR:-4e-5}"
 EM_NB="${EM_NB:-25}"
-ABORT_AT="${ABORT_AT:-5}"        # measure the adapter after this many batches; 0 disables
+ABORT_AT="${ABORT_AT:-0}"        # measure the adapter after this many batches; 0 disables
 SCORERS="${SCORERS:-policy}"     # add "base" for the thoughts_base arm (doubles the cost)
 TAGSFX="${TAGSFX:-_ap32}"
 # Reward/advantage formulation. Default reproduces the TINKER reference as actually run
