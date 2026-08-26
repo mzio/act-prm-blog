@@ -52,7 +52,14 @@ MDIR="${MDIR:-/tmp/aprm/stage1_r32}"; mkdir -p "$MDIR"
 _fail=0
 LORA="${LORA:-r32_a32_linear}"
 LR="${LR:-4e-5}"
-EM_NB="${EM_NB:-25}"
+# 100, not 25. The 25 was arbitrary -- hardcoded in the initial 07-25 commit's scripts
+# (run_em.sh, setup_new_box.sh, run_airline_stage1_8b.sh) while pg.yaml's own default is
+# 200, and never justified against a convergence check. It may also be short of the point
+# where the zero-init cold start is escaped: lora_B starts at 0, so |B@A| growth should be
+# SUPERLINEAR early (B grows -> dL/dA rises -> A grows -> dL/dB rises). With --save_every 5
+# a 100-batch run yields 20 growth measurements, so the SHAPE of |B@A| over training is
+# observable rather than just its endpoint.
+EM_NB="${EM_NB:-100}"
 ABORT_AT="${ABORT_AT:-0}"        # measure the adapter after this many batches; 0 disables
 SCORERS="${SCORERS:-policy}"     # add "base" for the thoughts_base arm (doubles the cost)
 TAGSFX="${TAGSFX:-_ap32}"
@@ -95,7 +102,7 @@ for spec in "${DOMAINS[@]}"; do
     if [ ! -f "$MDIR/${EMTAG}.done" ]; then
       log "EM $EMTAG (lora=$LORA lr=$LR nb=$EM_NB)"
       wait_gpu_free
-      SAVE=(); [ "$ABORT_AT" != 0 ] && SAVE=(--save_every "$ABORT_AT")
+      SAVE=(--save_every "${SAVE_EVERY:-5}")  # growth curve; independent of the disabled abort
       ./scripts/train.sh --env_config "$env" --generator_config act_prm --trainer_config pg \
           --model_config "$MODEL" --lora_config "$LORA" --replay_buffer_config default \
           $SWB --run_tag "$EMTAG" --group_size 4 --batch_size 4 --num_batches "$EM_NB" \
