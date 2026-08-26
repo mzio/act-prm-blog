@@ -41,6 +41,9 @@ export https_proxy="${https_proxy:-http://fwdproxy:8080}"
 export http_proxy="${http_proxy:-http://fwdproxy:8080}"
 export HF_TOKEN="${HF_TOKEN:-$(cat "$HOME/models/token" 2>/dev/null || true)}"
 export HF_HUB_DISABLE_XET="${HF_HUB_DISABLE_XET:-1}"
+# W&B: exports the key from .env, sets the proxy/timeout, and degrades to
+# WANDB_MODE=offline when api.wandb.ai is unreachable through fwdproxy (it currently is).
+[ -f scripts/wandb_preflight.sh ] && . scripts/wandb_preflight.sh
 
 MODEL="${MODEL_CFG:-hf_qwen3_4b_instruct}"; export MODEL_CFG="$MODEL"
 MDIR="${MDIR:-/tmp/aprm/insurance}"; mkdir -p "$MDIR"
