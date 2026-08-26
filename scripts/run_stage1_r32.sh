@@ -50,7 +50,7 @@ LR="${LR:-4e-5}"
 EM_NB="${EM_NB:-25}"
 ABORT_AT="${ABORT_AT:-5}"        # measure the adapter after this many batches; 0 disables
 SCORERS="${SCORERS:-policy}"     # add "base" for the thoughts_base arm (doubles the cost)
-TAGSFX="${TAGSFX:-_tinker}"
+TAGSFX="${TAGSFX:-_clamped32}"
 # Reward/advantage formulation. Default reproduces the TINKER reference as actually run
 # (configs/generator/aprm_qwen3_ap.yaml -> reward_method "action_probs"), which the
 # documented commands in act_prm_sft_rl.py / act_prm_joint.py use:
@@ -58,8 +58,8 @@ TAGSFX="${TAGSFX:-_tinker}"
 #   * length handled by normalising the logprob sum by token count (already in
 #     `likelihoods`), NOT by our extra subtractive penalty -> LENGTH_PENALTY=0
 #   * lora_rank 32 (Tinker's trainer configs all set lora_rank: 32)
-ADV_MODE="${ADV_MODE:-action_probs}"
-LENGTH_PENALTY="${LENGTH_PENALTY:-0}"
+ADV_MODE="${ADV_MODE:-clamped}"
+LENGTH_PENALTY="${LENGTH_PENALTY:-0.15}"
 log(){ echo "[$(date '+%m-%d %H:%M:%S')] $*" | tee -a "$MDIR/stage1_r32.log"; }
 wait_gpu_free(){ while pgrep -f '[m]ain_pytorch.py' >/dev/null 2>&1; do sleep 60; done; sleep 10; }
 newest(){ ls -dt $1 2>/dev/null | head -1; }

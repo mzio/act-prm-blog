@@ -79,8 +79,10 @@ class ActPrmGenerator(HuggingFaceGenerator):
         #   "top_half" — 1.0 on the better half by reward, else 0
         #   "uniform"  — 1.0 on every thought
         #   "grpo"     — mean-centered reward (r - mean), optionally /std; can be negative
-        #   "action_probs" — RAW length-normalised p(x|s,z), no group normalisation
-        #                    (the Tinker reference's default; use with --length_penalty 0)
+        #   "action_probs" — RAW length-normalised p(x|s,z), no group normalisation, the
+        #                    length penalty affects SELECTION only (Tinker's aprm_qwen3_ap)
+        #   "clamped"  — max(reward, 0) unnormalised: keeps the length penalty IN the
+        #                advantage, but drops the group-sum division that "em" applies
         advantage_mode: str = "em",
         grpo_normalize: bool = True,
         # Score p(x|s,z) with the frozen BASE model (LoRA disabled) instead of the
@@ -371,6 +373,14 @@ class ActPrmGenerator(HuggingFaceGenerator):
             a = np.zeros(g, dtype=np.float64)
             a[top] = 1.0
             return a
+        if mode == "clamped":
+            # Non-normalised advantage WITH the length penalty: max(lik - lp*len_frac, 0),
+            # no division by the group sum. Keeps the absolute quality of the step, which
+            # "em" discards -- under "em" a step whose G thoughts all score ~0.01 still gets
+            # total weight 1.0 and trains as hard as a step whose best thought scores 0.99.
+            # Clamped at 0 so a below-penalty thought contributes nothing rather than being
+            # actively pushed down (that is what "grpo" would do).
+            return np.maximum(np.array(rewards, dtype=np.float64), 0.0)
         if mode == "action_probs":
             # The Tinker reference's `reward_method: "action_probs"` -- the RAW
             # length-normalised likelihood p(x|s,z) per candidate, with NO group
