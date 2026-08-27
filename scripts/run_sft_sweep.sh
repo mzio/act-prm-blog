@@ -25,7 +25,7 @@ DOM="${ENVNAME#tau2_}"                      # retail / airline (matches existing
 LR="${LR:-}"
 # Optimizer. Every Stage-2 result before 08-27 used plain SGD, because optim.get_optimizer
 # defaults to name="sgd" and main_pytorch never passed one -- so the 3e-3 those runs used was
-# "the LR that makes SGD limp", not a tuned value. AdamW needs ~1e-4 (MZ has run this before);
+# "the LR that makes SGD limp", not a tuned value. AdamW needs ~1e-3 (MZ has run this before);
 # 3e-3 under AdamW would be an enormous step since the update is roughly lr*sign(grad).
 OPTIMIZER="${OPTIMIZER:-sgd}"
 LR_ARGS=(); LRTAG=""
