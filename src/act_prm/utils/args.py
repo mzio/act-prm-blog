@@ -530,6 +530,21 @@ def get_args() -> argparse.Namespace:
     parser.add_argument("--advantage_threshold", type=float)
     parser.add_argument("--learning_rate", type=float)
     parser.add_argument(
+        "--optimizer",
+        type=str,
+        default=None,
+        choices=["sgd", "adam", "adamw", "adamw_torch", "adamw_torch_fused", "adafactor"],
+        help=(
+            "Optimizer. NOTE: optim.get_optimizer defaults to 'sgd' and main_pytorch never "
+            "passed a name, so EVERY run in this project so far -- Stage-1 EM and Stage-2 SFT "
+            "alike -- used plain SGD. The Tinker reference uses Adam at lr 4e-5 and its EM "
+            "reward climbs ~0.55->0.88 in 38 steps; ours is flat at the same LR. SGD's update "
+            "is lr*grad (with LoRA grads ~1e-3 that is ~4e-8/step), while Adam's is roughly "
+            "lr*sign(grad) and scale-invariant -- which is exactly the 4-orders-of-magnitude "
+            "shortfall measured in max|B@A|."
+        ),
+    )
+    parser.add_argument(
         "--require_thought",
         action="store_true",
         default=None,

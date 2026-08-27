@@ -209,7 +209,9 @@ def main() -> None:
         # requires_grad=False), so LoRA grads silently come out zero.
         llm.model.enable_input_require_grads()
         print("[main_pytorch] gradient_checkpointing enabled (use_reentrant=False)")
-    optimizer = get_optimizer(llm.model, learning_rate=cfg.learning_rate)  # simple for now
+    optimizer = get_optimizer(
+        llm.model, name=cfg.get("optimizer", "sgd"), learning_rate=cfg.learning_rate
+    )
 
     if args.verbose:  # Display trainable parameters
         _params_text = "Trainable parameters:\n"

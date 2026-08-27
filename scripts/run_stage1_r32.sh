@@ -73,6 +73,10 @@ TAGSFX="${TAGSFX:-_ap32}"
 #   * length handled by normalising the logprob sum by token count (already in
 #     `likelihoods`), NOT by our extra subtractive penalty -> LENGTH_PENALTY=0
 #   * lora_rank 32 (Tinker's trainer configs all set lora_rank: 32)
+# AdamW, not the SGD every prior run silently used (optim.get_optimizer defaults to "sgd"
+# and main_pytorch never passed a name). The Tinker reference trains fine at lr 4e-5 with
+# Adam; SGD at the same LR gave max|B@A| ~2e-05 after 100 batches and a flat reward.
+OPTIMIZER="${OPTIMIZER:-adamw}"
 ADV_MODE="${ADV_MODE:-action_probs}"
 LENGTH_PENALTY="${LENGTH_PENALTY:-0}"
 log(){ echo "[$(date '+%m-%d %H:%M:%S')] $*" | tee -a "$MDIR/stage1_r32.log"; }
@@ -88,7 +92,7 @@ DOMAINS=(
   "insurance:act_prm/snorkel_insurance:data/snorkel_insurance_split:45:data/sft_corpus/snorkel_insurance"
 )
 
-log "=== Stage-1 @ $LORA lr=$LR adv=$ADV_MODE lp=$LENGTH_PENALTY, scorers='$SCORERS', abort-check at batch $ABORT_AT ==="
+log "=== Stage-1 @ $LORA lr=$LR opt=$OPTIMIZER adv=$ADV_MODE lp=$LENGTH_PENALTY, scorers='$SCORERS', abort-check at batch $ABORT_AT ==="
 for spec in "${DOMAINS[@]}"; do
   IFS=":" read -r dom env pool rnb corpus <<< "$spec"
   # ONLY_DOMAINS="airline" restricts the sweep to a subset without editing the array --
@@ -114,7 +118,7 @@ for spec in "${DOMAINS[@]}"; do
           --model_config "$MODEL" --lora_config "$LORA" --replay_buffer_config default \
           $SWB --run_tag "$EMTAG" --group_size 4 --batch_size 4 --num_batches "$EM_NB" \
           --learning_rate "$LR" --length_penalty "$LENGTH_PENALTY" \
-          --advantage_mode "$ADV_MODE" --save_generations \
+          --advantage_mode "$ADV_MODE" --optimizer "$OPTIMIZER" --save_generations \
           --no_initial_eval --eval_every "$EM_NB" --gradient_checkpointing "${SAVE[@]}" --verbose \
           > "$MDIR/${EMTAG}.log" 2>&1 \
         || { _fail=$((_fail+1)); log "$EMTAG: FAILED"; continue; }
