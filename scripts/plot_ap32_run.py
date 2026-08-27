@@ -25,6 +25,10 @@ BLUE, ORANGE, GREEN = "#2d6ca8", "#c26a3d", "#3f7d55"
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--run", default="logs/act_prm_tau2_airline/hf_qwen3_4b_instruct/airline_s1em_policy_ap32-*/")
+    ap.add_argument("--compare", default="", help="glob for a second run to overlay")
+    ap.add_argument("--label", default="this run")
+    ap.add_argument("--clabel", default="comparison")
+    ap.add_argument("--nb", type=int, default=100)
     ap.add_argument("--out", default="stage1_airline_ap32.html")
     args = ap.parse_args()
 
