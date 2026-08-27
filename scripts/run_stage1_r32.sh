@@ -93,12 +93,16 @@ DOMAINS=(
 )
 
 log "=== Stage-1 @ $LORA lr=$LR opt=$OPTIMIZER adv=$ADV_MODE lp=$LENGTH_PENALTY, scorers='$SCORERS', abort-check at batch $ABORT_AT ==="
-for spec in "${DOMAINS[@]}"; do
+# Iterate in ONLY_DOMAINS order, not array order -- the filter alone silently kept the
+# array's airline-first ordering when retail was wanted first.
+_order="${ONLY_DOMAINS:-airline retail finance insurance}"
+for _want in $_order; do
+ for spec in "${DOMAINS[@]}"; do
   IFS=":" read -r dom env pool rnb corpus <<< "$spec"
+  [ "$dom" = "$_want" ] || continue
   # ONLY_DOMAINS="airline" restricts the sweep to a subset without editing the array --
   # useful when a formulation has been shown not to work and the remaining domains would
   # just reproduce it (lr 4e-5 across retail/finance/insurance = ~30h of known no-op).
-  case " ${ONLY_DOMAINS:-airline retail finance insurance} " in *" $dom "*) ;; *) continue ;; esac
   ENVDIR="${env//\//_}"
   for scorer in $SCORERS; do
     SWB=--no-score_with_base; SWBV=0
@@ -159,6 +163,7 @@ for spec in "${DOMAINS[@]}"; do
       || { _fail=$((_fail+1)); log "$RTAG: export FAILED"; continue; }
     log "$dom/$scorer: corpus -> $OUT ($(n_rows "$OUT/train.json") train / $(n_rows "$OUT/eval.json") eval)"
   done
+ done
 done
 if [ "${_fail:-0}" -eq 0 ]; then touch "$MDIR/ALLDONE"; log "=== stage1 r32 sweep complete ==="
 else log "=== stage1 r32 sweep INCOMPLETE: $_fail failure(s) ==="; fi
