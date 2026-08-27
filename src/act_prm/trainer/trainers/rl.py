@@ -472,6 +472,18 @@ class RLTrainer(BaseTrainer):
                 logger.info(
                     "Saved rolling checkpoint (step %d) -> %s", batch_idx, self.last_checkpoint_path
                 )
+                # ALSO keep a numbered snapshot. step_last is overwritten every save_every
+                # batches, and step_best is only meaningful if evals are frequent -- with
+                # eval_every == num_batches they both end up being the FINAL model. That cost
+                # us the batch-30 checkpoint of the 08-26 retail run, whose generations show
+                # 0% degenerate thoughts at batch 30 versus 41% by batch 79: the good model
+                # existed and was overwritten by the hacked one.
+                # ~253MB per snapshot at r32; set keep_step_checkpoints=false to disable.
+                if cfg.get("keep_step_checkpoints", True):
+                    _snap = join(self.checkpoint_path, f"step_{batch_idx + 1:04d}")
+                    os.makedirs(_snap, exist_ok=True)
+                    save_lora(llm.model, _snap)
+                    logger.info("Saved numbered snapshot -> %s", _snap)
 
             # Log metrics
             try:

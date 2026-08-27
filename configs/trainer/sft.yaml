@@ -38,6 +38,9 @@ learning_rate: 4e-5
 # a config, so without this line --optimizer is silently dropped. Left at sgd to preserve
 # the behaviour every existing result was produced under; pass --optimizer adamw explicitly.
 optimizer: "sgd"
+# Keep a numbered step_NNNN snapshot each save_every batches (~253MB each at r32), in
+# addition to the overwritten step_last. Without this an early good checkpoint is lost.
+keep_step_checkpoints: true
 discount_factor: 0.9
 loss_fn: "cross_entropy"
 num_substeps: 1
