@@ -5,7 +5,12 @@ name: "act_prm_traces"
 
 dataset: "mzio/aprm-snorkelai_agent_finance_reasoning"
 split_file: "data/splits/snorkel_finance.json"
-dataset_path: "data/snorkel_finance_split"   # first run streams via split + caches; reruns load offline
+# v3 is the QUESTION-level subselection: the uid-level pool in data/snorkel_finance_split
+# leaks (76% of its eval questions also appear in train, 91% of rl_eval), so eval likelihood
+# measured on it is contaminated. It must also match the --source-pools the Stage-1 driver
+# passes to export_sft_corpus.py; when the two disagreed (08-28) the export silently resolved
+# only 3/25 eval and 94/116 train trajectories.
+dataset_path: "data/snorkel_finance_split_v3"   # first run streams via split + caches; reruns load offline
 synthetic: false
 keep_expert_thoughts: false # true keeps original expert reasoning+action per turn (expert thought-action SFT; use a distinct dataset_path)
 

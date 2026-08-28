@@ -248,3 +248,69 @@ Not queued, but higher value than 2h/2z: **the interleaved rollout fix** (cc-8.0
 - **The judge defaults to "no" on any unparsed verdict.** 67% of finance verdicts hit that
   default. `parse_verdict` now falls through several shapes;
   `scripts/check_judge_parse_rate.py` gates every insurance rollout.
+
+---
+
+## 08-28 — the finance corpus eval count (3/25): run/export split mismatch
+
+**Trigger.** The Stage-1 AdamW/lp=0/30-batch sweep produced corpora of 52/8 (retail),
+24/4 (airline) and **94 train / 3 eval** (finance). Finance's eval pool has 25
+trajectories, so 3 was wrong on its face.
+
+**What it was NOT** (each checked and ruled out, in order):
+1. *Under-generation* — the relabel logged 1020 eval rows covering all **25** distinct
+   eval `sample_id`s. Generation was complete; the loss was downstream, in the export.
+2. *sample_id collision across eval passes* — there were 3 eval passes (eval_every=10
+   over 29 batches) and `sample_id` increments globally, so I expected two different
+   trajectories to merge under one key. Measured: **0/25** sample_ids saw more than one
+   `target_action` at the same timestep. Not it.
+3. *`_action_seq` not stripping expert thoughts* — `_resolve_source` compares raw
+   assistant content against the row's extracted `target_action`, while the export body
+   (line ~173) applies `extract_action`. A real asymmetry, but normalising both sides
+   changed resolution by **0** (still 3/25). Not it.
+4. *Timesteps beyond the source length* — classified every failure: 22/25 eval groups
+   were **content mismatch**, 0 were overlong.
+
+**What it was.** The unresolved eval groups matched **zero** steps of **any** trajectory
+in the pool the export was given. The run and the export were pointed at two different
+finance splits:
+
+| | pool | eval n |
+|---|---|---|
+| run (`snorkel_finance_split.yaml` `dataset_path`) | `data/snorkel_finance_split` | 25 |
+| export (driver's `--source-pools`) | `data/snorkel_finance_split_v3` | 25 |
+
+Both are 116/25 over the same underlying trajectories, so they *look* interchangeable —
+but v3 is the **question-level** re-split (the leak fix; the uid-level original has 76%
+of its eval questions also in train, 91% for rl_eval), so the membership differs.
+`_resolve_source` joins on content, not index, so the trajectories present in *both*
+eval sets resolved — exactly 3 — and everything else was dropped with a warning that
+scrolled past. Train survived at 94/116 for the same reason: set overlap, not correctness.
+
+Re-exporting the *existing* generations against `data/snorkel_finance_split` gives
+**116/116 train, 25/25 eval, 0 mismatches** — confirming the pool was the whole story.
+
+**Two defects, two fixes.**
+- *The corpus was truncated.* `configs/environments/act_prm/snorkel_finance_split.yaml`
+  now sets `dataset_path: data/snorkel_finance_split_v3`, so run and export agree. All
+  four domains cross-checked; finance was the only mismatch, and **insurance (running
+  now) pairs correctly**, so it will not hit this at export time in ~13h.
+- *The truncation was silent.* `export_sft_corpus.py` gained `--min-coverage` (default
+  0.9): it now prints per-split `resolved/pool` coverage and **aborts** below the floor.
+  Verified it aborts on the v3 pool (81% / 12%) and passes on the correct one (100% /
+  100%). A silently-truncated corpus is indistinguishable from a complete one downstream,
+  which is why this had to become an error rather than a warning.
+
+**Consequence for results already reported.** Finance's Stage-1 `eval likelihood 0.7848`
+was measured on the *leaky* uid-level split and is contaminated — it is not comparable to
+retail (0.7114) or airline (0.6554), both of which are clean. The finance corpus is
+quarantined at `data/sft_corpus/snorkel_finance_split/INVALID_policy_adamw30_wrongpool/`
+and a v3 redo (~7h: 3h32m EM + ~3h relabel) is chained behind insurance via
+`scripts/chain_finance_v3_redo.sh`. **Do not run Stage-2 finance until that lands.**
+
+**Incidental finding — duplicate trajectories.** Coverage-checking the other corpora
+turned up retail 52 exported from a 49 pool and airline 24 from 21: **3 duplicates each**,
+zero missing. Cause is benign and expected — 30 batches x 4 exceeds one epoch, so a
+trajectory revisited in epoch 2 gets a fresh `sample_id`, a fresh group, and a second
+export with its own relabeled thoughts. Effect is a ~6% upweighting of 3 trajectories,
+not a correctness bug, so it is **not** blocking Stage-2. Worth a `--dedupe` flag later.

@@ -121,6 +121,7 @@ def export(
     out_dir: str,
     splits: list[str],
     strict: bool = False,
+    min_coverage: float = 0.9,
 ) -> dict[str, int]:
     """Build {split}.json pools; return per-split trajectory counts."""
     rows = _load_rows(gen_file)
@@ -139,6 +140,7 @@ def export(
         grouped.setdefault(key, {})[int(r["timestep"])] = r
 
     out: dict[str, list[dict[str, Any]]] = {s: [] for s in splits}
+    resolved_idx: dict[str, set[int]] = {s: set() for s in splits}
     n_mismatch = 0
     n_unresolved = 0
     for (split, sample_id), steps in sorted(grouped.items()):
@@ -158,6 +160,7 @@ def export(
                     f"sample {sample_id} (0 or >1 candidates match its target_action sequence)."
                 )
             continue
+        resolved_idx[split].add(src_idx)
         traj = copy.deepcopy(pool[src_idx])
         messages = traj["messages"]
         action_indices = [i for i, m in enumerate(messages) if m.get("role") == "assistant"]
@@ -177,6 +180,32 @@ def export(
                     )
             messages[idx]["content"] = _committed_target(row)
         out[split].append(traj)
+
+    # COVERAGE GUARD. The failure this exists for (08-28, finance): the run's env
+    # dataset_path and the driver's --source-pools pointed at two DIFFERENT finance
+    # splits. Because _resolve_source joins on content, the overlapping trajectories
+    # still resolved and the export "succeeded" -- with 3/25 eval and 94/116 train.
+    # A silently-truncated corpus reads exactly like a complete one downstream, so a
+    # low resolve rate has to be an error, not a warning.
+    coverage: dict[str, float] = {}
+    starved = []
+    for split in splits:
+        pool = source.get(split) or []
+        if not pool:
+            continue
+        cov = len(resolved_idx[split]) / len(pool)
+        coverage[split] = cov
+        print(f"  coverage {split}: {len(resolved_idx[split])}/{len(pool)} source "
+              f"trajectories resolved ({100 * cov:.0f}%)", file=sys.stderr)
+        if cov < min_coverage:
+            starved.append(f"{split} {len(resolved_idx[split])}/{len(pool)} ({100 * cov:.0f}%)")
+    if starved:
+        raise SystemExit(
+            "ABORT: source-pool coverage below --min-coverage "
+            f"{100 * min_coverage:.0f}% for: {', '.join(starved)}.\n"
+            "  Almost always --source-pools is not the pool the relabel pass actually ran on;\n"
+            "  it must equal that run's env dataset_path. Pass --min-coverage 0 to override."
+        )
 
     if n_unresolved:
         print(f"WARNING: {n_unresolved} step(s) belonged to a (split, sample_id) group "
@@ -201,6 +230,7 @@ def export(
             "n_eval": len(out.get("eval", [])),
             "n_mismatch": n_mismatch,
             "n_unresolved": n_unresolved,
+            "coverage": coverage,
             "join": "target_action-sequence match (robust to dataloader shuffle)",
             "note": "SFT corpus: assistant content = committed (best) thought + action.",
         },
@@ -235,11 +265,20 @@ def main() -> None:
         action="store_true",
         help="Error (instead of warn) if a row's target_action doesn't match the source action.",
     )
+    ap.add_argument(
+        "--min-coverage",
+        type=float,
+        default=0.9,
+        help="Abort if the fraction of SOURCE pool trajectories resolved falls below this "
+        "(default 0.9). Guards against --source-pools naming a different split than the "
+        "relabel run used, which silently truncates the corpus. 0 disables.",
+    )
     args = ap.parse_args()
 
     gen_file = _find_generations(args.generations)
     splits = [s.strip() for s in args.splits.split(",") if s.strip()]
-    counts = export(gen_file, args.source_pools, args.out, splits, strict=args.strict)
+    counts = export(gen_file, args.source_pools, args.out, splits, strict=args.strict,
+                    min_coverage=args.min_coverage)
     total = sum(counts.values())
     print(f"Exported {total} trajectories to {args.out}")
     for s in splits:
