@@ -627,6 +627,14 @@ def prepare_minibatch(
         print(f"[STRL_VERIFY] wrote {len(_verify_records)} trainable-step records to {_verify_path}")
     dataset = HFDataset.from_list(data_dict)
     collate_fn = DataCollatorForPolicyGradient(tokenizer=hf_tokenizer, return_tensors="pt")
+    if len(dataset) == 0:
+        # Every trajectory in this batch was filtered out (e.g. --require_thought when none
+        # of the sampled trajectories has a reasoning-bearing target -- 56% of the finance
+        # expert trajectories are like this). torch's RandomSampler raises on an empty
+        # dataset, which killed the whole run. Make the batch a no-op instead: the caller's
+        # loop body never executes, so no optimizer step is taken.
+        dataloader_kwargs = {**dataloader_kwargs, "shuffle": False}
+        print("[prepare_minibatch] no trainable steps in this batch -- skipping the update")
     dataloader = DataLoader(dataset, batch_size=batch_size, collate_fn=collate_fn, **dataloader_kwargs)
     return dataloader, metrics  # empty metrics for now
 
