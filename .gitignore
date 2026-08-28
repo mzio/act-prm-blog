@@ -234,3 +234,6 @@ docs/
 /tau2-bench/
 _quarantine_action_only_training/
 _quarantine_stubs/
+
+# cron completion markers (runtime state, not source)
+.guard_markers/

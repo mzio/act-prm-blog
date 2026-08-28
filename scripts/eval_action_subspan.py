@@ -196,6 +196,20 @@ def parse_run(run_dir):
     return variant, base, corpus, regime
 
 
+# CLEAN_EVAL=1 swaps every arm onto its *_cleaneval corpus: the finance eval split shares
+# 76% of its questions with train (uids were partitioned, but many uids map to the same
+# finqa_reasoning question), so the default pools score largely memorised questions. The
+# clean pools keep only trajectories whose question was never in act_prm_train.
+CLEAN_EVAL = os.environ.get("CLEAN_EVAL", "0") == "1"
+
+
+def _clean(p):
+    if not CLEAN_EVAL:
+        return p
+    q = Path(str(p.parent) + "_cleaneval") / p.name
+    return q if q.exists() else p
+
+
 def eval_pool_path(base_variant, corpus):
     """Map a variant to the eval.json it trained/evaluated against.
 
@@ -205,14 +219,14 @@ def eval_pool_path(base_variant, corpus):
     - thoughts_base   -> data/sft_corpus/<env>/base[_last]/eval.json
     """
     if base_variant == "actions_only":
-        return Path("data") / ENVNAME / "eval.json"
+        return _clean(Path("data") / ENVNAME / "eval.json")
     if base_variant == "expert_thoughts":
-        return Path("data") / f"{ENVNAME}_expert_thoughts" / "eval.json"
+        return _clean(Path("data") / f"{ENVNAME}_expert_thoughts" / "eval.json")
     if base_variant.startswith("thoughts_"):
         sub = base_variant[len("thoughts_"):]  # policy | base
         if corpus == "last":
             sub = f"{sub}_last"
-        return Path("data") / "sft_corpus" / ENVNAME / sub / "eval.json"
+        return _clean(Path("data") / "sft_corpus" / ENVNAME / sub / "eval.json")
     return None
 
 

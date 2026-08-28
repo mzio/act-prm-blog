@@ -23,12 +23,19 @@ DOM="${ENVNAME#tau2_}"                      # retail / airline (matches existing
 # variant column). NB the 4e-5 runs left an adapter that barely moved off its
 # init (max|B@A| ~ 4e-5 vs base weights ~1e-2), which is why this knob exists.
 LR="${LR:-}"
+# Optimizer. Every Stage-2 result before 08-27 used plain SGD, because optim.get_optimizer
+# defaults to name="sgd" and main_pytorch never passed one -- so the 3e-3 those runs used was
+# "the LR that makes SGD limp", not a tuned value. AdamW needs ~1e-3 (MZ has run this before);
+# 3e-3 under AdamW would be an enormous step since the update is roughly lr*sign(grad).
+OPTIMIZER="${OPTIMIZER:-sgd}"
 LR_ARGS=(); LRTAG=""
 # NB sanitize the LR for the tag: main_pytorch's run-name builder rewrites "-" and "."
 # to "_", so a tag of _lr1e-4 lands on disk as _lr1e_4 and the step_best skip-glob below
 # would never match -> the sweep would re-run finished work forever. Pre-sanitize so the
 # tag we search for is the tag that exists.
 if [ -n "$LR" ]; then LR_ARGS=(--learning_rate "$LR"); LRTAG="_lr${LR//[-.]/_}"; fi
+OPT_ARGS=(--optimizer "$OPTIMIZER")
+[ "$OPTIMIZER" != "sgd" ] && LRTAG="${LRTAG}_${OPTIMIZER}"   # keep AdamW runs in distinct dirs
 # Short-probe knobs: cheap validation that the adapter actually moves before
 # committing the full matrix (NUM_BATCHES=8 EVAL_EVERY=2 VARIANTS=actions_only).
 NUM_BATCHES="${NUM_BATCHES:-}"
@@ -86,7 +93,7 @@ run_one(){  # $1=sft_variant  $2=label(run_tag)  $3=regime(hide|full)  $4..=extr
   if [ -f "$MDIR/${tag}.done" ]; then log "$tag: completed by another driver while waiting, skip"; return 0; fi
   env "${fc[@]}" ./scripts/train_sft.sh "$ENVCFG" "$variant" \
       --run_tag "$tag" --best_metric eval_action_ppl \
-      "${LR_ARGS[@]}" "${EXTRA[@]}" "$@" > "$MDIR/${tag}.log" 2>&1 \
+      "${LR_ARGS[@]}" "${OPT_ARGS[@]}" "${EXTRA[@]}" "$@" > "$MDIR/${tag}.log" 2>&1 \
     && { touch "$MDIR/${tag}.done"; log "$tag: done"; } || log "$tag: FAILED (see $MDIR/${tag}.log)"
 }
 

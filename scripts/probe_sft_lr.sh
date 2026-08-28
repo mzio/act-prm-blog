@@ -21,6 +21,12 @@ DOM="${ENVCFG##*/}"; DOM="${DOM#tau2_}"
 VARIANT="${VARIANT:-actions_only}"     # actions_only needs no corpus -> cheapest arm
 BATCHES="${BATCHES:-8}"
 LRS="${LRS:-4e-5 1e-4 1e-3}"           # 4e-5 is the control (current default)
+# Optimizer. Every result in this project up to 08-26 used plain SGD, because
+# optim.get_optimizer defaults to name="sgd" and main_pytorch never passed one -- so the
+# 3e-3 that this probe originally picked was "the LR that makes SGD limp", not a property
+# of the model. AdamW needs a completely different range (~1e-4..1e-3 for LoRA): its update
+# is roughly lr*sign(grad), so 3e-3 would be an enormous step.
+OPTIMIZER="${OPTIMIZER:-sgd}"
 # Thought variants SFT on a fixed Stage-1.5 corpus; without --dataset_path they would
 # regenerate thoughts on the fly, which is a different (and much slower) experiment.
 # thoughts_policy -> policy corpus, thoughts_base -> base corpus.
@@ -35,15 +41,15 @@ MDIR=/tmp/aprm/lrprobe; mkdir -p "$MDIR"
 log(){ echo "[$(date '+%m-%d %H:%M:%S')] $*" | tee -a "$MDIR/probe.log"; }
 wait_gpu_free(){ while pgrep -f '[m]ain_pytorch.py' >/dev/null 2>&1; do sleep 30; done; sleep 5; }
 
-log "=== SFT LR probe: env=$ENVCFG variant=$VARIANT batches=$BATCHES lrs='$LRS' ==="
+log "=== SFT LR probe: env=$ENVCFG variant=$VARIANT opt=$OPTIMIZER batches=$BATCHES lrs='$LRS' ==="
 for lr in $LRS; do
-  tag="${DOM}_s2probe_${VARIANT}_lr${lr}"
+  tag="${DOM}_s2probe_${VARIANT}_${OPTIMIZER}_lr${lr//[-.]/_}"  # sanitise: lr1e-4 -> lr1e_4 (a raw "-" broke resume matching before)
   log "--- $tag"
   wait_gpu_free
   ./scripts/train_sft.sh "$ENVCFG" "$VARIANT" \
       --run_tag "$tag" --best_metric eval_action_ppl \
       --learning_rate "$lr" --num_batches "$BATCHES" --eval_every "${EVAL_EVERY:-10}" \
-      "${DS_ARGS[@]}" \
+      --optimizer "$OPTIMIZER" "${DS_ARGS[@]}" \
       > "$MDIR/${tag}.log" 2>&1 \
     && log "$tag: done" || log "$tag: FAILED (see $MDIR/${tag}.log)"
 done
