@@ -9,7 +9,11 @@ this collapses to standard maximum-likelihood SFT — no PPO-style importance
 ratio.
 """
 
+import hashlib
+import json
+import logging
 import math
+import os
 from typing import Any
 
 import torch
@@ -17,6 +21,8 @@ from torch.nn import functional as F
 
 from ..utils import action_start_token
 from .rl import RLTrainer
+
+logger = logging.getLogger(__name__)
 
 
 # Shared with prepare_minibatch's label mask so the tokens trained under
@@ -89,6 +95,15 @@ class SFTTrainer(RLTrainer):
         act_ce = 0.0
         act_correct = 0
         act_tokens = 0
+        # Per-step records, so any SUBSET of the eval turns can be scored offline without
+        # re-running. Motivation: the arms disagree about which turns they can supervise --
+        # the expert has reasoning on only ~50% of turns (31% on finance), Act-PRM has it on
+        # all of them, actions_only on none. Restricting the comparison to turns where the
+        # EXPERT reasoned is a fair, on-distribution question, but it cannot be answered from
+        # inside a single arm's run: actions_only has no thoughts in its own targets and so
+        # cannot identify the subset. Join these records across arms on `action_key` (see
+        # below) to get the restricted table for every arm at once.
+        step_records: list[dict[str, Any]] = []
         for traj in trajs:
             for step in traj.episode_steps:
                 ids = getattr(step, "state_action_tokens", None)
@@ -125,11 +140,41 @@ class SFTTrainer(RLTrainer):
                 if 0 <= a_off < tgt_labels.numel():
                     a_labels = tgt_labels[a_off:]
                     a_argmax = tgt_argmax[a_off:]
-                    act_ce += F.cross_entropy(
-                        tgt_logits_f[a_off:], a_labels, reduction="sum"
-                    ).item()
-                    act_correct += int((a_argmax == a_labels).sum().item())
-                    act_tokens += int(a_labels.numel())
+                    _ce = F.cross_entropy(tgt_logits_f[a_off:], a_labels, reduction="sum").item()
+                    _ok = int((a_argmax == a_labels).sum().item())
+                    _n = int(a_labels.numel())
+                    act_ce += _ce
+                    act_correct += _ok
+                    act_tokens += _n
+                    # Content key. (sample_id, timestep) is NOT stable across arms: the
+                    # thought pools carry a different number of trajectories than the
+                    # actions_only pool (finance eval: 27/398 steps vs 25/363), so the
+                    # sample numbering shifts and only ~90% of nominally-shared turns even
+                    # agree on action length. The gold ACTION tokens, by contrast, are
+                    # identical across arms for the same turn -- only the thought prefix
+                    # differs -- so they identify the turn. Paired with the trailing state
+                    # tokens to disambiguate a repeated identical tool call.
+                    _akey = hashlib.sha1(
+                        ",".join(str(int(t)) for t in a_labels.tolist()).encode()
+                    ).hexdigest()[:16]
+                    _skey = hashlib.sha1(
+                        ",".join(str(int(t)) for t in ids[max(0, state_len - 64) : state_len]).encode()
+                    ).hexdigest()[:16]
+                    step_records.append(
+                        {
+                            "action_key": _akey,
+                            "state_key": _skey,
+                            "sample_id": getattr(step, "sample_id", None),
+                            "timestep": getattr(step, "timestep", None),
+                            "action_ce": _ce,
+                            "action_correct": _ok,
+                            "action_tokens": _n,
+                            # a_start > state_len <=> this arm's target carries a reasoning
+                            # prefix on this turn. False for every actions_only step.
+                            "has_thought": bool(a_start > state_len),
+                            "thought_tokens": int(max(0, a_start - state_len)),
+                        }
+                    )
 
         if was_training:
             model.train()
@@ -147,6 +192,27 @@ class SFTTrainer(RLTrainer):
             # action fit independent of thought verbosity.
             out[f"{prefix}/eval_actiononly_ppl"] = math.exp(act_ce / act_tokens)
             out[f"{prefix}/eval_actiononly_accuracy"] = act_correct / act_tokens
+            # Same subspan, restricted to the turns where THIS arm has a reasoning prefix.
+            # Reported for transparency only: it is NOT cross-arm comparable, because each
+            # arm's thought-bearing turns are a different subset (and empty for
+            # actions_only). Use the per-step dump + a common turn set for that.
+            _sub = [r for r in step_records if r["has_thought"]]
+            _sn = sum(r["action_tokens"] for r in _sub)
+            if _sn > 0:
+                out[f"{prefix}/eval_actiononly_ppl_ownthoughtsub"] = math.exp(
+                    sum(r["action_ce"] for r in _sub) / _sn
+                )
+                out[f"{prefix}/eval_actiononly_frac_turns_with_thought"] = len(_sub) / max(
+                    1, len(step_records)
+                )
+        if step_records and self.log_path:
+            try:
+                os.makedirs(self.log_path, exist_ok=True)
+                with open(os.path.join(self.log_path, "eval_step_records.jsonl"), "a") as _f:
+                    for _r in step_records:
+                        _f.write(json.dumps({"split": split, "prefix": prefix, **_r}) + "\n")
+            except Exception as _e:  # never let bookkeeping kill an eval
+                logger.warning("could not write eval_step_records.jsonl: %s", _e)
         return out
 
     def compute_loss(
