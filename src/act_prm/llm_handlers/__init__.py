@@ -27,6 +27,22 @@ def load_llm(
     if name == "hf_transformer":
         return HuggingFaceLLM(model_config=model_config, **kwargs)
 
+    if name in ("claude_agent_sdk", "claude_query"):
+
+        # LLM-judge backend for the graders (the snorkel_finance gym scores
+
+        # finqa_reasoning answers with it). LAZY import: the Claude Agent SDK
+
+        # lives in the grader venv, not the base training .venv, so importing
+
+        # inside the branch keeps the base venv working without it installed.
+
+        from .claude_agent_sdk import ClaudeQueryLLM
+
+
+        return ClaudeQueryLLM(**(model_config or {}), **kwargs)
+
+
     raise ValueError(
         f"Invalid model name: {name!r}. This Act-PRM fork only supports 'hf_transformer'."
     )
