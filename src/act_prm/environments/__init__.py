@@ -31,6 +31,30 @@ def get_env(name: str, is_async: bool = True, **kwargs: Any) -> Environment:
 
         return Tau2BenchEnv(**kwargs)
 
+    if name == "snorkel_insurance":
+        # Tool-calling commercial underwriting over the snorkel benchmark tables,
+        # LLM-judge graded. Ported alongside the finance env so the insurance domain has a
+        # gym for Stage-3 rollout eval on its 41 held-out questions.
+        if is_async:
+            from .snorkel_insurance import AsyncSnorkelInsuranceEnv
+
+            return AsyncSnorkelInsuranceEnv(**kwargs)
+        from .snorkel_insurance import SnorkelInsuranceEnv
+
+        return SnorkelInsuranceEnv(**kwargs)
+
+    if name == "snorkel_finance":
+        # Tool-calling financial QA over 10-K filings, LLM-judge graded. Ported from the
+        # recovered mz-airline branch so the finance domain has a gym for rollout eval.
+        if is_async:
+            from .snorkel_finance import AsyncSnorkelFinanceEnv
+
+            return AsyncSnorkelFinanceEnv(**kwargs)
+        else:
+            from .snorkel_finance import SnorkelFinanceEnv
+
+            return SnorkelFinanceEnv(**kwargs)
+
     raise NotImplementedError(f"Sorry, invalid environment: '{name}'.")
 
 

@@ -1,0 +1,53 @@
+# Interactive Snorkel Finance gym (SnorkelFinanceEnv) for Stage-3 agentic RL.
+# The LoRA policy does tool-calling rollouts (get_descriptions / get_table_info /
+# sql_query / calculator / respond_user) over real 10-K tables; the finqa_reasoning
+# answer is graded by an LLM judge (Claude via the Agent SDK, headless over the Meta
+# AI gateway). Runs in the base .venv (now has claude-agent-sdk + litellm).
+#
+# NOTE (hold-out): uses the env's OWN frac split of finqa_reasoning (79 Qs), NOT the
+# aprm `rl_eval` uids — the uid->CSV-row mapping is still a TODO (see
+# cc-finance-2.0-rl-design.md). Fine for getting RL running + comparing warm-starts.
+name: "snorkel_finance"
+is_async: true
+
+data_path: "data/snorkel_finance/raw"
+benchmark_csv: "data/snorkel_finance/benchmark/finqa_reasoning.csv"
+task: "finqa_reasoning"
+
+# LLM-judge grader (Claude Agent SDK).
+grader_model_config:
+  name: "claude_agent_sdk"
+  model_config:
+    model: "claude-sonnet-4-5"
+    max_turns: 1
+grader_model_samples: 1
+grader_model_verbose: false
+num_fewshot_prompts: 0
+
+# Explicit question-id selection. These MUST be declared here even as null: update_configs
+# only applies a CLI flag when `argname in config`, so an undeclared key means
+# --eval_query_ids is silently DROPPED. That is what happened on 08-23: all 10 finance
+# rollouts fell back to the fractional split below and evaluated the same 11 questions
+# instead of the fair-10 / hard-29 sets they were launched for.
+train_query_ids: null
+eval_query_ids: null
+
+# Env's own split of the 79 finqa_reasoning questions. Only used when the *_query_ids above
+# are null; the v3 rollouts override both.
+frac_train: 0.7
+frac_val: 0.15
+frac_test: 0.15
+eval_all_samples: false
+eval_splits: ["eval"]
+
+# hide-obs regime (matching the SFT hide checkpoints we warm-start from).
+hide_observations: true
+first_obs_to_show: 1
+last_obs_to_show: 1
+
+max_turns: 12
+num_tries: 1
+eval_num_tries: 1
+seed: 0
+data_seed: 0
+split: "train"

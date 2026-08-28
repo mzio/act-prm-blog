@@ -1,0 +1,58 @@
+# Snorkel Insurance underwriting (action-only) for Act-PRM Stage-1 EM + Stage-2 SFT.
+#
+# Source rollouts: mzio/aprm-insurance-gpt5m_med-gs4-s0-r1-train -- a STEP-level GPT-5-mini
+# replay buffer (13,131 steps / 1,000 trajectories / 262 questions, group_size 4).
+# scripts/build_insurance_pools.py reconstructs trajectories, keeps only the SUCCESSFUL ones
+# (910/1000 = 91%, covering 261/262 questions), and writes the pools this config reads.
+#
+# The split is by QUESTION and three-way disjoint (180 train / 40 eval / 41 rollout); the
+# rollout questions are never seen by Stage 1 or Stage 2. Splitting at question level is
+# deliberate: the finance v1 split partitioned uids, and because ~2.5 uids shared each
+# question it leaked 76% of eval and 91% of the RL hold-out into train.
+#
+# Pools are capped at ONE demonstration per question (180 traj / 2,273 steps, from an
+# available 631 / 8,037). Retail's thought pools kept up to two generations per task, which
+# gave the thought arms 1043 supervised steps against the baseline's 635 and forced a
+# separate volume-matched control to disentangle "thoughts help" from "more data helps".
+# One-per-question makes every arm volume-matched by construction.
+name: "act_prm_traces"
+
+dataset: "mzio/aprm-insurance-gpt5m_med-gs4-s0-r1-train"
+split_file: "data/splits/snorkel_insurance.json"
+dataset_path: "data/snorkel_insurance_split"       # prebuilt by build_insurance_pools.py
+synthetic: false
+keep_expert_thoughts: false  # true -> expert reasoning+action targets; pair with the
+                             # data/snorkel_insurance_split_expert_thoughts pool
+
+num_trajectories: null       # all 180 train questions
+eval_trajectories: null      # all 40 eval questions
+max_steps_per_traj: null     # infer a thought for every logged action
+obs_max_chars: 4000          # REQUIRED here, not optional. Insurance tool calls return whole
+                             # SQL tables: observations run to p99=48,995 and max=56,543 chars,
+                             # and full trajectories to 99,177 chars (~25k tokens). Uncapped,
+                             # the EM M-step OOMed on 08-24 (817 MiB free of 95 GiB). A 4000
+                             # cap leaves 93% of observations untouched and brings the worst
+                             # trajectory to ~6.6k tokens. Applied via the env, so every arm
+                             # sees the same truncation and the comparison stays fair.
+
+# Observation hiding OFF for thought generation (reserved for downstream SFT/RL).
+hide_observations: false
+first_obs_to_show: 1
+last_obs_to_show: 1
+
+# NO target filtering. All four arms train on every logged action of the selected
+# trajectories (2,273 train / 540 eval targets), so they are matched step for step.
+#
+# The sample filter is at TRAJECTORY level and was applied when the pools were built:
+#   (1) the expert solved it        -> 910/1000 successful trajectories
+#   (2) >=1 reasoning-bearing step  -> 220/220 of the selected trajectories already qualify,
+#                                      so this filters nothing on insurance (it would matter
+#                                      on finance, where 56% of expert trajectories carry no
+#                                      reasoning on any turn).
+# expert_thoughts therefore keeps the 36% of its targets that are bare <tool_call>. That is
+# a faithful property of the expert data, not an artifact -- and insurance is the mildest
+# case of it we have (retail 50% bare, airline 46%, finance 69%), which makes this the
+# fairest head-to-head between real expert thoughts and Act-PRM inferred thoughts.
+
+num_tries: 1
+seed: 0
