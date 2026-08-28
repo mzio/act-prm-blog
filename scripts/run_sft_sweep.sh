@@ -100,7 +100,13 @@ run_one(){  # $1=sft_variant  $2=label(run_tag)  $3=regime(hide|full)  $4..=extr
 # Thought corpora come from two EM relabel checkpoints: "" = step_best (early-peaked),
 # _last = step_last (fully trained). Each is an SFT arm. best-corpus is required; _last
 # is skipped if its relabel/export hasn't produced it.
-for k in "" _last; do
+# CORPUS_VARIANTS selects WHICH relabel corpora to use. Default "" _last is the historical
+# pair (step_best / step_last of the SGD-era relabel). Set it explicitly to consume a
+# regenerated corpus, e.g. CORPUS_VARIANTS="_adamw30" -> data/sft_corpus/<env>/policy_adamw30.
+# Without this the sweep silently picks $CORPUS/policy -- the OLD corpus -- which would
+# confound the optimizer change with a data change and quietly invalidate the comparison.
+CORPUS_VARIANTS="${CORPUS_VARIANTS:-"" _last}"
+for k in $CORPUS_VARIANTS; do
   corpus_ok "$CORPUS/policy$k" || log "WARN: $CORPUS/policy$k missing/empty (thoughts_policy$k skipped)"
   corpus_ok "$CORPUS/base$k"   || log "WARN: $CORPUS/base$k missing/empty (thoughts_base$k skipped)"
 done
@@ -109,7 +115,7 @@ log "=== SFT sweep $ENVCFG : {actions_only, expert_thoughts, thoughts_{policy,ba
 for regime in $REGIMES; do
   run_one actions_only    actions_only    "$regime"
   run_one expert_thoughts expert_thoughts "$regime"
-  for k in "" _last; do   # "" = step_best corpus, _last = step_last corpus
+  for k in $CORPUS_VARIANTS; do
     corpus_ok "$CORPUS/policy$k" && run_one thoughts_policy "thoughts_policy$k" "$regime" --dataset_path "$CORPUS/policy$k"
     corpus_ok "$CORPUS/base$k"   && run_one thoughts_base   "thoughts_base$k"   "$regime" --dataset_path "$CORPUS/base$k"
   done
