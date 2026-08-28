@@ -34,6 +34,13 @@ num_return_sequences: null
 
 # Training (M-step policy updates)
 learning_rate: 4e-5
+# MUST be declared here: update_configs only applies a CLI flag whose key already exists in
+# a config, so without this line --optimizer is silently dropped. Left at sgd to preserve
+# the behaviour every existing result was produced under; pass --optimizer adamw explicitly.
+optimizer: "sgd"
+# Keep a numbered step_NNNN snapshot each save_every batches (~253MB each at r32), in
+# addition to the overwritten step_last. Without this an early good checkpoint is lost.
+keep_step_checkpoints: true
 discount_factor: 0.9
 loss_fn: "cross_entropy"
 num_substeps: 1
@@ -78,3 +85,7 @@ wandb_name: null
 # the variants are comparable on a same-span basis; otherwise the thought arms spend
 # most of their gradient on tokens the metric never looks at. No-op for actions_only.
 train_action_only: false
+
+# Train only on assistant turns with reasoning before the action (see --require_thought).
+# Off by default; the expert_thoughts_all arm switches it on.
+require_thought: false

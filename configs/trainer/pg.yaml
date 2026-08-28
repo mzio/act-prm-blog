@@ -32,6 +32,13 @@ num_return_sequences: null
 
 # Training (M-step policy updates)
 learning_rate: 4e-5
+# MUST be declared here: update_configs only applies a CLI flag whose key already exists in
+# a config, so without this line --optimizer is silently dropped. Left at sgd to preserve
+# the behaviour every existing result was produced under; pass --optimizer adamw explicitly.
+optimizer: "sgd"
+# Keep a numbered step_NNNN snapshot each save_every batches (~253MB each at r32), in
+# addition to the overwritten step_last. Without this an early good checkpoint is lost.
+keep_step_checkpoints: true
 discount_factor: 1.0      # no discounting. For Act-PRM EM this is unused (single-step
                           # episodes; advantages are the precomputed EM weights). For RLVR
                           # the generator config governs, but keep this 1.0 too so no 0.9

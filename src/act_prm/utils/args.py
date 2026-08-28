@@ -333,8 +333,16 @@ def get_args() -> argparse.Namespace:
         "--advantage_mode",
         type=str,
         default=None,
-        choices=["em", "best", "top_half", "uniform", "grpo"],
-        help="How per-candidate rewards become advantages (em=EM weights, best=argmax, top_half, uniform, grpo=mean-centered)",
+        choices=["em", "best", "top_half", "uniform", "grpo", "action_probs", "clamped"],
+        help=(
+            "How per-candidate rewards become advantages. em=group-normalised EM weights "
+            "(the published method: notebooks/act_prm_tinker.ipynb normalises r/sum(r)); "
+            "best=argmax; top_half; uniform; grpo=mean-centered; "
+            "action_probs=RAW length-normalised p(x|s,z) with NO group normalisation (the "
+            "Tinker aprm_qwen3_ap config -- pair with --length_penalty 0, since in this mode "
+            "the penalty affects best-SELECTION only, not the advantage); "
+            "clamped=max(penalised reward,0) unnormalised (keeps the penalty in the advantage)."
+        ),
     )
     parser.add_argument(
         "--grpo_normalize",
@@ -388,6 +396,17 @@ def get_args() -> argparse.Namespace:
         nargs="+",
         default=None,
         help="Explicit tau2 task ids for the train split (overrides count-based split)",
+    )
+    parser.add_argument(
+        "--eval_query_ids",
+        nargs="+",
+        type=str,
+        default=None,
+        help=(
+            "Explicit finqa question ids for the snorkel_finance gym eval split. The aprm "
+            "finance data leaks at the QUESTION level (many uids share a question), so eval "
+            "sets must be chosen by question id rather than by fraction."
+        ),
     )
     parser.add_argument(
         "--eval_task_ids",
@@ -510,6 +529,45 @@ def get_args() -> argparse.Namespace:
     ## Training Updates
     parser.add_argument("--advantage_threshold", type=float)
     parser.add_argument("--learning_rate", type=float)
+    parser.add_argument(
+        "--optimizer",
+        type=str,
+        default=None,
+        choices=["sgd", "adam", "adamw", "adamw_torch", "adamw_torch_fused", "adafactor"],
+        help=(
+            "Optimizer. NOTE: optim.get_optimizer defaults to 'sgd' and main_pytorch never "
+            "passed a name, so EVERY run in this project so far -- Stage-1 EM and Stage-2 SFT "
+            "alike -- used plain SGD. The Tinker reference uses Adam at lr 4e-5 and its EM "
+            "reward climbs ~0.55->0.88 in 38 steps; ours is flat at the same LR. SGD's update "
+            "is lr*grad (with LoRA grads ~1e-3 that is ~4e-8/step), while Adam's is roughly "
+            "lr*sign(grad) and scale-invariant -- which is exactly the 4-orders-of-magnitude "
+            "shortfall measured in max|B@A|."
+        ),
+    )
+    parser.add_argument(
+        "--require_thought",
+        action="store_true",
+        default=None,
+        help=(
+            "Train only on assistant turns that carry reasoning BEFORE the action. ~50% of "
+            "GPT-5-mini's logged retail actions (46% airline) are a bare <tool_call>, so the "
+            "expert_thoughts arm learned 'usually do not think'. Filters TARGETS only -- every "
+            "turn stays in the context, so trajectories remain coherent. TRAIN split only "
+            "unless --require_thought_eval is also passed."
+        ),
+    )
+    parser.add_argument(
+        "--require_thought_eval",
+        action="store_true",
+        default=None,
+        help=(
+            "Apply --require_thought to the EVAL split too. Only sound when EVERY arm being "
+            "compared sets it: the eval subset is then identical across arms (comparable) and "
+            "on-distribution for all of them. Setting it on a single arm makes that arm's "
+            "PPL/accuracy incomparable to the rest -- thought-bearing targets are longer and "
+            "harder, which once made an arm look 24%% better than baseline when it was worse."
+        ),
+    )
     parser.add_argument(
         "--train_action_only",
         action="store_true",
