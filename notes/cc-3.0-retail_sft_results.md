@@ -23,11 +23,15 @@ for wordiness rather than for mispredicting the action, which inverts the rankin
 | actions_only_lr1e_3_nb150 | hide | 3.0719 | 0.7652 | 149 | 3.0719 | 0.7652 | 149 | 0.7723 |
 | actions_only_lr1e_4 | hide | 3.8346 | 0.7606 | 50 | 3.8346 | 0.7606 | 50 | 0.5078 |
 | actions_only_lr3e_3_nb150 | hide | 2.3422 | 0.7726 | 149 | 2.3422 | 0.7726 | 149 | 0.5186 |
+| expert_thoughts_all_lr3e_3_nb150 | hide | 2.2503 | 0.7771 | 149 | 3.5330 | 0.6704 | 149 | 1.3412 |
+| expert_thoughts_all_lr3e_3_nb150_fixeval | hide | 2.1192 | 0.7947 | 149 | 3.1807 | 0.6974 | 149 | 1.3447 |
 | expert_thoughts_lr3e_3_nb150 | hide | 2.1071 | 0.7973 | 149 | 3.2141 | 0.6958 | 149 | 0.5808 |
 | thoughts_base_last | hide | 3.1928 | 0.7784 | 59 | 3.6738 | 0.7401 | 59 | 0.9956 |
 | thoughts_base_lr3e_3_nb150 | hide | 2.2003 | 0.7890 | 149 | 2.3705 | 0.7610 | 149 | 0.6979 |
+| thoughts_policy_1gen_lr3e_3_nb150 | hide | 2.2058 | 0.7931 | 149 | 2.3954 | 0.7614 | 149 | 0.3960 |
 | thoughts_policy_last | hide | 3.2078 | 0.7825 | 40 | 3.7470 | 0.7390 | 10 | 1.5987 |
 | thoughts_policy_lr3e_3_nb150 | hide | 2.2059 | 0.7925 | 149 | 2.3959 | 0.7609 | 149 | 0.8757 |
+| actions_only_lr3e_3_nb150 | full | 2.9830 | 0.8021 | 40 | 2.9830 | 0.8021 | 40 | 0.4462 |
 | thoughts_base_last | full | 2.9816 | 0.8027 | 59 | 3.4170 | 0.7653 | 59 | 1.0100 |
 | thoughts_policy_last | full | 2.9834 | 0.8050 | 30 | 3.4333 | 0.7637 | 30 | 0.9191 |
 
@@ -51,11 +55,15 @@ that saved step:
 | actions_only_lr1e_3_nb150 | hide | 3.0719 | 0.7652 |
 | actions_only_lr1e_4 | hide | 3.8346 | 0.7606 |
 | actions_only_lr3e_3_nb150 | hide | 2.3422 | 0.7726 |
+| expert_thoughts_all_lr3e_3_nb150 | hide | 2.2503 | 0.7771 |
+| expert_thoughts_all_lr3e_3_nb150_fixeval | hide | 2.1192 | 0.7947 |
 | expert_thoughts_lr3e_3_nb150 | hide | 2.1071 | 0.7973 |
 | thoughts_base_last | hide | 3.1928 | 0.7784 |
 | thoughts_base_lr3e_3_nb150 | hide | 2.2003 | 0.7890 |
+| thoughts_policy_1gen_lr3e_3_nb150 | hide | 2.2058 | 0.7931 |
 | thoughts_policy_last | hide | 3.2100 | 0.7810 |
 | thoughts_policy_lr3e_3_nb150 | hide | 2.2059 | 0.7925 |
+| actions_only_lr3e_3_nb150 | full | 2.9830 | 0.8021 |
 | thoughts_base_last | full | 2.9816 | 0.8027 |
 | thoughts_policy_last | full | 2.9834 | 0.8050 |
 

@@ -1,5 +1,15 @@
 # cc-5.0 — Stage-2 SFT never trained: diagnosis, fix, and the re-run
 
+> **RETRACTION (08-24) — rollout/completion numbers only.** All task-completion figures
+> below are superseded; see [cc-8.0](cc-8.0-rollout-confound.md). The airline
+> `thoughts_policy` 72.2% (+22.2pp) did not replicate — 55.6% re-running the SAME seed,
+> 44.4–50.0% at seeds 0/1/7 — and at 3 rollouts/task the pooled difference is +0.6pp
+> (p=0.765). The harness also confounds arm with measurement time (`actions_only` scored
+> 53.7% at 09:39 and 33–39% at 17:50 the same day). Teacher-forced Stage-2 PPL/accuracy in
+> this note are computed offline from fixed checkpoints and are NOT affected.
+
+
+
 Running log. The results table near the bottom is refreshed automatically every 20 min
 by `scripts/snapshot_results.sh` (cron).
 
@@ -224,6 +234,111 @@ a properly trained baseline is far better than the broken one (2.34 vs 3.84).
 
 Figures: `notebooks/figs_sft/sft_curves_subspan_hide_lr3e3.png`.
 
+## CROSS-DOMAIN (hide, 3e-3, 150 batches) — retail + airline complete, finance partial
+
+| domain | baseline | Act-PRM (policy) | Act-PRM (base) | oracle | oracle gap | recovery (policy) |
+|---|---|---|---|---|---|---|
+| retail | 2.3422 | 2.2059 | 2.2003 | 2.1071 | **10.04%** | **58%** |
+| airline | 2.4506 | 2.3868 | 2.3981 | 2.3383 | **4.58%** | **57%** |
+| finance | 1.8930 | 1.8486* | running | 1.8589 | **1.80%** | 130%* |
+
+\* finance thoughts_policy still running at b104.
+
+Accuracy: retail 0.7726 / 0.7925 / 0.7973 (gap 2.47pp, 81% recovered); airline 0.7629 /
+0.7691 / 0.7732 (gap 1.03pp, 60%); finance 0.8398 / 0.8575 / 0.8455 (gap 0.57pp — Act-PRM
+above the oracle).
+
+**Finding 1 — the recovery fraction replicates.** 58% (retail) and 57% (airline) on PPL,
+across domains whose oracle gaps differ by more than 2×. This is the Act-PRM claim in its
+robust form: inferred thoughts capture a stable *fraction* of what expert thoughts buy.
+
+**Finding 2 — how much thoughts help at all is strongly domain-dependent** and shrinks
+sharply: 10.0% → 4.6% → 1.8%. On finance the expert-thought advantage is nearly nil.
+
+**Finding 3 — on finance the inferred thoughts currently BEAT the expert oracle**
+(1.8486 vs 1.8589 PPL; 0.8575 vs 0.8455 accuracy). Consistent with self-generated thoughts
+being better matched to the model than borrowed GPT-5-mini ones. But with a 1.80% oracle
+gap the recovery *ratio* is meaningless (the accuracy version comes out at 311%), so
+finance should be reported in absolute terms only: Act-PRM 2.3% better than baseline,
+expert thoughts 1.8% better — too close on a 25-task eval to rank.
+
+**Correction to an earlier claim.** From retail alone I concluded the effect "does not
+hinge on the scorer choice" (the two Act-PRM variants agreed to 0.006 PPL). Airline breaks
+that: `thoughts_base` recovers 47% PPL / 15% accuracy against `thoughts_policy`'s 57% /
+60%. The scorer choice *is* domain-dependent; the retail agreement was not general.
+
+## ROLLOUT EVAL (complete, hide regime): task completion inverts the PPL ranking
+
+Each policy acts in the live tau2 gym on **never-in-logs** tasks (retail 42, airline 18 —
+no expert demos, no training exposure) and is scored on task completion.
+
+| arm | retail (42) | airline (18) | PPL rank |
+|---|---|---|---|
+| actions_only | 11.9% | 50.0% | 4th |
+| expert_thoughts (oracle) | 11.9% (+0.0pp) | **33.3% (−16.7pp)** | **1st** |
+| thoughts_base | 16.7% (+4.8pp) | 44.4% (−5.6pp) | 2nd |
+| **thoughts_policy** | **21.4% (+9.5pp)** | **72.2% (+22.2pp)** | 3rd |
+
+**1. `thoughts_policy` is the result.** 1.8× baseline on retail, 1.44× on airline —
+consistent in direction and large in both. Combined 22/60 vs 14/60 against baseline.
+
+**2. Expert thoughts are not an upper bound on behaviour.** They have the best
+action-token PPL in every domain, yet deliver zero completion benefit on retail and a
+16.7pp penalty on airline. The model imitates GPT-5-mini's reasoning closely enough to
+lower perplexity without that reasoning improving — or while it degrades — its own acting.
+
+**3. Perplexity is the wrong yardstick here.** The completion ranking is nearly the
+inverse of the PPL ranking. Any Stage-2 conclusion drawn from PPL alone (including the
+"58% of the oracle gap" framing) describes prediction, not behaviour.
+
+**4. Scorer choice matters and base-scoring is unreliable**: +4.8pp retail, −5.6pp
+airline. Only the policy-scored variant is consistently positive. Consistent with the
+teacher-forced result where policy beat base in 2 of 3 domains.
+
+**Caveat: one rollout per task.** retail +9.5pp ≈ 1.7 binomial SE; airline +22.2pp ≈ 1.9
+SE (n=18, SE≈11.8pp). Individually suggestive, not significant; the cross-domain agreement
+is what carries it. Needs ≥3 rollouts/task before publication.
+
+Finance has no rollout number: its gym env was only ported here (from the recovered
+mz-airline branch) and has never been run or validated on this box.
+
+## VOLUME-MATCHED CONTROL (retail): the advantage is not a data artifact
+
+The retail thought corpora carried 1043 supervised steps against the baseline's 635 (the
+relabel emitted up to two generations per task; the export kept both). Retrained
+`thoughts_policy` on one generation per task -- 48 traj / 627 steps, matching the baseline
+-- with identical hyperparameters:
+
+| retail thoughts_policy | steps | final PPL | final acc |
+|---|---|---|---|
+| as run | 1043 | 2.2059 | 0.7925 |
+| **volume-matched** | **627** | **2.2119** | **0.7918** |
+| actions_only baseline | 635 | 2.3422 | 0.7726 |
+
+0.3% apart on PPL and 0.07pp on accuracy. The curves also track each other throughout
+(b10..b50: 3.136/3.033/2.897/2.740/2.594 matched vs 3.140/3.036/2.902/2.746/2.601 as-run).
+
+**So the retail Act-PRM advantage is not explained by extra supervision.** Combined with
+airline -- whose arms were already matched at 221 steps and which showed the *largest*
+effect (+22.2pp rollout) -- the volume confound is closed on both domains.
+
+### Rollout half (complete)
+
+| retail, 42 never-in-logs tasks | steps | completion | gains/loses vs base | McNemar p |
+|---|---|---|---|---|
+| actions_only (baseline) | 635 | 5/42 = 11.9% | — | — |
+| thoughts_policy, **matched** | **627** | **8/42 = 19.0%** | 5 / 2 | 0.453 |
+| thoughts_policy, as run | 1043 | 9/42 = 21.4% | 6 / 2 | 0.289 |
+
+The advantage survives volume-matching on the BEHAVIOURAL metric too: +7.1pp at matched
+supervision vs +9.5pp with 64% more data. The two Act-PRM runs also solve overlapping task
+sets (25, 65, 73 in both), which is what a real effect looks like rather than luck.
+
+**So the volume confound is closed on both domains and both metrics.** What is NOT closed
+is significance: neither arm reaches p<0.05 alone (0.29 / 0.45), and the pooled figure
+across retail+airline was 0.077. Only more rollouts per task fix that -- more arms cannot.
+
+
 ## Open questions
 
 - **Accuracy does not move.** At 1e-3, PPL improves 4.31% while held-out accuracy goes
@@ -252,7 +367,7 @@ retail/actions_only_lr1e_3_nb150                     hide  149     3.8307 ->   3
 
 2/2 arms complete   (Δ% = held-out action-subspan PPL improvement, higher is better)
 ```
-_last refreshed: 2026-08-21 02:40_
+_last refreshed: 2026-08-27 18:00_
 <!--/RESULTS-->
 
 ## Infrastructure
