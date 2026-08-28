@@ -79,6 +79,10 @@ class ActPrmGenerator(HuggingFaceGenerator):
         #   "top_half" — 1.0 on the better half by reward, else 0
         #   "uniform"  — 1.0 on every thought
         #   "grpo"     — mean-centered reward (r - mean), optionally /std; can be negative
+        #   "action_probs" — RAW length-normalised p(x|s,z), no group normalisation, the
+        #                    length penalty affects SELECTION only (Tinker's aprm_qwen3_ap)
+        #   "clamped"  — max(reward, 0) unnormalised: keeps the length penalty IN the
+        #                advantage, but drops the group-sum division that "em" applies
         advantage_mode: str = "em",
         grpo_normalize: bool = True,
         # Score p(x|s,z) with the frozen BASE model (LoRA disabled) instead of the
@@ -369,6 +373,29 @@ class ActPrmGenerator(HuggingFaceGenerator):
             a = np.zeros(g, dtype=np.float64)
             a[top] = 1.0
             return a
+        if mode == "clamped":
+            # Non-normalised advantage WITH the length penalty: max(lik - lp*len_frac, 0),
+            # no division by the group sum. Keeps the absolute quality of the step, which
+            # "em" discards -- under "em" a step whose G thoughts all score ~0.01 still gets
+            # total weight 1.0 and trains as hard as a step whose best thought scores 0.99.
+            # Clamped at 0 so a below-penalty thought contributes nothing rather than being
+            # actively pushed down (that is what "grpo" would do).
+            return np.maximum(np.array(rewards, dtype=np.float64), 0.0)
+        if mode == "action_probs":
+            # The Tinker reference's `reward_method: "action_probs"` -- the RAW
+            # length-normalised likelihood p(x|s,z) per candidate, with NO group
+            # normalisation. This is what the documented Tinker runs actually used
+            # (configs/generator/aprm_qwen3_ap.yaml, referenced by act_prm_sft_rl.py and
+            # act_prm_joint.py); its `em` config exists but no run command references it.
+            #
+            # Differs from "em" in what it preserves: "em" gives every logged action the
+            # same total weight 1.0, so a step where all G thoughts are poor trains just as
+            # hard as one where the best thought scores 0.99. Unnormalised keeps that
+            # absolute quality, so hopeless steps contribute proportionally less.
+            # Pair with --length_penalty 0 to match Tinker exactly: Tinker handles length by
+            # normalising the logprob SUM by token count (already done in `likelihoods`),
+            # not by our additional subtractive penalty.
+            return np.array(likelihoods, dtype=np.float64)
         if mode == "grpo":
             adv = r - r.mean()
             if self.grpo_normalize:
@@ -428,6 +455,52 @@ class ActPrmGenerator(HuggingFaceGenerator):
         from act_prm.environments.act_prm_traces.data import compact_observations
 
         action_indices = [i for i, m in enumerate(messages) if m["role"] == "assistant"]
+        # require_thought: train ONLY on assistant turns that carry reasoning before the
+        # action. Motivation: ~50% of GPT-5-mini's logged retail actions (46% airline) are
+        # a bare <tool_call> with no reasoning at all, so the expert_thoughts arm was
+        # taught "usually don't think" and at rollout it reasons before 0-8% of its tool
+        # calls. Filtering the TARGETS (not the messages) keeps every prior turn in the
+        # context -- state is still messages[:idx] -- so trajectories stay coherent.
+        #
+        # Applies to TRAIN ONLY by default. Filtering eval as well would score the arm on a
+        # different (and harder -- thought-bearing targets are longer) subset than every
+        # other arm, making the PPL/accuracy tables silently non-comparable; that bug
+        # inflated retail's mean eval target from 293.6 to 497.7 tokens and made
+        # expert_thoughts_all look 24% better than baseline on finance when it was 1.4%
+        # worse.
+        #
+        # `require_thought_eval` opts eval in as well. That is only sound when EVERY arm in
+        # the comparison sets it -- then the eval subset is identical across arms (so still
+        # comparable) AND on-distribution for all of them (each arm was trained on the same
+        # kind of turn). This is the insurance setup: all four arms train and evaluate on
+        # the 64% of turns that carry expert reasoning, which also removes the handicap that
+        # sank expert_thoughts elsewhere, where a third of its targets were bare tool calls.
+        _req_thought = getattr(self, "require_thought", False) or (
+            cfg is not None and cfg.get("require_thought", False)
+        )
+        _req_thought_eval = getattr(self, "require_thought_eval", False) or (
+            cfg is not None and cfg.get("require_thought_eval", False)
+        )
+        if _req_thought and (split == "train" or _req_thought_eval):
+            from act_prm.environments.act_prm_traces.data import extract_action as _xa
+
+            def _has_thought(i: int) -> bool:
+                c = messages[i].get("content") or ""
+                a = _xa(c)
+                if not a or c.find(a) < 0:
+                    return False  # no separable action -> not an action target
+                return len(c[: c.find(a)].strip()) >= 10
+
+            # NB: this decides targets from the CONTENT, so it only makes sense on a pool
+            # that keeps the expert reasoning. An actions_only pool has it stripped, so the
+            # check finds nothing and the arm would train on zero targets -- do not enable
+            # require_thought for a baseline arm.
+            _kept = [i for i in action_indices if _has_thought(i)]
+            logger.info(
+                "require_thought: %d/%d assistant turns carry reasoning (targets filtered)",
+                len(_kept), len(action_indices),
+            )
+            action_indices = _kept
         max_steps = self.max_steps_per_traj or getattr(env, "max_steps_per_traj", None) or len(action_indices)
         action_indices = action_indices[:max_steps]
 
