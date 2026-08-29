@@ -314,3 +314,63 @@ zero missing. Cause is benign and expected — 30 batches x 4 exceeds one epoch,
 trajectory revisited in epoch 2 gets a fresh `sample_id`, a fresh group, and a second
 export with its own relabeled thoughts. Effect is a ~6% upweighting of 3 trajectories,
 not a correctness bug, so it is **not** blocking Stage-2. Worth a `--dedupe` flag later.
+
+---
+
+## 08-28 — insurance `obs_max_chars: 4000`: justified, but costlier than the commit implies
+
+**Question raised:** was 4000 an OOM workaround, and is it still needed?
+
+**Provenance.** Yes, measured. Commit `22c1b0b`: uncapped, the M-step OOMed with 817 MiB
+free of 95 GiB. Insurance tool calls return whole SQL tables. The cap shipped alongside
+`--gradient_checkpointing` and `--no_initial_eval` in the same commit.
+
+**Still needed.** Peak GPU during the 08-28 EM is **70.7 GiB of 98**, *with* grad
+checkpointing on and the cap at 4000. There is no headroom to raise it, and none for a
+concurrent second run. (I briefly claimed otherwise off a 16 GiB reading — that was a
+trough between batches, not the peak. Sample GPU memory repeatedly, never once.)
+
+**But the stated cost is understated.** The commit says the cap "leaves 93% of
+observations untouched." True per-observation, and misleading, because the length
+distribution is extreme — p50 **265** chars, p90 2,612, p99 **48,446**, max 56,543:
+
+| cap | obs truncated | of all obs text | trajectories with >=1 truncation |
+|---|---|---|---|
+| 4,000 | 5.8% | **63% dropped** | **122/180 (68%)** |
+| 16,000 | 4.2% | 37% | 94/180 (52%) |
+| 32,000 | 1.1% | 10% | — |
+
+Truncation is **head-keeping** (`data.py:287`: `content[:cap] + " ...[truncated]"`), so a
+table dump keeps its first rows and loses the rest.
+
+**Does it damage the EM?** Measured best-of-group p(x|s,z), joining generation rows back
+to source trajectories and flagging steps whose visible state contains a truncated
+observation:
+
+- state INTACT (n=876): mean **0.7650**
+- state TRUNCATED (n=336): mean **0.7851**  (**+0.0201**)
+
+Truncated steps score *higher*. Reading the committed thoughts explains the split:
+- *Follow-up-query steps stay grounded.* One correctly observes the rows returned are for
+  NAICS 331110 rather than the 332618 it wants, and re-queries — reasoning that genuinely
+  does not need the table body.
+- *Terminal answer steps assert hidden specifics.* One concludes a B&B is out of appetite
+  "due to wood-frame construction ... underwriting rules explicitly state," justification
+  living past the cut. Another lists five qualifying lines of business when only some are
+  visible (correct, but unreadable from the visible state).
+
+**Interpretation — do not read +0.02 as reassurance.** The reward measures only whether a
+thought makes the *logged* action likely. An assertion that cannot be checked against the
+visible state is *easier* to make likely, not harder, so confabulation is rewarded rather
+than penalised. This is a corpus-quality risk confined to answer steps, and specific to
+insurance (the other three domains run uncapped).
+
+**Proposed fix (NOT applied; insurance was mid-run and a redo costs ~10h).** A bigger cap
+is not the lever — it does not fit in VRAM. Instead switch `data.py:287` to **middle-out**
+truncation: keep head + tail with a marker between. At identical token cost this preserves
+the end of a row dump and the table's shape, which is what the head-only cut destroys.
+Applies to any future insurance run; would need an A/B on answer-step thought quality
+(not on reward, which is the metric that cannot see the problem) to confirm it helps.
+
+**Status:** accepted as a known caveat for the insurance corpus. Split kept at 180 train /
+40 eval / 41 rollout for comparability with the other three domains.
