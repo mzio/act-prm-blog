@@ -12,6 +12,19 @@
 #   ACTION_ONLY=0 (whole-span loss; eval_actiononly_ppl/accuracy still reported).
 set -uo pipefail
 cd /home/mzio/projects/act-prm-blog
+
+# W&B: api.wandb.ai is NOT reachable through fwdproxy. Without this, main_pytorch inits
+# W&B online, the run hangs, and -- worse -- it hangs in atexit teardown
+# (service_connection.teardown -> service_process.join -> subprocess.wait) waiting on the
+# wandb service to flush, so the process looks ALIVE while doing nothing: 0% CPU, 4 MiB of
+# GPU, no stdout (block-buffered to the log and never flushed). run_stage1_r32.sh:52 sources
+# this; omitting it here cost a 21-minute no-op on 2026-08-29.
+[ -f scripts/wandb_preflight.sh ] && . scripts/wandb_preflight.sh
+# Unbuffered so a stall is visible in the log instead of sitting in a 4 KB stdio buffer.
+export PYTHONUNBUFFERED=1
+# Pin the model cache: an inherited HF_HOME (e.g. /home/mzio/models from an interactive
+# shell) points away from the populated cache the configs expect and triggers a re-download.
+export HF_HOME=/data/users/mzio/models/hf_cache
 MDIR=/tmp/aprm/stage2_adamw; mkdir -p "$MDIR"
 L="$MDIR/stage2_adamw.log"
 log(){ echo "[$(date '+%m-%d %H:%M:%S')] $*" | tee -a "$L"; }
