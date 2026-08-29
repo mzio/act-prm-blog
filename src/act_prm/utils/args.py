@@ -669,7 +669,7 @@ def get_args() -> argparse.Namespace:
         "resume_from",  # a long checkpoint path; must not go into the run name (filename too long)
         "project_name",
         "run_tag",  # prepended explicitly below; don't also auto-encode it
-        "dataset_path",  # a long path; run_tag/env already identify the run (kept the name < 255)
+        "dataset_path",  # long path; encoded compactly as -dp= below instead of inline
         "train_task_ids",  # explicit id lists can be 70+ ints; would blow up the run name
         "eval_task_ids",
         "early_stop_patience",  # a stopping knob, not part of the run's identity
@@ -680,6 +680,22 @@ def get_args() -> argparse.Namespace:
     if args.base_env_config is not None and args.base_env_config == args.env_config:
         _ignore_args.append("base_env_config")
     args.run_name = get_run_name(args, prefix=args.project_name, ignore_args=_ignore_args)
+
+    # dataset_path IS part of a run's identity, but its full path is too long to encode
+    # inline (that is why it sits in _ignore_args). Omitting it entirely was wrong: on
+    # 2026-08-29 the finance EM+relabel were re-pointed from data/snorkel_finance_split to
+    # data/snorkel_finance_split_v3 with the env CONFIG name unchanged, so both runs
+    # resolved to the SAME run dir and generations.jsonl was appended to -- merging two
+    # pools' rows under colliding sample_ids. Encode a short readable leaf + a digest of
+    # the full path so different pools always land in different dirs.
+    _dsp = getattr(args, "dataset_path", None)
+    if _dsp:
+        import hashlib as _hl
+
+        _leaf = str(_dsp).rstrip("/").split("/")[-1][:28]
+        _leaf = "".join(c if c.isalnum() else "_" for c in _leaf)
+        _dg = _hl.md5(str(_dsp).encode()).hexdigest()[:4]
+        args.run_name += f"-dp={_leaf}_{_dg}"
     if args.run_tag:
         # Sanitize like get_run_name does, then prepend so the leaf dir is self-describing.
         _tag = str(args.run_tag).replace("-", "_").replace(".", "_").replace("/", "_")

@@ -22,6 +22,7 @@ trajectory-group helpers from :class:`HuggingFaceGenerator`.
 """
 
 import logging
+import os
 from copy import copy
 from typing import Any
 
@@ -117,6 +118,20 @@ class ActPrmGenerator(HuggingFaceGenerator):
         self.generations_path = (
             generations_path if generations_path else f"{_log_path}/generations.jsonl"
         )
+        # Rows are APPENDED, so a pre-existing file from an earlier run in this same dir
+        # would silently merge two passes -- colliding sample_ids make the (split,
+        # sample_id) -> source-trajectory join in scripts/export_sft_corpus.py ambiguous
+        # and the corpus comes out truncated. Rotate instead of appending. (Happened
+        # 2026-08-29 on the finance v3 redo; see that run dir's README_APPEND_BUG.txt.)
+        if self.save_generations and os.path.exists(self.generations_path):
+            _n = 0
+            while os.path.exists(f"{self.generations_path}.prev{_n}"):
+                _n += 1
+            os.rename(self.generations_path, f"{self.generations_path}.prev{_n}")
+            print(
+                f"NOTE: rotated pre-existing generations log to "
+                f"{os.path.basename(self.generations_path)}.prev{_n}"
+            )
 
     # ------------------------------------------------------------------
     # tokenization helpers
