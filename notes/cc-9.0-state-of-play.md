@@ -374,3 +374,48 @@ Applies to any future insurance run; would need an A/B on answer-step thought qu
 
 **Status:** accepted as a known caveat for the insurance corpus. Split kept at 180 train /
 40 eval / 41 rollout for comparability with the other three domains.
+
+---
+
+## 08-28 — HF publisher prepped for the AdamW generation (nothing pushed yet)
+
+**Goal.** Publish the Stage-1 relabel passes' *full E-step* (all G thoughts with
+`rewards` / `likelihoods` / `thought_tokens` / `best_index`) so the corpus can be
+re-derived downstream as top-1 / top-half / EM-weighted. `export_sft_corpus.py` commits
+only `thoughts[best]`, so the log dirs are the irreplaceable artifact; the corpus is not.
+
+**Naming decision.** New repos with suffix `-policy_best-adamw30-lp0` rather than
+overwriting. `mzio/aprm-sft-thoughts-tau2-retail` already exists **public**, 7 files,
+modified 07-28 — that is the SGD-era data the blog currently describes. Overwriting it
+with a materially different setup (SGD->AdamW, lp 0.15->0, 4 variants->1) would silently
+invalidate the published record.
+
+**Changes to `scripts/export_sft_dataset_hf.py`** (all offline; no push performed):
+1. `--variants "split=run_tag,..."` — the hardcoded 2-scorer x 2-checkpoint `VARIANTS`
+   list only matched `<domain>_s1relabel_<scorer>_<ckpt>_heldout-*` dirs. Default
+   behaviour preserved when the flag is omitted.
+2. `LENGTH_PENALTY = 0.15` was a module constant stamped into the published reward column
+   and card. Now read per-run from `config.json`; the card renders
+   `reward(z) = p(x|s,z)` with no penalty term when lp is 0. Verified: these runs are
+   lp=0.0 and `rewards == likelihoods` exactly.
+3. Card de-hardcoded: `%%SUITE%%`, dynamic `%%SPLIT_CONFIG%%` and `%%VARIANT_TABLE%%`
+   (it assumed tau2 and exactly four splits).
+
+**Unforeseen problem — the manifest asserted `optimizer: "sgd"`.** The relabel pass runs
+`--no_train`, so its `config.json` optimizer sits at the default `"sgd"`; the driver only
+passes `--optimizer` to the EM step. Reading hparams from the relabel config would have
+published the exact opposite of this project's headline finding. **Fix that worked:**
+follow the relabel's `resume_from` checkpoint path back to the EM run's own log dir and
+read *its* config, reported under a separate `em` key and as a provenance table in the
+card. Now correctly shows optimizer adamw / lr 4e-5 / nb 30 / action_probs / r32_a32.
+
+**Dry runs (`--no-push`).**
+- retail: 756 rows (664 train G=4, 92 eval G=1), unresolved=0 -> OK
+- airline: 276 rows (239 train, 37 eval), unresolved=0 -> OK
+- finance adamw30: **integrity FAILED, exit 1, refused to push** — independent
+  confirmation that the invalid leaky-split corpus cannot reach the Hub by accident.
+  (Note: the publisher already gated on `n_unresolved == 0` before any of this work, so
+  it never needed the `--min-coverage` guard added to `export_sft_corpus.py`.)
+
+**Status:** ready to run. Awaiting finance v3 (~05:00 Sat) and insurance relabel, then a
+single consistent 4-domain push — which needs explicit go-ahead, being public.
