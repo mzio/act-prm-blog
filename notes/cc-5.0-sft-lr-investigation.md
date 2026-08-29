@@ -362,13 +362,13 @@ across retail+airline was 0.077. Only more rollouts per task fix that -- more ar
 ```
 arm                                                  reg     b   eval ppl first->last      Δ%     acc  train ao ppl
 ----------------------------------------------------------------------------------------------------------------------
-retail/actions_only_lr1e_3_adamw_nb150               hide   10     1.9265 ->   1.9265   0.00%  0.8119        1.0625  <running>
+retail/actions_only_lr1e_3_adamw_nb150               hide   30     1.9265 ->   1.7990   6.62%  0.8293        1.4219  <running>
 retail/actions_only_lr1e_3                           hide   59     3.8355 ->   3.6702   4.31%  0.7609        1.6094
 retail/actions_only_lr1e_3_nb150                     hide  149     3.8307 ->   3.0719  19.81%  0.7652        2.1719
 
 2/3 arms complete   (Δ% = held-out action-subspan PPL improvement, higher is better)
 ```
-_last refreshed: 2026-08-29 16:00_
+_last refreshed: 2026-08-29 16:20_
 <!--/RESULTS-->
 
 ## Infrastructure
