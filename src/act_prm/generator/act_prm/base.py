@@ -45,6 +45,9 @@ from .prompts import (
 
 logger = logging.getLogger(__name__)
 
+# generations-log paths already rotated by THIS process (see ActPrmGenerator.__init__).
+_ROTATED_LOGS: set[str] = set()
+
 
 def em_weights(penalized_rewards: list[float], likelihoods: list[float]) -> np.ndarray:
     """Group-normalized EM weights from possibly-negative penalized rewards:
@@ -123,15 +126,25 @@ class ActPrmGenerator(HuggingFaceGenerator):
         # sample_id) -> source-trajectory join in scripts/export_sft_corpus.py ambiguous
         # and the corpus comes out truncated. Rotate instead of appending. (Happened
         # 2026-08-29 on the finance v3 redo; see that run dir's README_APPEND_BUG.txt.)
-        if self.save_generations and os.path.exists(self.generations_path):
-            _n = 0
-            while os.path.exists(f"{self.generations_path}.prev{_n}"):
-                _n += 1
-            os.rename(self.generations_path, f"{self.generations_path}.prev{_n}")
-            print(
-                f"NOTE: rotated pre-existing generations log to "
-                f"{os.path.basename(self.generations_path)}.prev{_n}"
-            )
+        # Rotate ONCE PER PROCESS, not per construction. The generator is constructed
+        # repeatedly within a single run (rl.py builds one for the eval pass, the
+        # save-rollouts pass and each train-rollout pass), so rotating on every __init__
+        # scatters one run's rows across a dozen .prevN files and leaves only the last
+        # pass in generations.jsonl -- which would silently truncate the Stage-1 corpus,
+        # the exact failure this guard exists to prevent. Rotating once per process still
+        # stops a NEW run from appending to a previous run's file (the 08-29 finance bug,
+        # where two pools' rows merged under colliding sample_ids).
+        if self.save_generations and self.generations_path not in _ROTATED_LOGS:
+            _ROTATED_LOGS.add(self.generations_path)
+            if os.path.exists(self.generations_path):
+                _n = 0
+                while os.path.exists(f"{self.generations_path}.prev{_n}"):
+                    _n += 1
+                os.rename(self.generations_path, f"{self.generations_path}.prev{_n}")
+                print(
+                    f"NOTE: rotated pre-existing generations log to "
+                    f"{os.path.basename(self.generations_path)}.prev{_n}"
+                )
 
     # ------------------------------------------------------------------
     # tokenization helpers
