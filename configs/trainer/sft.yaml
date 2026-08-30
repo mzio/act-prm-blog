@@ -63,6 +63,13 @@ no_initial_eval: false
 # over act_prm_eval (offline SFT early-stop); "eval_action_accuracy" -> highest
 # target-token argmax accuracy; "final_reward" (default) -> mean p(x|s,z).
 best_metric: "final_reward"
+# Early stop: stop if best_metric hasn't improved for this many EVAL checks (0 = off).
+# SFTTrainer subclasses RLTrainer, so the logic (rl.py, "EARLY STOP at step") was always
+# inherited -- but update_configs only overrides keys a config ALREADY has, so without
+# this line --early_stop_patience was silently dropped for every SFT run and the flag did
+# nothing. That cost a full 150-batch retail arm on 2026-08-29 whose eval action-PPL had
+# already bottomed out at batch 20 and then degraded 33%.
+early_stop_patience: 0
 
 # Rollout saving
 save_rollouts_every: 0

@@ -19,13 +19,15 @@ for wordiness rather than for mispredicting the action, which inverts the rankin
 | thoughts_policy | full | 3.0003 | 0.8038 | 59 | 3.4046 | 0.7697 | 59 | 1.0355 |
 | thoughts_base | hide | 3.1735 | 0.7819 | 59 | 3.7098 | 0.7454 | 59 | 0.9361 |
 | thoughts_base | full | 2.9999 | 0.8035 | 30 | 3.4093 | 0.7717 | 59 | 0.6225 |
-| actions_only_lr1e_3_adamw_nb150 | hide | 1.7915 | 0.8259 | 20 | 1.7915 | 0.8259 | 20 | 0.0533 |
+| actions_only_lr1e_3_adamw_nb100 | hide | — | — | — | — | — | — | 0.0601 |
+| actions_only_lr1e_3_adamw_nb150 | hide | 1.7915 | 0.8259 | 20 | 1.7915 | 0.8259 | 20 | 0.0282 |
 | actions_only_lr1e_3 | hide | 3.6702 | 0.7609 | 59 | 3.6702 | 0.7609 | 59 | 0.4756 |
 | actions_only_lr1e_3_nb150 | hide | 3.0719 | 0.7652 | 149 | 3.0719 | 0.7652 | 149 | 0.7723 |
 | actions_only_lr1e_4 | hide | 3.8346 | 0.7606 | 50 | 3.8346 | 0.7606 | 50 | 0.5078 |
 | actions_only_lr3e_3_nb150 | hide | 2.3422 | 0.7726 | 149 | 2.3422 | 0.7726 | 149 | 0.5186 |
 | expert_thoughts_all_lr3e_3_nb150 | hide | 2.2503 | 0.7771 | 149 | 3.5330 | 0.6704 | 149 | 1.3412 |
 | expert_thoughts_all_lr3e_3_nb150_fixeval | hide | 2.1192 | 0.7947 | 149 | 3.1807 | 0.6974 | 149 | 1.3447 |
+| expert_thoughts_lr1e_3_adamw_nb100 | hide | 1.7999 | 0.8280 | 10 | 2.7352 | 0.7232 | 10 | 0.7093 |
 | expert_thoughts_lr3e_3_nb150 | hide | 2.1071 | 0.7973 | 149 | 3.2141 | 0.6958 | 149 | 0.5808 |
 | thoughts_base_last | hide | 3.1928 | 0.7784 | 59 | 3.6738 | 0.7401 | 59 | 0.9956 |
 | thoughts_base_lr3e_3_nb150 | hide | 2.2003 | 0.7890 | 149 | 2.3705 | 0.7610 | 149 | 0.6979 |
@@ -52,6 +54,7 @@ that saved step:
 | thoughts_policy | full | 3.0003 | 0.8038 |
 | thoughts_base | hide | 3.1735 | 0.7819 |
 | thoughts_base | full | 3.0008 | 0.8030 |
+| actions_only_lr1e_3_adamw_nb100 | hide | — | — |
 | actions_only_lr1e_3_adamw_nb150 | hide | 1.7915 | 0.8259 |
 | actions_only_lr1e_3 | hide | 3.6702 | 0.7609 |
 | actions_only_lr1e_3_nb150 | hide | 3.0719 | 0.7652 |
@@ -59,6 +62,7 @@ that saved step:
 | actions_only_lr3e_3_nb150 | hide | 2.3422 | 0.7726 |
 | expert_thoughts_all_lr3e_3_nb150 | hide | 2.2503 | 0.7771 |
 | expert_thoughts_all_lr3e_3_nb150_fixeval | hide | 2.1192 | 0.7947 |
+| expert_thoughts_lr1e_3_adamw_nb100 | hide | 1.7999 | 0.8280 |
 | expert_thoughts_lr3e_3_nb150 | hide | 2.1071 | 0.7973 |
 | thoughts_base_last | hide | 3.1928 | 0.7784 |
 | thoughts_base_lr3e_3_nb150 | hide | 2.2003 | 0.7890 |

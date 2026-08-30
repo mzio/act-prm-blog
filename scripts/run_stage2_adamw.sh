@@ -37,7 +37,7 @@ declare -A ENVOF=(
   [insurance]=act_prm/snorkel_insurance
 )
 LR="${LR:-1e-3}"; OPTIMIZER="${OPTIMIZER:-adamw}"
-NUM_BATCHES="${NUM_BATCHES:-150}"; EVAL_EVERY="${EVAL_EVERY:-10}"
+NUM_BATCHES="${NUM_BATCHES:-100}"; EVAL_EVERY="${EVAL_EVERY:-10}"
 
 log "=== Stage-2 $OPTIMIZER lr=$LR nb=$NUM_BATCHES corpus=policy_adamw30 domains='$DOMAINS' ==="
 for dom in $DOMAINS; do
