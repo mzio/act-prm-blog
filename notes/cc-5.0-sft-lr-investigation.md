@@ -373,11 +373,11 @@ airline/actions_only_lr1e_3_adamw_nb100              hide   50     2.1901 ->   3
 airline/expert_thoughts_lr1e_3_adamw_nb100           hide   50     2.0737 ->   3.1936 -54.00%  0.7913        1.0000  <running>
 airline/thoughts_policy_adamw30_lr1e_3_adamw_nb100   hide   50     2.0724 ->   3.4621 -67.06%  0.7952        1.0000  <running>
 snorkel_finance_split/actions_only_lr1e_3_adamw_nb100 hide   80     1.7603 ->   1.6942   3.75%  0.8648        1.0391  <running>
-snorkel_finance_split/expert_thoughts_lr1e_3_adamw_nb100 hide   47     1.6835 ->   1.6081   4.48%  0.8682        1.8750  <running>
+snorkel_finance_split/expert_thoughts_lr1e_3_adamw_nb100 hide   68     1.6835 ->   1.6111   4.30%  0.8699        1.0391  <running>
 
 2/11 arms complete   (Δ% = held-out action-subspan PPL improvement, higher is better)
 ```
-_last refreshed: 2026-08-30 09:00_
+_last refreshed: 2026-08-30 09:20_
 <!--/RESULTS-->
 
 ## Infrastructure
