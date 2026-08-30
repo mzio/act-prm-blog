@@ -369,11 +369,11 @@ retail/actions_only_lr1e_3_nb150                     hide  149     3.8307 ->   3
 retail/expert_thoughts_lr1e_3_adamw_nb100            hide   60     1.8014 ->   1.7078   5.20%  0.8487        1.0000  <running>
 retail/expert_thoughts_lr1e_3_adamw_nb100            hide   30     1.7999 ->   1.6634   7.58%  0.8463        1.0000  <running>
 retail/thoughts_policy_adamw30_lr1e_3_adamw_nb100    hide   70     1.8959 ->   1.9718  -4.00%  0.8345        1.3828  <running>
-airline/actions_only_lr1e_3_adamw_nb100              hide    8         (no evals yet)
+airline/actions_only_lr1e_3_adamw_nb100              hide   32     2.1901 ->   2.3495  -7.27%  0.7902        1.2734  <running>
 
-2/6 arms complete   (Δ% = held-out action-subspan PPL improvement, higher is better)
+2/7 arms complete   (Δ% = held-out action-subspan PPL improvement, higher is better)
 ```
-_last refreshed: 2026-08-30 05:00_
+_last refreshed: 2026-08-30 05:20_
 <!--/RESULTS-->
 
 ## Infrastructure
