@@ -371,7 +371,7 @@ retail/expert_thoughts_lr1e_3_adamw_nb100            hide   30     1.7999 ->   1
 
 2/4 arms complete   (Δ% = held-out action-subspan PPL improvement, higher is better)
 ```
-_last refreshed: 2026-08-29 21:00_
+_last refreshed: 2026-08-29 21:20_
 <!--/RESULTS-->
 
 ## Infrastructure
