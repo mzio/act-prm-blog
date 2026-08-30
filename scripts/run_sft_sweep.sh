@@ -77,7 +77,10 @@ corpus_ok(){ [ -s "$1/train.json" ] && [ "$(python3 -c "import json;print(len(js
 run_one(){  # $1=sft_variant  $2=label(run_tag)  $3=regime(hide|full)  $4..=extra flags
   local variant=$1 label=$2 regime=$3; shift 3
   if [ -n "$ONLY" ] && [[ " $ONLY " != *" $label "* ]]; then return 0; fi
-  local tag="${DOM}_s2_${label}${AOTAG}${LRTAG}${NBTAG}_heldout"; [ "$regime" = full ] && tag="${tag}_fullctx"
+  # TAGSFX distinguishes otherwise-identical configs that differ by a CODE change
+  # (e.g. _rshuffle for the per-epoch-reshuffle fix), so the runs land in separate dirs
+  # and separate .done markers instead of colliding with the previous generation.
+  local tag="${DOM}_s2_${label}${AOTAG}${LRTAG}${NBTAG}${TAGSFX:-}_heldout"; [ "$regime" = full ] && tag="${tag}_fullctx"
   # Completion is marked by an explicit .done file, NOT by step_best: step_best is
   # written at the FIRST eval (batch 10), so an interrupted run would otherwise look
   # finished and be skipped forever, silently leaving a half-trained arm in the matrix.

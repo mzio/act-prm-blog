@@ -230,7 +230,11 @@ class RLTrainer(BaseTrainer):
         # MZ 03/07/2026: just set this to 1 for now
         dataloader_batch_size = 1
 
-        wen_shuffle = len(env.datasets["train"])
+        # 0, not len(train): initialising to the pool size meant the condition
+        # `rl_start_idx + batch_size > wen_shuffle` stayed false for the whole FIRST
+        # epoch, so epoch 1 always ran in raw on-disk pool order and the first shuffle
+        # only fired at the epoch-1/2 boundary.
+        wen_shuffle = 0
 
         for batch_idx in range(0, num_steps):
             metrics = {

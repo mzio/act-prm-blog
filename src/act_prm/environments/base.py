@@ -125,7 +125,14 @@ class Environment(ABC):
         Shuffle environment's samples (e.g., after going through all during training)
         """
         split = split or self.split
-        np.random.seed(seed or self.seed)
+        # Advance the seed per call. Re-seeding with the CONSTANT self.seed made every
+        # epoch's permutation IDENTICAL, so from epoch 2 on the model saw the same order
+        # and the same batch composition forever -- most of the way to not shuffling at
+        # all. (Found 2026-08-30 from a batch-25-35 bump that recurred at a fixed offset
+        # in both insurance arms.) Still fully deterministic given self.seed.
+        self._shuffle_count = getattr(self, "_shuffle_count", 0) + 1
+        base_seed = self.seed if seed is None else seed
+        np.random.seed((base_seed + 1_000_003 * self._shuffle_count) % (2**32 - 1))
         ds = self.datasets[split]
         indices = np.arange(len(ds))
         np.random.shuffle(indices)
