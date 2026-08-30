@@ -13,6 +13,13 @@
 # Cron entry: */5 * * * * /home/mzio/projects/act-prm-blog/scripts/sweep_guard.sh
 set -uo pipefail
 cd "$(dirname "$0")/.." || exit 0
+
+# Manual kill-switch. Every gate below competes for the single GPU, so when a
+# long foreground sweep owns the box the guard must stand down completely -- the
+# busy-check further down only covers the instant a driver is ALIVE, and on
+# 2026-08-29 a Stage-2 crash at 19:19 let the guard relaunch a broken rollout
+# 33s later and burn seven hours. Remove the file to re-enable.
+[ -f /tmp/aprm/GUARD_PAUSED ] && exit 0
 export PATH="$HOME/.local/bin:$HOME/.cargo/bin:/usr/local/bin:/usr/bin:/bin:$PATH"
 export HF_HUB_OFFLINE=${HF_HUB_OFFLINE:-0}
 G=/tmp/aprm; mkdir -p "$G"
