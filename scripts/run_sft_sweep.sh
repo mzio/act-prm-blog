@@ -92,7 +92,7 @@ run_one(){  # $1=sft_variant  $2=label(run_tag)  $3=regime(hide|full)  $4..=extr
   # overwriting the finished curve.
   if [ -f "$MDIR/${tag}.done" ]; then log "$tag: completed by another driver while waiting, skip"; return 0; fi
   env "${fc[@]}" ./scripts/train_sft.sh "$ENVCFG" "$variant" \
-      --run_tag "$tag" --best_metric eval_action_ppl \
+      --run_tag "$tag" --best_metric eval_actiononly_ppl \
       "${LR_ARGS[@]}" "${OPT_ARGS[@]}" "${EXTRA[@]}" "$@" > "$MDIR/${tag}.log" 2>&1 \
     && { touch "$MDIR/${tag}.done"; log "$tag: done"; } || log "$tag: FAILED (see $MDIR/${tag}.log)"
 }

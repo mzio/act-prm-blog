@@ -59,9 +59,19 @@ eval_every: 10
 save_every: 20
 no_initial_eval: false
 # best_metric selects the step_best checkpoint on the eval metric whose key
-# contains this substring. "eval_action_ppl" -> lowest action-token perplexity
-# over act_prm_eval (offline SFT early-stop); "eval_action_accuracy" -> highest
-# target-token argmax accuracy; "final_reward" (default) -> mean p(x|s,z).
+# contains this substring.
+#   "eval_actiononly_ppl"  -> lowest ACTION-SUB-SPAN perplexity. USE THIS for SFT: it is
+#                             the metric report_sft_sweep.py plots and the only one that is
+#                             comparable across arms.
+#   "eval_action_ppl"      -> whole TARGET span (thought + action). NOT action-only despite
+#                             the name. Identical to the above for actions_only (no
+#                             reasoning prefix) but very different for thought arms
+#                             (retail expert_thoughts b20: 2.5600 whole vs 1.6901 action-
+#                             only), so selecting on it picks step_best partly on how well
+#                             the model reproduces THOUGHTS. Was the sweep default until
+#                             2026-08-29.
+#   "eval_action_accuracy" -> highest whole-target-span argmax accuracy.
+#   "final_reward"         -> mean p(x|s,z) (the RL default).
 best_metric: "final_reward"
 # Early stop: stop if best_metric hasn't improved for this many EVAL checks (0 = off).
 # SFTTrainer subclasses RLTrainer, so the logic (rl.py, "EARLY STOP at step") was always
