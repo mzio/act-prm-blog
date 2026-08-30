@@ -366,11 +366,11 @@ retail/actions_only_lr1e_3_adamw_nb100               hide    3         (no evals
 retail/actions_only_lr1e_3_adamw_nb150               hide  125     1.9265 ->   2.3890 -24.01%  0.8322        1.0312  <running>
 retail/actions_only_lr1e_3                           hide   59     3.8355 ->   3.6702   4.31%  0.7609        1.6094
 retail/actions_only_lr1e_3_nb150                     hide  149     3.8307 ->   3.0719  19.81%  0.7652        2.1719
-retail/expert_thoughts_lr1e_3_adamw_nb100            hide   10     1.7999 ->   1.7999   0.00%  0.8280        1.0000  <running>
+retail/expert_thoughts_lr1e_3_adamw_nb100            hide   25     1.7999 ->   1.6901   6.10%  0.8416        1.0156  <running>
 
 2/4 arms complete   (Δ% = held-out action-subspan PPL improvement, higher is better)
 ```
-_last refreshed: 2026-08-29 18:40_
+_last refreshed: 2026-08-29 19:00_
 <!--/RESULTS-->
 
 ## Infrastructure
