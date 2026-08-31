@@ -30,6 +30,13 @@ def get_trainer(name: str, **kwargs: Any) -> Any:
 
         return SFTTrainer(**kwargs)
 
+    if name == "sft_flat":
+        # Corpus-wide step-level SFT (see trainers/sft_flat.py). Kept as a SEPARATE
+        # trainer so the 12 Stage-2 arms produced on the "sft" path stay reproducible.
+        from .trainers.sft_flat import SFTFlatTrainer
+
+        return SFTFlatTrainer(**kwargs)
+
     raise NotImplementedError(f"Trainer {name} not implemented")
 
 

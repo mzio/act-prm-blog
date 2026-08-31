@@ -592,6 +592,15 @@ def get_args() -> argparse.Namespace:
         ),
     )
     parser.add_argument(
+        "--steps_per_batch",
+        type=int,
+        help=(
+            "sft_flat only: EFFECTIVE gradient batch size in STEPS, sampled corpus-wide. "
+            "The sft trainer's equivalent is implicit (~64-70 = every step of `batch_size` "
+            "trajectories), so pass 8 / 32 / 64 here to compare like for like."
+        ),
+    )
+    parser.add_argument(
         "--mini_batch_size",
         type=int,
         help=(

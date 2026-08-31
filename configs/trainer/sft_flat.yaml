@@ -1,0 +1,114 @@
+# Supervised fine-tuning trainer for Act-PRM.
+# Same rollout/eval/checkpoint loop as pg, but compute_loss is plain
+# (advantage-weighted) cross-entropy on the (thought+action) span — no PPO ratio.
+# Pair with a generator advantage_mode:
+#   - best      : MLE SFT on the single best thought per group
+#   - em        : soft-distill (EM-weighted over the group)
+#   - top_half  : train on the better half of the group (uniform)
+#   - uniform   : train on all G thoughts equally
+# or with generator.infer_thoughts=false for the actions-only baseline.
+trainer_name: sft_flat
+supervised_fine_tuning: true
+balance_advantages: false
+
+model_name: null
+
+tool_call_kwargs:
+  tool_call_bos: "<tool_call>"
+  tool_call_eos: "</tool_call>"
+  tool_call_argname: "arguments"
+
+# Generation (E-step rollouts)
+num_batches: 200
+num_tries: null
+eval_num_tries: null
+max_tokens: 1024
+temperature: 1.0
+max_input_id_len: null
+max_seq_len: 8192
+
+batch_size: 8
+group_size: 4
+eval_group_size: 1
+num_return_sequences: null
+
+# Training (M-step policy updates)
+learning_rate: 4e-5
+# MUST be declared here: update_configs only applies a CLI flag whose key already exists in
+# a config, so without this line --optimizer is silently dropped. Left at sgd to preserve
+# the behaviour every existing result was produced under; pass --optimizer adamw explicitly.
+optimizer: "sgd"
+# Keep a numbered step_NNNN snapshot each save_every batches (~253MB each at r32), in
+# addition to the overwritten step_last. Without this an early good checkpoint is lost.
+keep_step_checkpoints: true
+discount_factor: 0.9
+loss_fn: "cross_entropy"
+num_substeps: 1
+mini_batch_size: null
+dataloader_batch_size: 1
+# Drop zero-advantage samples from the batch (best/top_half train only the kept
+# thoughts; without this the dropped thoughts waste compute + dilute the update).
+drop_zero_advantage: true
+
+compute_post_kl: false
+kl_penalty_coef: 0.0
+kl_discount_factor: 0.0
+
+# Checkpointing / eval
+eval_every: 10
+save_every: 20
+no_initial_eval: false
+# best_metric selects the step_best checkpoint on the eval metric whose key
+# contains this substring.
+#   "eval_actiononly_ppl"  -> lowest ACTION-SUB-SPAN perplexity. USE THIS for SFT: it is
+#                             the metric report_sft_sweep.py plots and the only one that is
+#                             comparable across arms.
+#   "eval_action_ppl"      -> whole TARGET span (thought + action). NOT action-only despite
+#                             the name. Identical to the above for actions_only (no
+#                             reasoning prefix) but very different for thought arms
+#                             (retail expert_thoughts b20: 2.5600 whole vs 1.6901 action-
+#                             only), so selecting on it picks step_best partly on how well
+#                             the model reproduces THOUGHTS. Was the sweep default until
+#                             2026-08-29.
+#   "eval_action_accuracy" -> highest whole-target-span argmax accuracy.
+#   "final_reward"         -> mean p(x|s,z) (the RL default).
+best_metric: "final_reward"
+# Early stop: stop if best_metric hasn't improved for this many EVAL checks (0 = off).
+# SFTTrainer subclasses RLTrainer, so the logic (rl.py, "EARLY STOP at step") was always
+# inherited -- but update_configs only overrides keys a config ALREADY has, so without
+# this line --early_stop_patience was silently dropped for every SFT run and the flag did
+# nothing. That cost a full 150-batch retail arm on 2026-08-29 whose eval action-PPL had
+# already bottomed out at batch 20 and then degraded 33%.
+early_stop_patience: 0
+
+# Rollout saving
+save_rollouts_every: 0
+num_tasks_per_save: null
+save_rollouts_to_hub: false
+
+# Other
+base_url: null
+log_path: "./logs"
+load_checkpoint_path: null
+checkpoint_path: "./checkpoints"
+push_to_hub: false
+wandb_project: null
+wandb_name: null
+
+# Supervise ONLY the action tokens (<tool_call>...</tool_call> or a "Final Answer:"
+# suffix), masking the reasoning prefix out of the loss. The thought stays in the
+# INPUT and still conditions the prediction — we just take no gradient on producing
+# it. This makes the trained span identical to the span eval_actiononly_* scores, so
+# the variants are comparable on a same-span basis; otherwise the thought arms spend
+# most of their gradient on tokens the metric never looks at. No-op for actions_only.
+train_action_only: false
+
+# Train only on assistant turns with reasoning before the action (see --require_thought).
+# Off by default; the expert_thoughts_all arm switches it on.
+require_thought: false
+
+# --- sft_flat only -------------------------------------------------------------
+# steps_per_batch: the EFFECTIVE gradient batch, in STEPS, drawn corpus-wide. The
+# sft.py path's equivalent is implicit (~64-70: every step of `batch_size`
+# trajectories); here it is explicit, so 8 / 32 / 64 are directly comparable.
+steps_per_batch: 32

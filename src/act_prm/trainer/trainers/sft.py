@@ -279,6 +279,10 @@ class SFTTrainer(RLTrainer):
             actiononly_accuracy = token_accuracy
             action_token_frac = 1.0
 
+        _n_label_tokens_out = num_label_tokens.item() if hasattr(num_label_tokens, "item") else num_label_tokens
+        _n_action_tokens_out = (
+            _amask.sum().item() if _amask is not None else _n_label_tokens_out
+        )
         mean_advantage = (advantages.sum() / num_label_tokens).item()
         per_seq_gen_lens = label_mask.sum(dim=-1).tolist()
         num_gen_tokens = sum(per_seq_gen_lens) / len(per_seq_gen_lens) if per_seq_gen_lens else 0.0
@@ -293,6 +297,11 @@ class SFTTrainer(RLTrainer):
             "actiononly_accuracy": actiononly_accuracy,
             "action_token_frac": action_token_frac,
             "action_accuracy": token_accuracy,
+            # Token counts so a caller aggregating over batches can do a TOKEN-WEIGHTED
+            # mean. Averaging per-batch means is wrong here: action spans range ~57-973
+            # tokens, so short batches would count as much as long ones.
+            "n_label_tokens": float(_n_label_tokens_out),
+            "n_action_tokens": float(_n_action_tokens_out),
             "advantage": mean_advantage,
             "num_gen_tokens": num_gen_tokens,
         }
