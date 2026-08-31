@@ -297,5 +297,215 @@ class SFTTrainer(RLTrainer):
             "num_gen_tokens": num_gen_tokens,
         }
 
+    def train(
+        self,
+        llm: HuggingFaceLLM | None = None,
+        optimizer: Optimizer | Any | None = None,
+        cfg: DictConfig | None = None,
+        env: Environment | None = None,
+        eval_env: Environment | None = None,
+        eval_every: int | None = None,
+        # Specify training duration
+        num_steps: int | None = None,
+        num_substeps: int | None = None,
+        # Other identifiers
+        checkpoint_name: str | None = None,
+        name_or_identifier: str | None = None,
+        **generate_and_save_trajectories_kwargs: Any,
+    ) -> HuggingFaceLLM:
+        """
+        Implement SFT training loop while adhering to RLTrainer interface.
+
+        Given the Act-PRM environment with full (thought)-action trajectories, we:
+        1. 
+        
+        entire Policy Gradient training loop for Hugging Face Transformer (PEFT) model (llm.model)
+        """
+        pass
+
+    def _dispatch_rollouts(self, **kwargs):
+        """
+        For SFT traiining, we assume env is an ActPrmTracesEnv, so we have full (thought)-action
+        trajectories already for training. We "generate rollouts" by sampling from these
+        """
+        return run_rollouts(**kwargs)
+
+    def run_rollouts(
+    llm: HuggingFaceLLM,
+    hf_tokenizer: PreTrainedTokenizerBase,
+    generator_constructor: Callable[..., HuggingFaceGenerator],
+    env: Environment,
+    cfg: DictConfig,
+    batch_id: int,
+    checkpoint_name: str | None = None,
+    split: str = "train",
+    num_tries: int = 1,
+    start_idx: int = 0,
+    tasks_per_update: int | None = None,  # i.e., batch_size
+    name_or_identifier: str | None = None,
+    # Overrides for generation
+    max_tokens: int | None = None,
+    temperature: float | None = None,
+    pbar_position: int = 0,
+    num_return_sequences: int | None = None,
+) -> tuple[dict[str, Any], dict[str, list[Trajectory]]]:
+    """
+    Run rollouts for a single batch, e.g., by generating rollouts and grading them
+
+    Returns:
+    - final_metrics: Metrics for the batch, keyed by "{split}/{try_idx}/{metric}"
+    - new_trajectories: Trajectories for the batch, keyed by an identifier (default "policy")
+    """
+    num_tries = num_tries or 1  # guard: eval/train configs may leave (eval_)num_tries unset
+    _has_torch_model = hasattr(llm, "model") and hasattr(getattr(llm, "model", None), "training")
+    if _has_torch_model:
+        was_training = llm.model.training
+    else:
+        was_training = False
+
+    ctx = torch.no_grad() if _has_torch_model else contextlib.nullcontext()
+    with ctx:
+        if _has_torch_model:
+            llm.model.eval()
+        env.split = split  # Select task split
+
+        generator = generator_constructor(
+            llm=llm,
+            hf_tokenizer=hf_tokenizer,
+            env=env,
+            cfg=cfg,
+            enable_thinking=cfg.get("enable_thinking", False),
+            name_or_identifier=name_or_identifier,
+        )
+        batch_size = tasks_per_update or len(env)  # len(env) is the number of tasks or problems
+        num_return_sequences = num_return_sequences or (
+            cfg.group_size if split == "train" else cfg.eval_group_size
+        )
+        all_eval_metrics = {}
+        keys_for_correct = []
+        eval_metric_keys = [
+            "final_reward",
+            "first_return",
+            "action_prob",
+            "last_state_len",
+            "timesteps",
+            "correct",
+            "match_rate",
+            "total",
+        ]
+        # Store new trajectories to return
+        new_trajectories: dict[str, list[Trajectory]] = {}
+        all_trajectory_groups: list[dict[str, list[TrajectoryGroup]]] = []
+
+        for try_idx in range(num_tries):
+            pbar_desc = f"Generating {num_return_sequences} rollouts for sample {start_idx + 1} / {start_idx + batch_size}"
+            sample_pbar = tqdm(
+                range(start_idx, start_idx + batch_size),
+                desc=pbar_desc,
+                colour="blue",
+                leave=True,
+                position=pbar_position,
+            )
+            n_success_so_far = 0
+            n_total_so_far = 0
+            for _, sample_id in enumerate(sample_pbar):
+                group_dict = generator.do_group_rollout(
+                    env=env,
+                    sample_id=sample_id,
+                    batch_id=batch_id,
+                    split=split,
+                    try_step=try_idx,
+                    num_return_sequences=num_return_sequences,
+                    max_tokens=max_tokens,
+                    temperature=temperature,
+                    pbar_position=pbar_position + 1,
+                )
+                all_trajectory_groups.append(group_dict)
+                # Tally successes for the live success/total pbar postfix.
+                # Use the primary trajectory key ("policy" if present, else the
+                # first one returned). "correct" is an int/bool on Trajectory.
+                _primary_key = "policy" if "policy" in group_dict else next(iter(group_dict), None)
+                if _primary_key is not None:
+                    for _tg in group_dict.get(_primary_key, []) or []:
+                        for _traj in getattr(_tg, "trajectories", []) or []:
+                            n_total_so_far += 1
+                            if int(getattr(_traj, "correct", 0) or 0) >= 1:
+                                n_success_so_far += 1
+                pbar_desc = f"Generating {num_return_sequences} rollouts for sample {start_idx + 1} / {start_idx + batch_size}"
+                sample_pbar.set_description(pbar_desc)
+                sample_pbar.set_postfix(success=f"{n_success_so_far}/{n_total_so_far}")
+                # Per-task rollout record (one line per trajectory). Lets us slice a
+                # run's eval by task subset, bootstrap CIs, and diff arms task-by-task
+                # -- the aggregate metrics below throw all of that away.
+                _dump_per_task_records(
+                    cfg=cfg,
+                    env=env,
+                    group_dict=group_dict,
+                    sample_id=sample_id,
+                    split=split,
+                    batch_id=batch_id,
+                    try_idx=try_idx,
+                    checkpoint_name=checkpoint_name,
+                )
+            # End-of-try checkpoint: push the running rollouts buffer
+            # to the hub (covers every rollout collected for try_idx).
+            try:
+                generator._maybe_save_rollouts()
+            except Exception:
+                pass  # already best-effort inside _maybe_save_rollouts
+
+        # Save metrics and samples
+        trajectory_keys = all_trajectory_groups[0].keys()
+        _metric_prefix = f"{checkpoint_name}_{split}" if checkpoint_name is not None else split
+
+        for _key in trajectory_keys:
+            for trajectory_groups in all_trajectory_groups:  # list of list of trajectory groups
+                for traj_group in trajectory_groups[_key]:  # len(trajectory_groups) usually 1,
+                    for trajectory in traj_group.trajectories:  # can be >1, e.g., if step-wise adv
+                        if _key == "policy":
+                            # Only store metrics for the default "policy" trajectory group
+                            _try_step = trajectory.try_step
+                            for metric_key in eval_metric_keys:
+                                _metric_key = f"{_metric_prefix}/try_{_try_step}/{metric_key}"
+                                if metric_key == "correct":
+                                    keys_for_correct.append(_metric_key)
+                                if _metric_key not in all_eval_metrics:
+                                    all_eval_metrics[_metric_key] = []
+                                val = getattr(trajectory, metric_key, 1)  # 1 for total samples
+                                all_eval_metrics[_metric_key].append(val)
+                            # Also log flat env metrics surfaced on the trajectory
+                            # (eval env: task_completion, task_personalization, num_respond_user).
+                            for _mk, _mv in getattr(trajectory, "metrics", {}).items():
+                                all_eval_metrics.setdefault(f"{_metric_prefix}/try_{_try_step}/{_mk}", []).append(_mv)
+                        # Add trajectory to list of new trajectories
+                        if _key not in new_trajectories:
+                            new_trajectories[_key] = []
+                        new_trajectories[_key].append(trajectory)
+
+    final_metrics = {}  # return these metrics for the batch
+    # 1. Compute aggregate metrics
+    for k, v in all_eval_metrics.items():
+        if "correct" in k or "total" in k:
+            final_metrics[k] = np.sum(v).item()  # convert to float for json.dumps
+        else:
+            final_metrics[k] = np.mean(v).item()
+        final_metrics[f"{k}_std"] = np.std(v).item()
+        final_metrics[f"{k}_max"] = np.max(v).item()
+    # 2. Add accuracy (dummy for Act-PRM training rollouts)
+    for k in keys_for_correct:
+        total_v = final_metrics[k.replace("correct", "total")]
+        final_metrics[k.replace("correct", "accuracy")] = final_metrics[k] / total_v
+
+    # 3. Add generator usage metrics (token counts)
+    if hasattr(generator, "get_usage_metrics"):
+        usage = generator.get_usage_metrics()
+        for k, v in usage.items():
+            final_metrics[f"usage/{k}"] = v
+
+    if _has_torch_model and was_training:
+        llm.model.train()
+
+    return final_metrics, new_trajectories
+
 
 __all__ = ["SFTTrainer"]
