@@ -35,13 +35,14 @@ DOMAINS = [
     ("insurance", "act_prm_snorkel_insurance",    "snorkel_insurance"),
 ]
 OUT = "/tmp/aprm_plots"
+import os as _os
+RUNPAT = _os.environ.get("RUNPAT", "lr1e_3_adamw_nb200_flat32_heldout")
 
 
 def curve(envdir, prefix, arm):
     """(batch -> (ppl, acc)) for one arm; falls back to the nb150 dir for retail
     actions_only, which was trained before the batch cap was cut to 100."""
-    pats = [f"logs/{envdir}/hf_qwen3_4b_instruct/{prefix}_s2_{arm}_lr1e_3_adamw_nb100_heldout-*/",
-            f"logs/{envdir}/hf_qwen3_4b_instruct/{prefix}_s2_{arm}_lr1e_3_adamw_nb150_heldout-*/"]
+    pats = [f"logs/{envdir}/hf_qwen3_4b_instruct/{prefix}_s2_{arm}_{RUNPAT}-*/"]
     ds = [d for p in pats for d in glob.glob(p) if os.path.exists(d + "metrics.jsonl")]
     if not ds:
         return {}
@@ -101,10 +102,9 @@ for col, (dom, _, _) in enumerate(DOMAINS):
         for s in ("top", "right"):
             ax.spines[s].set_visible(False)
 axes[0][0].legend(frameon=False, fontsize=9, loc="upper right")
-fig.suptitle("Act-PRM Stage-2 SFT — action-token metrics by domain  ·  AdamW, lr 1e-3, "
-             "hide-observations, r8/a16  ·  ★ = step_best (min PPL)", fontsize=13, y=.98)
+fig.suptitle(_os.environ.get("TITLE", "Act-PRM Stage-2 SFT (sft_flat: corpus-wide step sampling) — action-token metrics by domain  ·  AdamW lr 1e-3, steps_per_batch 32, hide-obs  ·  ★ = step_best"), fontsize=13, y=.98)
 fig.tight_layout(rect=(0, 0, 1, .95))
-p = f"{OUT}/stage2_curves.png"
+p = f"{OUT}/" + _os.environ.get("OUTNAME", "stage2_curves_flat.png")
 os.makedirs(OUT, exist_ok=True)
 fig.savefig(p, dpi=150, bbox_inches="tight", facecolor="white")
 print("wrote", p)

@@ -39,8 +39,7 @@ OUT, WIN = "/tmp/aprm_plots", 9
 
 def series(envdir, prefix, arm):
     """[(batch, ppl, acc)] of TRAIN points for one arm."""
-    pats = [f"logs/{envdir}/hf_qwen3_4b_instruct/{prefix}_s2_{arm}_lr1e_3_adamw_nb100_heldout-*/",
-            f"logs/{envdir}/hf_qwen3_4b_instruct/{prefix}_s2_{arm}_lr1e_3_adamw_nb150_heldout-*/"]
+    pats = [f"logs/{envdir}/hf_qwen3_4b_instruct/{prefix}_s2_{arm}_lr1e_3_adamw_nb200_flat32_heldout-*/"]
     ds = [d for p in pats for d in glob.glob(p) if os.path.exists(d + "metrics.jsonl")]
 
     def read(d):
@@ -101,12 +100,12 @@ for col, (dom, _, _) in enumerate(DOMAINS):
         for sp in ("top", "right"):
             ax.spines[sp].set_visible(False)
 axes[0][0].legend(frameon=False, fontsize=9, loc="upper right")
-fig.suptitle("Act-PRM Stage-2 SFT — TRAIN action-token metrics by domain  ·  AdamW, lr 1e-3, "
+fig.suptitle("Act-PRM Stage-2 SFT — TRAIN action-token metrics (sft_flat) by domain  ·  AdamW lr 1e-3, spb 32, "
              f"hide-observations, r8/a16  ·  faint = per-batch, bold = running mean (window {WIN})",
              fontsize=13, y=.98)
 fig.tight_layout(rect=(0, 0, 1, .95))
 os.makedirs(OUT, exist_ok=True)
-p = f"{OUT}/stage2_train_curves.png"
+p = f"{OUT}/stage2_train_curves_flat.png"
 fig.savefig(p, dpi=150, bbox_inches="tight", facecolor="white")
 print("wrote", p)
 for dom, _, _ in DOMAINS:

@@ -48,7 +48,10 @@ AIRLINE_TRAIN=$(python3 -c "import json;print(json.load(open('data/splits/tau2_a
 run_one(){  # $1=domain  $2=variant  $3=eval ids  $4=throwaway train id
   local dom=$1 v=$2 ids=$3 tid=$4
   local envdir="act_prm_tau2_${dom}"
-  local ck; ck=$(newest "checkpoints_lora/$envdir/$MODEL/${dom}_s2_${v}_lr3e_3_nb150_heldout-*/step_best")
+  # CKPT_PAT selects WHICH Stage-2 generation to roll out. Default is the historical
+  # SGD-era lr3e_3/nb150 set; the 08-31 sft_flat arms are lr1e_3_adamw_nb200_flat32.
+  # Hardcoding it silently evaluated obsolete checkpoints for hours on 08-29.
+  local ck; ck=$(newest "checkpoints_lora/$envdir/$MODEL/${dom}_s2_${v}_${CKPT_PAT:-lr3e_3_nb150}_heldout-*/step_best")
   [ -z "$ck" ] && { log "ROLLOUT $dom/$v: no checkpoint, skip"; return; }
   local tag="${dom}_rollout_${v}_lr3e_3${RTAG}"
   [ "$SMOKE" = 1 ] && tag="${tag}_smoke"

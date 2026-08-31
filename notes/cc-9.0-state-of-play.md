@@ -419,3 +419,55 @@ card. Now correctly shows optimizer adamw / lr 4e-5 / nb 30 / action_probs / r32
 
 **Status:** ready to run. Awaiting finance v3 (~05:00 Sat) and insurance relabel, then a
 single consistent 4-domain push — which needs explicit go-ahead, being public.
+
+---
+
+## 08-31 — arm/eval-pool mismatches: two published numbers were wrong
+
+**Symptom that exposed it.** A validation run of the new `sft_flat` trainer reported
+18,425 eval action tokens for retail `expert_thoughts` where a direct measurement of the
+pool gave 13,459. The *ratio* of action to label tokens matched (0.546 vs 0.545), so the
+span logic was right — the arm was simply being scored on **more trajectories**.
+
+**Root cause.** Each Stage-2 arm reads a different pool: `actions_only` the base pool,
+`expert_thoughts` a `keep_expert_thoughts` pool, `thoughts_policy` the Act-PRM corpus.
+They must contain the SAME trajectories and the SAME train/eval partition — only the
+assistant/target content may differ. Two did not:
+
+| domain | arm | pool | eval set vs base |
+|---|---|---|---|
+| retail | expert_thoughts | `tau2_retail_expert_thoughts` | **10 trajectories vs 8** (2 EXTRA) |
+| finance | expert_thoughts | `snorkel_finance_split_expert_thoughts` | **3/25 shared** (pre-v3 split) |
+
+Both are silent at runtime: the env loads whatever pool exists, and `train_sft.sh` derives
+the path by string convention (`data/${ENVNAME}_expert_thoughts`), so a stale or
+differently-partitioned directory is used without any error.
+
+**Effect on reported results.** Re-running on matched pools:
+
+| | as reported (sft) | corrected (sft_flat, matched pools) |
+|---|---|---|
+| retail expert_thoughts | -7.0% | -7.1%  (barely moved) |
+| finance expert_thoughts | **-3.5%** | **-1.3%** |
+
+Finance is the consequential one: on the correct eval set expert thoughts are
+**indistinguishable from Act-PRM's** (1.6337 vs 1.6340), not more than twice as good. The
+`actions_only` and `thoughts_policy` arms always shared a pool, so every
+Act-PRM-vs-baseline number stands.
+
+**Fixes.**
+1. `scripts/check_arm_pools.py` — a startup gate asserting every arm's eval set is
+   **set-equal** to the base pool's. My first version tested *containment* and passed
+   retail's 10-vs-8 case; extra trajectories are as disqualifying as missing ones.
+   `run_stage2_flat.sh` runs it per domain and SKIPS the domain on mismatch.
+2. `train_sft.sh` gained `EXPERT_POOL` so the derived path can be overridden; the driver
+   points finance at `..._expert_thoughts_v3`.
+3. `data/tau2_retail_expert_thoughts_matched` — retail's expert pool filtered to exactly
+   the base pool's 49 train / 8 eval trajectories.
+
+**Related, same shape, already fixed earlier this week:** insurance `expert_thoughts`
+crashed with `KeyError: 'dataset'` because the derived pool path did not exist at all
+(pools were built as `snorkel_insurance_split*`), and the finance Stage-1 export resolved
+only 3/25 eval trajectories because the run and the export pointed at different splits.
+Three separate incidents, one cause: **paths derived by string convention, with no
+assertion that the resolved data is the data intended.** The gate now covers all of them.
