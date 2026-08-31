@@ -14,17 +14,17 @@ log(){ echo "[$(date '+%m-%d %H:%M:%S')] $*" >> "$L"; }
 ARMS_PER_DOMAIN=3   # actions_only, expert_thoughts, thoughts_policy_adamw30
 log "watchdog up"
 while true; do
-  done_n=$(ls /tmp/aprm/sft_sweep_*/*lr1e_3_adamw_nb100_heldout.done 2>/dev/null | wc -l)
+  done_n=$(ls /tmp/aprm/sft_sweep_*/*lr1e_3_adamw_nb200_flat32_heldout.done 2>/dev/null | wc -l)
   if [ "$done_n" -ge $((4 * ARMS_PER_DOMAIN)) ]; then
     log "all $done_n arms done -- watchdog exiting"; exit 0
   fi
-  if ! pgrep -f 'run_stage2_adamw\.sh' >/dev/null 2>&1; then
+  if ! pgrep -f 'run_stage2_(adamw|flat)\.sh' >/dev/null 2>&1; then
     # don't relaunch on top of a live trainer (a slow arm can outlive a driver blip)
     if pgrep -f 'main_pytorch\.py' >/dev/null 2>&1; then
       log "driver gone but a trainer is still alive -- waiting"
     else
       log "driver GONE with $done_n/12 arms done -- relaunching"
-      env -u HF_HOME -u WANDB_MODE setsid nohup ./scripts/run_stage2_adamw.sh >/dev/null 2>&1 &
+      env -u HF_HOME -u WANDB_MODE setsid nohup ./scripts/run_stage2_flat.sh >/dev/null 2>&1 &
       sleep 60
     fi
   fi

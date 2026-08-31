@@ -87,7 +87,7 @@ case "$VARIANT" in
     # Cached pools are keyed by dataset_path, so use a distinct one unless overridden.
     GEN="act_prm_actions_only"; MODE=(--keep_expert_thoughts)
     if [[ "$HAS_DATASET_PATH" == 0 ]]; then
-      MODE+=(--dataset_path "data/${ENVNAME}_expert_thoughts")
+      MODE+=(--dataset_path "${EXPERT_POOL:-data/${ENVNAME}_expert_thoughts}")
     fi ;;
   *) echo "bad variant '$VARIANT' (actions_only|thoughts_policy|thoughts_base|expert_thoughts)"; exit 1 ;;
 esac
@@ -100,7 +100,7 @@ HIDE_OBS=(--hide_observations); [ "${SFT_FULLCTX:-0}" = 1 ] && HIDE_OBS=()
 
 CMD=(uv run python main_pytorch.py
   --env_config "$ENVCFG" --model_config "$MODEL_CFG"
-  --lora_config r8_a16_linear --generator_config "$GEN" --trainer_config sft
+  --lora_config r8_a16_linear --generator_config "$GEN" --trainer_config "${TRAINER_CFG:-sft}"
   --replay_buffer_config default "${HIDE_OBS[@]}"
   --group_size 4 --batch_size 4 --num_batches 60 --eval_every 10 --no_initial_eval
   --length_penalty 0.15 "${MODE[@]}" --verbose "$@")

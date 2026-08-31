@@ -48,6 +48,9 @@ NBTAG=""; [ -n "$NUM_BATCHES" ] && NBTAG="_nb${NUM_BATCHES}"
 EXTRA=(); [ -n "$NUM_BATCHES" ] && EXTRA+=(--num_batches "$NUM_BATCHES")
 [ -n "$EVAL_EVERY" ] && EXTRA+=(--eval_every "$EVAL_EVERY")
 [ "$PATIENCE" != "0" ] && EXTRA+=(--early_stop_patience "$PATIENCE")
+# sft_flat only: effective gradient batch in STEPS, sampled corpus-wide.
+STEPS_PER_BATCH="${STEPS_PER_BATCH:-}"
+[ -n "$STEPS_PER_BATCH" ] && EXTRA+=(--steps_per_batch "$STEPS_PER_BATCH")
 ONLY="${VARIANTS:-}"   # space-separated variant labels to restrict to (default: all)
 # Which context regimes this invocation covers. Default both, but the matrix driver
 # passes one at a time so it can run regime-major: ALL hide arms across every dataset
