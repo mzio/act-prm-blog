@@ -390,7 +390,7 @@ snorkel_finance_split/thoughts_policy_adamw30_lr1e_3_adamw_nb200_flat32 hide  11
 
 5/24 arms complete   (Δ% = held-out action-subspan PPL improvement, higher is better)
 ```
-_last refreshed: 2026-08-31 15:20_
+_last refreshed: 2026-08-31 15:40_
 <!--/RESULTS-->
 
 ## Infrastructure
