@@ -364,12 +364,13 @@ arm                                                  reg     b   eval ppl first-
 ----------------------------------------------------------------------------------------------------------------------
 retail/actions_only_lr1e_3_adamw_nb100               hide    3         (no evals yet)
 retail/actions_only_lr1e_3_adamw_nb150               hide  125     1.9265 ->   2.3890 -24.01%  0.8322        1.0312  <running>
-retail/actions_only_lr1e_3_adamw_nb200_flat32        hide   50     2.1524 ->   1.9012  11.67%  0.8185        1.6057  <running>
+retail/actions_only_lr1e_3_adamw_nb200_flat32        hide   60     2.1524 ->   1.8642  13.39%  0.8278        1.3262  <running>
 retail/actions_only_lr1e_3_adamw_nb6_validate        hide    5     2.4827 ->   2.3125   6.86%  0.7719        1.5400
 retail/actions_only_lr1e_3                           hide   59     3.8355 ->   3.6702   4.31%  0.7609        1.6094
 retail/actions_only_lr1e_3_nb150                     hide  149     3.8307 ->   3.0719  19.81%  0.7652        2.1719
 retail/expert_thoughts_lr1e_3_adamw_nb100            hide   60     1.8014 ->   1.7078   5.20%  0.8487        1.0000  <running>
 retail/expert_thoughts_lr1e_3_adamw_nb100            hide   30     1.7999 ->   1.6634   7.58%  0.8463        1.0000  <running>
+retail/expert_thoughts_lr1e_3_adamw_nb200_flat32     hide   25     1.9852 ->   1.6583  16.47%  0.8453        1.3181  <running>
 retail/expert_thoughts_lr1e_3_adamw_nb6_validate     hide    5     2.2879 ->   2.0729   9.40%  0.7990        1.4971
 retail/thoughts_policy_adamw30_lr1e_3_adamw_nb100    hide   70     1.8959 ->   1.9718  -4.00%  0.8345        1.3828  <running>
 retail/thoughts_policy_adamw30_lr1e_3_adamw_nb6_validate hide    5     2.3775 ->   2.2449   5.57%  0.7814        1.3506
@@ -380,9 +381,9 @@ snorkel_finance_split/actions_only_lr1e_3_adamw_nb100 hide   80     1.7603 ->   
 snorkel_finance_split/expert_thoughts_lr1e_3_adamw_nb100 hide   80     1.6835 ->   1.6045   4.69%  0.8734        1.7344  <running>
 snorkel_finance_split/thoughts_policy_adamw30_lr1e_3_adamw_nb100 hide   80     1.7302 ->   1.6604   4.03%  0.8707        1.0391  <running>
 
-5/16 arms complete   (Δ% = held-out action-subspan PPL improvement, higher is better)
+5/17 arms complete   (Δ% = held-out action-subspan PPL improvement, higher is better)
 ```
-_last refreshed: 2026-08-30 18:40_
+_last refreshed: 2026-08-30 19:00_
 <!--/RESULTS-->
 
 ## Infrastructure

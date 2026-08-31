@@ -21,7 +21,7 @@ for wordiness rather than for mispredicting the action, which inverts the rankin
 | thoughts_base | full | 2.9999 | 0.8035 | 30 | 3.4093 | 0.7717 | 59 | 0.6225 |
 | actions_only_lr1e_3_adamw_nb100 | hide | — | — | — | — | — | — | 0.0601 |
 | actions_only_lr1e_3_adamw_nb150 | hide | 1.7915 | 0.8259 | 20 | 1.7915 | 0.8259 | 20 | 0.0282 |
-| actions_only_lr1e_3_adamw_nb200_flat32 | hide | 1.7670 | 0.8276 | 30 | — | — | — | 0.4271 |
+| actions_only_lr1e_3_adamw_nb200_flat32 | hide | 1.7670 | 0.8276 | 30 | — | — | — | 0.2589 |
 | actions_only_lr1e_3_adamw_nb6_validate | hide | 2.3125 | 0.7719 | 5 | — | — | — | 0.3685 |
 | actions_only_lr1e_3 | hide | 3.6702 | 0.7609 | 59 | 3.6702 | 0.7609 | 59 | 0.4756 |
 | actions_only_lr1e_3_nb150 | hide | 3.0719 | 0.7652 | 149 | 3.0719 | 0.7652 | 149 | 0.7723 |
@@ -31,6 +31,7 @@ for wordiness rather than for mispredicting the action, which inverts the rankin
 | expert_thoughts_all_lr3e_3_nb150_fixeval | hide | 2.1192 | 0.7947 | 149 | 3.1807 | 0.6974 | 149 | 1.3447 |
 | expert_thoughts_lr1e_3_adamw_nb100 | hide | 1.6660 | 0.8483 | 30 | 2.5258 | 0.7396 | 30 | 0.0016 |
 | expert_thoughts_lr1e_3_adamw_nb100 | hide | 1.6634 | 0.8463 | 30 | 2.5272 | 0.7399 | 30 | 0.0016 |
+| expert_thoughts_lr1e_3_adamw_nb200_flat32 | hide | 1.6583 | 0.8453 | 25 | — | — | — | 0.4541 |
 | expert_thoughts_lr1e_3_adamw_nb6_validate | hide | 2.0729 | 0.7990 | 5 | — | — | — | 0.4444 |
 | expert_thoughts_lr3e_3_nb150 | hide | 2.1071 | 0.7973 | 149 | 3.2141 | 0.6958 | 149 | 0.5808 |
 | thoughts_base_last | hide | 3.1928 | 0.7784 | 59 | 3.6738 | 0.7401 | 59 | 0.9956 |
@@ -72,6 +73,7 @@ that saved step:
 | expert_thoughts_all_lr3e_3_nb150_fixeval | hide | 2.1192 | 0.7947 |
 | expert_thoughts_lr1e_3_adamw_nb100 | hide | 1.6660 | 0.8483 |
 | expert_thoughts_lr1e_3_adamw_nb100 | hide | 1.6634 | 0.8463 |
+| expert_thoughts_lr1e_3_adamw_nb200_flat32 | hide | — | — |
 | expert_thoughts_lr1e_3_adamw_nb6_validate | hide | — | — |
 | expert_thoughts_lr3e_3_nb150 | hide | 2.1071 | 0.7973 |
 | thoughts_base_last | hide | 3.1928 | 0.7784 |
