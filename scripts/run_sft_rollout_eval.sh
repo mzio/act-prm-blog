@@ -24,6 +24,10 @@
 set -uo pipefail
 cd "$(dirname "$0")/.."
 export PATH="$HOME/.local/bin:$HOME/.cargo/bin:/usr/local/bin:$PATH"
+# api.wandb.ai is NOT reachable through fwdproxy: without this the run blocks 90s in
+# wandb.init and then dies on a broken CONNECT tunnel. Falls back to WANDB_MODE=offline.
+[ -f scripts/wandb_preflight.sh ] && . scripts/wandb_preflight.sh
+export PYTHONUNBUFFERED=1
 MODEL="${MODEL_CFG:-hf_qwen3_4b_instruct}"; export MODEL_CFG="$MODEL"
 MDIR=/tmp/aprm/rollout; mkdir -p "$MDIR"
 SMOKE="${SMOKE:-0}"
@@ -53,7 +57,11 @@ run_one(){  # $1=domain  $2=variant  $3=eval ids  $4=throwaway train id
   # Hardcoding it silently evaluated obsolete checkpoints for hours on 08-29.
   local ck; ck=$(newest "checkpoints_lora/$envdir/$MODEL/${dom}_s2_${v}_${CKPT_PAT:-lr3e_3_nb150}_heldout-*/step_best")
   [ -z "$ck" ] && { log "ROLLOUT $dom/$v: no checkpoint, skip"; return; }
-  local tag="${dom}_rollout_${v}_lr3e_3${RTAG}"
+  # The tag MUST encode which Stage-2 generation is being rolled out. It was hardcoded
+  # to lr3e_3, so the 08-31 sft_flat rollouts collided with the SGD-era ones: their .done
+  # markers made actions_only "done, skip" (losing the baseline) and their log dirs would
+  # have been appended to. CKPT_TAG defaults to the historical name for back-compat.
+  local tag="${dom}_rollout_${v}_${CKPT_TAG:-lr3e_3}${RTAG}"
   [ "$SMOKE" = 1 ] && tag="${tag}_smoke"
   if [ -f "$MDIR/${tag}.done" ]; then log "ROLLOUT $dom/$v: done, skip"; return; fi
   local nb=(--num_batches 1 --eval_every 1) turns=(--max_turns "$MAX_TURNS")
