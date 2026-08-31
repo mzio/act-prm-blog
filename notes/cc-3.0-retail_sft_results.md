@@ -31,13 +31,14 @@ for wordiness rather than for mispredicting the action, which inverts the rankin
 | expert_thoughts_all_lr3e_3_nb150_fixeval | hide | 2.1192 | 0.7947 | 149 | 3.1807 | 0.6974 | 149 | 1.3447 |
 | expert_thoughts_lr1e_3_adamw_nb100 | hide | 1.6660 | 0.8483 | 30 | 2.5258 | 0.7396 | 30 | 0.0016 |
 | expert_thoughts_lr1e_3_adamw_nb100 | hide | 1.6634 | 0.8463 | 30 | 2.5272 | 0.7399 | 30 | 0.0016 |
-| expert_thoughts_lr1e_3_adamw_nb200_flat32 | hide | 1.6409 | 0.8508 | 55 | — | — | — | 0.4074 |
+| expert_thoughts_lr1e_3_adamw_nb200_flat32 | hide | 1.6409 | 0.8508 | 55 | — | — | — | 0.3253 |
 | expert_thoughts_lr1e_3_adamw_nb6_validate | hide | 2.0729 | 0.7990 | 5 | — | — | — | 0.4444 |
 | expert_thoughts_lr3e_3_nb150 | hide | 2.1071 | 0.7973 | 149 | 3.2141 | 0.6958 | 149 | 0.5808 |
 | thoughts_base_last | hide | 3.1928 | 0.7784 | 59 | 3.6738 | 0.7401 | 59 | 0.9956 |
 | thoughts_base_lr3e_3_nb150 | hide | 2.2003 | 0.7890 | 149 | 2.3705 | 0.7610 | 149 | 0.6979 |
 | thoughts_policy_1gen_lr3e_3_nb150 | hide | 2.2058 | 0.7931 | 149 | 2.3954 | 0.7614 | 149 | 0.3960 |
 | thoughts_policy_adamw30_lr1e_3_adamw_nb100 | hide | 1.7358 | 0.8368 | 40 | 1.9884 | 0.7917 | 20 | 0.3668 |
+| thoughts_policy_adamw30_lr1e_3_adamw_nb200_flat32 | hide | 1.9172 | 0.8142 | 10 | — | — | — | 0.5151 |
 | thoughts_policy_adamw30_lr1e_3_adamw_nb6_validate | hide | 2.2449 | 0.7814 | 5 | — | — | — | 0.6407 |
 | thoughts_policy_last | hide | 3.2078 | 0.7825 | 40 | 3.7470 | 0.7390 | 10 | 1.5987 |
 | thoughts_policy_lr3e_3_nb150 | hide | 2.2059 | 0.7925 | 149 | 2.3959 | 0.7609 | 149 | 0.8757 |
@@ -80,6 +81,7 @@ that saved step:
 | thoughts_base_lr3e_3_nb150 | hide | 2.2003 | 0.7890 |
 | thoughts_policy_1gen_lr3e_3_nb150 | hide | 2.2058 | 0.7931 |
 | thoughts_policy_adamw30_lr1e_3_adamw_nb100 | hide | 1.7621 | 0.8306 |
+| thoughts_policy_adamw30_lr1e_3_adamw_nb200_flat32 | hide | — | — |
 | thoughts_policy_adamw30_lr1e_3_adamw_nb6_validate | hide | — | — |
 | thoughts_policy_last | hide | 3.2100 | 0.7810 |
 | thoughts_policy_lr3e_3_nb150 | hide | 2.2059 | 0.7925 |
