@@ -20,7 +20,7 @@ for wordiness rather than for mispredicting the action, which inverts the rankin
 | thoughts_base | hide | 2.3662 | 0.8491 | 59 | 3.1226 | 0.7746 | 59 | 0.7706 |
 | thoughts_base | full | 2.0637 | 0.8837 | 40 | 2.7097 | 0.8058 | 30 | 0.8326 |
 | actions_only_lr1e_3_adamw_nb100 | hide | 1.6535 | 0.8663 | 50 | 1.6535 | 0.8663 | 50 | 0.0356 |
-| actions_only_lr1e_3_adamw_nb200_flat32 | hide | 1.6711 | 0.8628 | 40 | — | — | — | 0.2588 |
+| actions_only_lr1e_3_adamw_nb200_flat32 | hide | 1.6554 | 0.8655 | 75 | — | — | — | 0.1882 |
 | actions_only_lr3e_3_nb150 | hide | 1.8930 | 0.8398 | 149 | 1.8930 | 0.8398 | 149 | 0.3245 |
 | actions_only_v3_lr3e_3_nb150 | hide | 1.9282 | 0.8407 | 149 | 1.9282 | 0.8407 | 149 | 0.4563 |
 | expert_thoughts_all_v3_lr3e_3_nb150 | hide | 1.9557 | 0.8413 | 149 | 1.9918 | 0.8336 | 149 | 1.5311 |
