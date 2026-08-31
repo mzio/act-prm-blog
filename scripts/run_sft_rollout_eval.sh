@@ -55,13 +55,13 @@ run_one(){  # $1=domain  $2=variant  $3=eval ids  $4=throwaway train id
   # CKPT_PAT selects WHICH Stage-2 generation to roll out. Default is the historical
   # SGD-era lr3e_3/nb150 set; the 08-31 sft_flat arms are lr1e_3_adamw_nb200_flat32.
   # Hardcoding it silently evaluated obsolete checkpoints for hours on 08-29.
-  local ck; ck=$(newest "checkpoints_lora/$envdir/$MODEL/${dom}_s2_${v}_${CKPT_PAT:-lr3e_3_nb150}_heldout-*/step_best")
+  local ck; ck=$(newest "checkpoints_lora/$envdir/$MODEL/${dom}_s2_${v}_${CKPT_PAT:-lr3e_3_nb150}_heldout-*/${CKPT_STEP:-step_best}")
   [ -z "$ck" ] && { log "ROLLOUT $dom/$v: no checkpoint, skip"; return; }
   # The tag MUST encode which Stage-2 generation is being rolled out. It was hardcoded
   # to lr3e_3, so the 08-31 sft_flat rollouts collided with the SGD-era ones: their .done
   # markers made actions_only "done, skip" (losing the baseline) and their log dirs would
   # have been appended to. CKPT_TAG defaults to the historical name for back-compat.
-  local tag="${dom}_rollout_${v}_${CKPT_TAG:-lr3e_3}${RTAG}"
+  local tag="${dom}_rollout_${v}_${CKPT_TAG:-lr3e_3}${CKPT_STEP:+_${CKPT_STEP}}${RTAG}"
   [ "$SMOKE" = 1 ] && tag="${tag}_smoke"
   if [ -f "$MDIR/${tag}.done" ]; then log "ROLLOUT $dom/$v: done, skip"; return; fi
   local nb=(--num_batches 1 --eval_every 1) turns=(--max_turns "$MAX_TURNS")

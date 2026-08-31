@@ -56,7 +56,11 @@ kl_discount_factor: 0.0
 
 # Checkpointing / eval
 eval_every: 10
-save_every: 20
+# Every 10 batches, not 20: the 08-31 rollout analysis showed the BEST rollout checkpoint
+# is an under-trained one (fitting the SFT target distribution fully destroys the
+# conversational turns tau2 needs), so the useful checkpoints are early and we want
+# resolution there. Snapshots are LoRA-only (~30 MB), so this is cheap.
+save_every: 10
 no_initial_eval: false
 # best_metric selects the step_best checkpoint on the eval metric whose key
 # contains this substring.
