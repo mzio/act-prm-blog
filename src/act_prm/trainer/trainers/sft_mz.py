@@ -316,19 +316,326 @@ class SFTTrainer(RLTrainer):
         """
         Implement SFT training loop while adhering to RLTrainer interface.
 
+        Assumes `env` is an ActPrmTracesEnv with `keep_expert_trajectories` is True
+        for ActPRM (`thoughts_policy`, `thoughts_base`) and `expert_thoughts` runs,
+        and False for `actions_only` runs.
+
+
         Given the Act-PRM environment with full (thought)-action trajectories, we:
         1. 
         
         entire Policy Gradient training loop for Hugging Face Transformer (PEFT) model (llm.model)
         """
-        pass
+        llm = llm or self.llm
+        optimizer = optimizer or self.optimizer
 
-    def _dispatch_rollouts(self, **kwargs):
+        cfg = cfg or self.cfg
+        env = env or self.env
+        eval_env = eval_env or self.eval_env
+        # Evaluation
+        hf_tokenizer = self.hf_tokenizer
+        # Batch iterations to evaluate on
+        eval_every = eval_every or cfg.eval_every
+
+        # 1. Determine mechanical dataset batch size and number of epochs
+        num_steps = num_steps or cfg.get("num_steps", None) or cfg.num_batches
+        num_substeps = (
+            num_substeps or cfg.num_substeps
+        )  # number of effective gradient updates per sampling batch
+        dataloader_batch_size = (
+            1 if cfg.get("group_size", 1) == 1 else 2
+        )  # HF behavior w/ batches and padding, also GPU poor
+        # MZ 03/07/2026: just set this to 1 for now
+        dataloader_batch_size = 1
+
+        # 0, not len(train): initialising to the pool size meant the condition
+        # `rl_start_idx + batch_size > wen_shuffle` stayed false for the whole FIRST
+        # epoch, so epoch 1 always ran in raw on-disk pool order and the first shuffle
+        # only fired at the epoch-1/2 boundary.
+        wen_shuffle = 0
+
+        for batch_idx in range(0, num_steps):
+            metrics = {
+                "progress/batch": batch_idx,
+                "optim/lr": cfg.learning_rate,
+                "progress/done_frac": (batch_idx + 1) / num_steps,
+            }
+            t_start = time.time()
+
+            # Run evaluations (skip the step-0 eval when --no_initial_eval, unless it's
+            # also the final step). Final step always evals.
+            _is_last = batch_idx == num_steps - 1
+            _is_eval_step = (eval_every > 0 and batch_idx % eval_every == 0) or _is_last
+            if batch_idx == 0 and cfg.get("no_initial_eval", False) and not _is_last:
+                _is_eval_step = False
+            if _is_eval_step:
+                llm.model.eval()
+                eval_rollout_metrics = {}
+                for eval_split in getattr(eval_env, "eval_splits", ["eval"]):
+                    with timed(f"run_evals_{eval_split}", metrics):
+                        eval_env.split = eval_split
+
+                        # Collect eval "rollouts" by selecting from env trajectories
+                        _split_trajs = []
+                        for _, sample_id in enumerate(range(0, len(eval_env))):
+                            _traj = eval_env.get_trajectory(sample_id, eval_split)
+                            _split_trajs.append(_traj)
+                        #^Doesn't matter for eval bc we're computing offline eval metrics
+                        # over the entire eval-set. But for training, we should consider
+                        # shuffling over each possible state-action (step)
+
+                        # TODO: incorporate the below into `compute_loss` override here,
+                        # so we also have the compute_loss metrics (to maybe select with)
+                        # Extra offline eval metrics (SFT: action-token PPL + accuracy
+                        # over the target span). Best-effort: never crash the eval.
+                        try:
+                            _extra = self.eval_extra_metrics(
+                                _split_trajs, split=eval_split, checkpoint_name=checkpoint_name
+                            )
+                            if _extra:
+                                _split_metrics.update(_extra)
+                                eval_rollout_metrics.update(_extra)
+                        except Exception as _ee:  # noqa: BLE001
+                            logger.warning(
+                                "eval_extra_metrics failed: %s: %s", type(_ee).__name__, _ee
+                            )
+                        display_metrics(
+                            _split_metrics,
+                            title=f"Rollout {eval_split.title()} Metrics, Step {batch_idx}",
+                            style="bright_yellow",
+                        )
+                metrics.update(eval_rollout_metrics)
+
+                # Save best checkpoints
+                best_metric_key = [k for k in eval_rollout_metrics.keys() if self.best_metric_name in k][0]
+                last_metric = eval_rollout_metrics[best_metric_key]
+                if is_better(last_metric, self.best_metric, self.best_metric_name):
+                    self.best_metric = last_metric
+                    self.best_metric_step = batch_idx
+                    save_lora(llm.model, self.best_checkpoint_path)
+                    logger.info(
+                        f"RL EVAL (Step {batch_idx}): Updated best metric to {last_metric} at step {batch_idx}"
+                    )
+                    metrics.update(
+                        {
+                            f"eval/{self.best_metric_name}": last_metric,
+                            f"eval/{self.best_metric_name}_best": self.best_metric,
+                            f"eval/{self.best_metric_name}_best_step": self.best_metric_step,
+                        }
+                    )
+                    try:  # Saving replay buffer
+                        self.replay_buffer.save_hf_dataset_to_disk(self.best_replay_buffer_path)
+                        logger.info(
+                            "Saved best replay buffer to %s",
+                            self.best_replay_buffer_path,
+                        )
+                    except SchemaInferenceError:
+                        logger.warning(
+                            "Failed to save best replay buffer to %s\nIs replay buffer empty?",
+                            self.best_replay_buffer_path,
+                        )
+
+                # Track consecutive non-improving evals for early stopping.
+                _patience = int(cfg.get("early_stop_patience", 0) or 0)
+                if _patience > 0:
+                    if self.best_metric_step == batch_idx:
+                        self._no_improve_evals = 0
+                    else:
+                        self._no_improve_evals += 1
+                    metrics["eval/no_improve_evals"] = self._no_improve_evals
+
+                # Early flush: persist eval metrics now so a crash later in
+                # this batch doesn't lose the eval snapshot. The end-of-batch
+                # log_metrics call appends a second row with train/loss + timing
+                # on the happy path; downstream analysis should dedupe by
+                # progress/batch and keep the last entry.
+                try:
+                    self.ml_logger.log_metrics(dict(metrics))
+                except Exception as _flush_exc:  # noqa: BLE001
+                    logger.warning(
+                        "early eval-metrics flush failed: %s: %s",
+                        type(_flush_exc).__name__,
+                        _flush_exc,
+                    )
+
+                # Early stop: eval best_metric hasn't improved for `early_stop_patience`
+                # evals. step_best is already saved above, so we lose nothing by stopping.
+                if _patience > 0 and self._no_improve_evals >= _patience and not _is_last:
+                    logger.info(
+                        "EARLY STOP at step %d: eval %s not improved for %d evals "
+                        "(best=%.4f @ step %d).",
+                        batch_idx, self.best_metric_name, self._no_improve_evals,
+                        float(self.best_metric), self.best_metric_step,
+                    )
+                    break
+
+            # Generate and save trajectories to a HF Dataset
+            _save_rollouts_every = cfg.get("save_rollouts_every", num_steps)
+            do_save_rollouts = _save_rollouts_every > 0 and (
+                (batch_idx + 1) % _save_rollouts_every == 0 or (batch_idx + 1 == num_steps)
+            )
+            if do_save_rollouts:
+                self.generate_and_save_trajectories(
+                    cfg=cfg,
+                    save_batch_idx=batch_idx,
+                    save_generator_constructor=self.rl_generator_constructor,
+                    **generate_and_save_trajectories_kwargs,
+                )
+
+            # NOTE: no_train (relabel / rollout-only) is handled AFTER the train-set
+            # rollouts are generated + saved below — otherwise `continue` here would
+            # skip train-set generation and the relabel would export ONLY eval
+            # trajectories (corpus train:0). See the split-coverage fix.
+            # 1. Sample rollouts for training
+            # (no_train is handled AFTER generation below, so relabel/rollout-only mode
+            #  still generates + saves TRAIN rollouts to generations.jsonl — it must not
+            #  skip this, or the exported corpus would contain only eval trajectories.)
+            env.split = "train"
+            rl_start_idx = batch_idx * cfg.batch_size
+            # Do NOT shuffle in no_train (relabel/export) mode: export_sft_corpus maps
+            # each generation back via pool[sample_id % n] on the UNSHUFFLED pool, so a
+            # mid-run shuffle would graft thoughts onto the wrong task's observations.
+            # Keeping order aligned lets any num_batches produce a correct corpus
+            # (wrap-around across tasks just yields clean augmentation). Training runs
+            # (no_train=False) still shuffle as before.
+            if not cfg.get("no_train", False) and rl_start_idx + cfg.batch_size > wen_shuffle:
+                env.shuffle(split="train")
+                wen_shuffle += len(env.datasets["train"])
+
+            with timed("train_rollouts", metrics):
+                train_rollout_metrics, new_trajectories = self._dispatch_rollouts(
+                    llm=llm,
+                    hf_tokenizer=hf_tokenizer,
+                    generator_constructor=self.rl_generator_constructor,
+                    env=env,
+                    cfg=cfg,
+                    batch_id=batch_idx,
+                    checkpoint_name=checkpoint_name,
+                    split="train",
+                    num_tries=cfg.num_tries,
+                    start_idx=rl_start_idx,
+                    tasks_per_update=cfg.batch_size,
+                    name_or_identifier=name_or_identifier,
+                )
+            metrics.update(train_rollout_metrics)
+            display_metrics(
+                train_rollout_metrics,
+                title=f"Rollout Training Metrics, Step {batch_idx}",
+                style="bright_cyan",
+            )
+
+            self.replay_buffer.save_hf_dataset_to_disk(self.last_replay_buffer_path)
+
+            # Relabel / rollout-only mode: TRAIN rollouts are now generated AND saved
+            # to generations.jsonl with this fixed checkpoint — skip only the optimizer
+            # step (so the exported SFT corpus covers train + eval, not eval-only).
+            if cfg.get("no_train", False):
+                continue
+
+            # 2. Update policy LLM with generated rollouts
+            _t_optim = time.time()
+            llm.model.train()
+
+            train_trajectories = []  # Get the trajectories we'll train on
+            for k, v in new_trajectories.items():
+                if k.startswith("policy"):
+                    train_trajectories.extend(v)
+
+            train_loader, _minibatch_metrics = self.prepare_minibatch(
+                new_trajectories=train_trajectories,
+                hf_tokenizer=hf_tokenizer,
+                batch_size=dataloader_batch_size,
+                shuffle=True,
+                batch_idx=batch_idx,  # for debugging
+                max_seq_len=cfg.get("max_seq_len", 32768),
+                drop_zero_advantage=cfg.get("drop_zero_advantage", False),
+                train_action_only=cfg.get("train_action_only", False),
+            )
+            metrics.update(_minibatch_metrics)  # empty {} for now
+
+            # For now, auto-calculate gradient accumulation steps based on num_substeps
+            gradient_accumulation_steps = max(1, len(train_loader) // num_substeps)
+            pbar_substep = tqdm(total=num_substeps, desc="Number of substeps", colour="blue", position=2)
+            pbar_dataloader = tqdm(train_loader, desc="Dataloader batches", colour="cyan", position=3)
+
+            for mini_batch_idx, mini_batch in enumerate(pbar_dataloader):
+                # Sanity-check model inputs
+                if mini_batch_idx == 0 or (mini_batch_idx + 1) % 10 == 0:
+                    self._check_model_inputs(mini_batch, hf_tokenizer, cfg)
+
+                loss_metrics = self.compute_loss(llm.model, mini_batch, fp32_loss=self.fp32_loss)
+                loss = loss_metrics["loss"]
+                loss = loss / gradient_accumulation_steps
+                loss.backward()
+
+                if (mini_batch_idx + 1) % gradient_accumulation_steps == 0:
+                    optimizer.step()
+                    optimizer.zero_grad()
+                    pbar_substep.update(1)
+
+                loss_metrics = {f"train/{k}": get_item(v) for k, v in loss_metrics.items()}
+                metrics.update(loss_metrics)
+                pbar_dataloader.set_postfix(**loss_metrics)
+
+            metrics["time/optim"] = time.time() - _t_optim
+
+            # Periodic rolling LoRA checkpoint for stop/restart (every save_every steps; the
+            # replay buffer is already saved every step above). Best checkpoint still saved on
+            # eval-improvement. Resume by starting from step_last (--lora_checkpoint_path).
+            _save_every = int(cfg.get("save_every", 0) or 0)
+            if _save_every > 0 and ((batch_idx + 1) % _save_every == 0 or _is_last):
+                save_lora(llm.model, self.last_checkpoint_path)
+                logger.info(
+                    "Saved rolling checkpoint (step %d) -> %s", batch_idx, self.last_checkpoint_path
+                )
+                # ALSO keep a numbered snapshot. step_last is overwritten every save_every
+                # batches, and step_best is only meaningful if evals are frequent -- with
+                # eval_every == num_batches they both end up being the FINAL model. That cost
+                # us the batch-30 checkpoint of the 08-26 retail run, whose generations show
+                # 0% degenerate thoughts at batch 30 versus 41% by batch 79: the good model
+                # existed and was overwritten by the hacked one.
+                # ~253MB per snapshot at r32; set keep_step_checkpoints=false to disable.
+                if cfg.get("keep_step_checkpoints", True):
+                    _snap = join(self.checkpoint_path, f"step_{batch_idx + 1:04d}")
+                    os.makedirs(_snap, exist_ok=True)
+                    save_lora(llm.model, _snap)
+                    logger.info("Saved numbered snapshot -> %s", _snap)
+
+            # Log metrics
+            try:
+                metrics["time/total"] = time.time() - t_start
+                self.ml_logger.log_metrics(metrics)  # increments each time
+            except Exception as e:
+                _error_class = e.__class__.__name__
+                _error_message = str(e)
+                rich_print(f"[red]Error logging metrics: {_error_class}: {_error_message}[/red]")
+                for k, v in metrics.items():
+                    print(k, type(v))
+                # headless-safe: a metric-logging failure must not kill training
+            torch.cuda.empty_cache()
+
+        # Load best model checkpoint
+        llm.model = load_lora(llm.model, self.best_checkpoint_path)
+        return llm
+
+    def _dispatch_rollouts(
+        self,
+        env: Environment,
+        cfg: DictConfig,
+        batch_id: int,
+        checkpoint_name: str | None = None,
+        split: str = "train",
+        num_tries: int = 1,
+        start_idx: int = 0,
+        tasks_per_update: int | None = None,  # i.e., batch_size
+        name_or_identifier: str | None = None,
+        **kwargs
+    ):
         """
         For SFT traiining, we assume env is an ActPrmTracesEnv, so we have full (thought)-action
         trajectories already for training. We "generate rollouts" by sampling from these
         """
-        return run_rollouts(**kwargs)
+        trajectory = env.get_trajectory(start_idx, split)
 
     def run_rollouts(
     llm: HuggingFaceLLM,
