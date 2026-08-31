@@ -373,18 +373,19 @@ retail/expert_thoughts_lr1e_3_adamw_nb100            hide   30     1.7999 ->   1
 retail/expert_thoughts_lr1e_3_adamw_nb200_flat32     hide   85     1.9852 ->   1.7020  14.27%  0.8509        1.2054  <running>
 retail/expert_thoughts_lr1e_3_adamw_nb6_validate     hide    5     2.2879 ->   2.0729   9.40%  0.7990        1.4971
 retail/thoughts_policy_adamw30_lr1e_3_adamw_nb100    hide   70     1.8959 ->   1.9718  -4.00%  0.8345        1.3828  <running>
-retail/thoughts_policy_adamw30_lr1e_3_adamw_nb200_flat32 hide   51     2.1230 ->   1.7529  17.43%  0.8371        1.2961  <running>
+retail/thoughts_policy_adamw30_lr1e_3_adamw_nb200_flat32 hide   65     2.1230 ->   1.8328  13.67%  0.8379        1.2222  <running>
 retail/thoughts_policy_adamw30_lr1e_3_adamw_nb6_validate hide    5     2.3775 ->   2.2449   5.57%  0.7814        1.3506
 airline/actions_only_lr1e_3_adamw_nb100              hide   50     2.1901 ->   3.3899 -54.78%  0.7893        1.0000  <running>
+airline/actions_only_lr1e_3_adamw_nb200_flat32       hide   28     2.2776 ->   2.1640   4.99%  0.7954        1.2449  <running>
 airline/expert_thoughts_lr1e_3_adamw_nb100           hide   50     2.0737 ->   3.1936 -54.00%  0.7913        1.0000  <running>
 airline/thoughts_policy_adamw30_lr1e_3_adamw_nb100   hide   50     2.0724 ->   3.4621 -67.06%  0.7952        1.0000  <running>
 snorkel_finance_split/actions_only_lr1e_3_adamw_nb100 hide   80     1.7603 ->   1.6942   3.75%  0.8648        1.0391  <running>
 snorkel_finance_split/expert_thoughts_lr1e_3_adamw_nb100 hide   80     1.6835 ->   1.6045   4.69%  0.8734        1.7344  <running>
 snorkel_finance_split/thoughts_policy_adamw30_lr1e_3_adamw_nb100 hide   80     1.7302 ->   1.6604   4.03%  0.8707        1.0391  <running>
 
-5/18 arms complete   (Δ% = held-out action-subspan PPL improvement, higher is better)
+5/19 arms complete   (Δ% = held-out action-subspan PPL improvement, higher is better)
 ```
-_last refreshed: 2026-08-30 20:00_
+_last refreshed: 2026-08-30 20:20_
 <!--/RESULTS-->
 
 ## Infrastructure
