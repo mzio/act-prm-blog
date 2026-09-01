@@ -77,6 +77,8 @@ def build_flat_steps(
     hf_tokenizer: Any,
     enable_thinking: bool = False,
     max_steps_per_traj: int | None = None,
+    require_thought: bool = False,
+    require_thought_eval: bool = False,
 ) -> list[EpisodeStep]:
     """Tokenise every logged (state, action) pair in ``env.datasets[split]`` into an
     EpisodeStep. NO model forward -- this is the whole point of the file.
@@ -101,6 +103,24 @@ def build_flat_steps(
         messages = traj["messages"]
         system_prompt = traj.get("system_prompt", "")
         action_indices = [i for i, m in enumerate(messages) if m.get("role") == "assistant"]
+        # require_thought: train ONLY on assistant turns carrying reasoning before the
+        # action -- the expert_thoughts_all arm. Implemented in the GENERATOR
+        # (generator/act_prm/base.py:512), which sft_flat bypasses entirely, so without
+        # this the flag reached the config, was silently ignored, and expert_thoughts_all
+        # ran as an exact duplicate of expert_thoughts (identical PPL and action_frac).
+        # TRAIN ONLY by default: filtering eval too would score the arm on a different,
+        # harder subset than the other arms.
+        if require_thought and (split == "train" or require_thought_eval):
+            from act_prm.environments.act_prm_traces.data import extract_action as _xa
+
+            def _has_thought(i: int) -> bool:
+                c = messages[i].get("content") or ""
+                a = _xa(c)
+                if not a or c.find(a) < 0:
+                    return False
+                return len(c[: c.find(a)].strip()) >= 10
+
+            action_indices = [i for i in action_indices if _has_thought(i)]
         if max_steps_per_traj:
             action_indices = action_indices[:max_steps_per_traj]
         for t, idx in enumerate(action_indices):
@@ -249,10 +269,12 @@ class SFTFlatTrainer(SFTTrainer):
 
         # ---- build once, no forwards ------------------------------------------------
         t0 = time.time()
+        _rt = bool(cfg.get("require_thought", False))
+        _rte = bool(cfg.get("require_thought_eval", False))
         train_steps = build_flat_steps(env, "train", hf_tokenizer, enable_thinking,
-                                       cfg.get("max_steps_per_traj", None))
+                                       cfg.get("max_steps_per_traj", None), _rt, _rte)
         eval_steps = build_flat_steps(eval_env, "eval", hf_tokenizer, enable_thinking,
-                                      cfg.get("max_steps_per_traj", None))
+                                      cfg.get("max_steps_per_traj", None), _rt, _rte)
         print(f"[sft_flat] built {len(train_steps)} train / {len(eval_steps)} eval steps "
               f"in {time.time() - t0:.1f}s (no model forwards); "
               f"steps_per_batch={steps_per_batch} micro_bs={micro_bs}")
