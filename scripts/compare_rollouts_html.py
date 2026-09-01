@@ -24,9 +24,15 @@ N_TASKS, MAX_MSG = 3, 10**6   # MAX_MSG effectively unlimited: show the whole tr
 
 
 def load(pat, logpat):
-    """Key episodes by TASK_ID, not task_prompt: the user simulator is an LLM, so it
-    phrases the same task differently every run (41 vs 43 distinct openings, none
-    matching). task_id is stable and identically ordered across all four runs."""
+    """Return {task_id: (full_episode, correct)}.
+
+    Episode extraction is the subtle part. The replay buffer stores ONE ROW PER STEP and
+    each row's full_state is the conversation SO FAR, growing 2,4,6,... within an episode
+    and resetting at the boundary. Keying a dict by len(full_state) therefore mixes
+    prefixes from different episodes and silently truncates them -- that artifact made a
+    NEW trajectory look like it stopped after 11 messages when it actually ran to 31.
+    The real episode is the LAST row before the length resets.
+    """
     import json as _json
     ds = sorted(glob.glob(f"{ROOT}/{pat}/replay_buffer"))
     lg = sorted(glob.glob(f"logs/tau2bench_retail_rlvr/hf_qwen3_4b_instruct/{logpat}/"),
@@ -35,21 +41,12 @@ def load(pat, logpat):
         return {}
     per = [_json.loads(l) for l in open(lg[-1] + "rollouts_per_task.jsonl")]
     order = [r.get("task_id") for r in per]
-    rew_by = {r.get("task_id"): r.get("correct") for r in per}
+    correct = {r.get("task_id"): bool(r.get("correct")) for r in per}
     d = load_from_disk(ds[0])
-    # episodes appear in task order; take the longest full_state per distinct length
-    eps = []
-    seen = set()
-    for row in d:
-        ms = row.get("full_state") or []
-        if len(ms) < 3:
-            continue
-        key = (len(ms), (row.get("task_prompt") or "")[:40])
-        if key in seen:
-            continue
-        seen.add(key)
-        eps.append(ms)
-    return {order[i]: (eps[i], rew_by.get(order[i]))
+    states = [r.get("full_state") or [] for r in d]
+    eps = [ms for i, ms in enumerate(states)
+           if (i + 1 == len(states) or len(states[i + 1]) < len(ms)) and len(ms) >= 3]
+    return {order[i]: (eps[i], correct.get(order[i]))
             for i in range(min(len(eps), len(order)))}
 
 
