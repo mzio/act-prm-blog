@@ -121,6 +121,14 @@ log "=== SFT sweep $ENVCFG : {actions_only, expert_thoughts, thoughts_{policy,ba
 for regime in $REGIMES; do
   run_one actions_only    actions_only    "$regime"
   run_one expert_thoughts expert_thoughts "$regime"
+  # expert_thoughts_all: expert reasoning+action, trained ONLY on turns that HAVE
+  # reasoning. Plain expert_thoughts is ~50% bare <tool_call> targets, which teaches the
+  # model not to think (measured: it reasons on 5.6% of retail rollout turns vs 19.7% for
+  # thoughts_policy). This variant existed in train_sft.sh from the start WITH that
+  # rationale, but was never invoked here -- so it had never once run as of 2026-08-31,
+  # despite being the arm the old-generation rollouts showed doubling task completion
+  # (11.9% -> 21.4%). Opt out with SKIP_EXPERT_ALL=1.
+  [ "${SKIP_EXPERT_ALL:-0}" = 1 ] || run_one expert_thoughts_all expert_thoughts_all "$regime"
   for k in $CORPUS_VARIANTS; do
     corpus_ok "$CORPUS/policy$k" && run_one thoughts_policy "thoughts_policy$k" "$regime" --dataset_path "$CORPUS/policy$k"
     corpus_ok "$CORPUS/base$k"   && run_one thoughts_base   "thoughts_base$k"   "$regime" --dataset_path "$CORPUS/base$k"
