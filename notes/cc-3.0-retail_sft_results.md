@@ -25,7 +25,7 @@ for wordiness rather than for mispredicting the action, which inverts the rankin
 | actions_only_lr1e_3_adamw_nb6_validate | hide | 2.3125 | 0.7719 | 5 | — | — | — | 0.3685 |
 | actions_only_lr1e_3 | hide | 3.6702 | 0.7609 | 59 | 3.6702 | 0.7609 | 59 | 0.4756 |
 | actions_only_lr1e_3_nb150 | hide | 3.0719 | 0.7652 | 149 | 3.0719 | 0.7652 | 149 | 0.7723 |
-| actions_only_lr1e_3_nb200_flat32sgd | hide | 2.9596 | 0.7658 | 165 | — | — | — | 0.7165 |
+| actions_only_lr1e_3_nb200_flat32sgd | hide | 2.7517 | 0.7681 | 199 | — | — | — | 0.6330 |
 | actions_only_lr1e_4_adamw_nb200_flat32 | hide | 1.7538 | 0.8306 | 115 | — | — | — | 0.2505 |
 | actions_only_lr1e_4 | hide | 3.8346 | 0.7606 | 50 | 3.8346 | 0.7606 | 50 | 0.5078 |
 | actions_only_lr3e_3_nb150 | hide | 2.3422 | 0.7726 | 149 | 2.3422 | 0.7726 | 149 | 0.5186 |
@@ -44,6 +44,7 @@ for wordiness rather than for mispredicting the action, which inverts the rankin
 | thoughts_policy_adamw30_lr1e_3_adamw_nb100 | hide | 1.7358 | 0.8368 | 40 | 1.9884 | 0.7917 | 20 | 0.3668 |
 | thoughts_policy_adamw30_lr1e_3_adamw_nb200_flat32 | hide | 1.7150 | 0.8383 | 35 | — | — | — | 0.2997 |
 | thoughts_policy_adamw30_lr1e_3_adamw_nb6_validate | hide | 2.2449 | 0.7814 | 5 | — | — | — | 0.6407 |
+| thoughts_policy_adamw30_lr1e_3_nb200_flat32sgd | hide | 3.1058 | 0.7733 | 5 | — | — | — | 1.1761 |
 | thoughts_policy_adamw30_lr1e_4_adamw_nb200_flat32 | hide | 1.7313 | 0.8393 | 140 | — | — | — | 0.2530 |
 | thoughts_policy_last | hide | 3.2078 | 0.7825 | 40 | 3.7470 | 0.7390 | 10 | 1.5987 |
 | thoughts_policy_lr3e_3_nb150 | hide | 2.2059 | 0.7925 | 149 | 2.3959 | 0.7609 | 149 | 0.8757 |
@@ -92,6 +93,7 @@ that saved step:
 | thoughts_policy_adamw30_lr1e_3_adamw_nb100 | hide | 1.7621 | 0.8306 |
 | thoughts_policy_adamw30_lr1e_3_adamw_nb200_flat32 | hide | — | — |
 | thoughts_policy_adamw30_lr1e_3_adamw_nb6_validate | hide | — | — |
+| thoughts_policy_adamw30_lr1e_3_nb200_flat32sgd | hide | — | — |
 | thoughts_policy_adamw30_lr1e_4_adamw_nb200_flat32 | hide | — | — |
 | thoughts_policy_last | hide | 3.2100 | 0.7810 |
 | thoughts_policy_lr3e_3_nb150 | hide | 2.2059 | 0.7925 |
