@@ -25,7 +25,7 @@ for wordiness rather than for mispredicting the action, which inverts the rankin
 | actions_only_lr1e_3_adamw_nb6_validate | hide | 2.3125 | 0.7719 | 5 | — | — | — | 0.3685 |
 | actions_only_lr1e_3 | hide | 3.6702 | 0.7609 | 59 | 3.6702 | 0.7609 | 59 | 0.4756 |
 | actions_only_lr1e_3_nb150 | hide | 3.0719 | 0.7652 | 149 | 3.0719 | 0.7652 | 149 | 0.7723 |
-| actions_only_lr1e_4_adamw_nb200_flat32 | hide | 1.7538 | 0.8306 | 115 | — | — | — | 0.2701 |
+| actions_only_lr1e_4_adamw_nb200_flat32 | hide | 1.7538 | 0.8306 | 115 | — | — | — | 0.2505 |
 | actions_only_lr1e_4 | hide | 3.8346 | 0.7606 | 50 | 3.8346 | 0.7606 | 50 | 0.5078 |
 | actions_only_lr3e_3_nb150 | hide | 2.3422 | 0.7726 | 149 | 2.3422 | 0.7726 | 149 | 0.5186 |
 | expert_thoughts_all_lr3e_3_nb150 | hide | 2.2503 | 0.7771 | 149 | 3.5330 | 0.6704 | 149 | 1.3412 |
@@ -34,6 +34,7 @@ for wordiness rather than for mispredicting the action, which inverts the rankin
 | expert_thoughts_lr1e_3_adamw_nb100 | hide | 1.6634 | 0.8463 | 30 | 2.5272 | 0.7399 | 30 | 0.0016 |
 | expert_thoughts_lr1e_3_adamw_nb200_flat32 | hide | 1.6409 | 0.8508 | 55 | — | — | — | 0.3253 |
 | expert_thoughts_lr1e_3_adamw_nb6_validate | hide | 2.0729 | 0.7990 | 5 | — | — | — | 0.4444 |
+| expert_thoughts_lr1e_4_adamw_nb200_flat32 | hide | 2.1074 | 0.8015 | 10 | — | — | — | 0.9570 |
 | expert_thoughts_lr3e_3_nb150 | hide | 2.1071 | 0.7973 | 149 | 3.2141 | 0.6958 | 149 | 0.5808 |
 | thoughts_base_last | hide | 3.1928 | 0.7784 | 59 | 3.6738 | 0.7401 | 59 | 0.9956 |
 | thoughts_base_lr3e_3_nb150 | hide | 2.2003 | 0.7890 | 149 | 2.3705 | 0.7610 | 149 | 0.6979 |
@@ -78,6 +79,7 @@ that saved step:
 | expert_thoughts_lr1e_3_adamw_nb100 | hide | 1.6634 | 0.8463 |
 | expert_thoughts_lr1e_3_adamw_nb200_flat32 | hide | — | — |
 | expert_thoughts_lr1e_3_adamw_nb6_validate | hide | — | — |
+| expert_thoughts_lr1e_4_adamw_nb200_flat32 | hide | — | — |
 | expert_thoughts_lr3e_3_nb150 | hide | 2.1071 | 0.7973 |
 | thoughts_base_last | hide | 3.1928 | 0.7784 |
 | thoughts_base_lr3e_3_nb150 | hide | 2.2003 | 0.7890 |
