@@ -25,6 +25,6 @@ while true; do
   done
   # stop once all four arms are marked done
   n=$(ls /tmp/aprm/sft_sweep_tau2_retail/*_lr1e_4_adamw_nb200_flat32_heldout.done 2>/dev/null | wc -l)
-  [ "$n" -ge 4 ] && { echo "[$(date '+%m-%d %H:%M')] all 4 arms done" >> "$OUT"; exit 0; }
+  [ "$n" -ge 3 ] && { echo "[$(date '+%m-%d %H:%M')] sweep arms done ($n)" >> "$OUT"; exit 0; }
   sleep 120
 done
