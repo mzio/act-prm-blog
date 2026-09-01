@@ -25,6 +25,7 @@ for wordiness rather than for mispredicting the action, which inverts the rankin
 | actions_only_lr1e_3_adamw_nb6_validate | hide | 2.3125 | 0.7719 | 5 | — | — | — | 0.3685 |
 | actions_only_lr1e_3 | hide | 3.6702 | 0.7609 | 59 | 3.6702 | 0.7609 | 59 | 0.4756 |
 | actions_only_lr1e_3_nb150 | hide | 3.0719 | 0.7652 | 149 | 3.0719 | 0.7652 | 149 | 0.7723 |
+| actions_only_lr1e_3_nb200_flat32sgd | hide | 3.7544 | 0.7611 | 40 | — | — | — | 0.7678 |
 | actions_only_lr1e_4_adamw_nb200_flat32 | hide | 1.7538 | 0.8306 | 115 | — | — | — | 0.2505 |
 | actions_only_lr1e_4 | hide | 3.8346 | 0.7606 | 50 | 3.8346 | 0.7606 | 50 | 0.5078 |
 | actions_only_lr3e_3_nb150 | hide | 2.3422 | 0.7726 | 149 | 2.3422 | 0.7726 | 149 | 0.5186 |
@@ -72,6 +73,7 @@ that saved step:
 | actions_only_lr1e_3_adamw_nb6_validate | hide | — | — |
 | actions_only_lr1e_3 | hide | 3.6702 | 0.7609 |
 | actions_only_lr1e_3_nb150 | hide | 3.0719 | 0.7652 |
+| actions_only_lr1e_3_nb200_flat32sgd | hide | — | — |
 | actions_only_lr1e_4_adamw_nb200_flat32 | hide | — | — |
 | actions_only_lr1e_4 | hide | 3.8346 | 0.7606 |
 | actions_only_lr3e_3_nb150 | hide | 2.3422 | 0.7726 |
