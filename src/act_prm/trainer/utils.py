@@ -79,3 +79,45 @@ def action_start_token(
         else:
             break
     return a_start
+
+
+def rotate_stale_run_artifacts(cfg: Any, checkpoint_path: str | None) -> None:
+    """Move a PREVIOUS run's metrics + step snapshots aside before this run writes here.
+
+    Run dirs are named from a hash of the DECLARED config, so a re-run with identical
+    config resolves to the same directory. Two artifacts had no protection:
+      * metrics.jsonl APPENDS -> one file holding two runs with the batch counter
+        resetting mid-file (scripts/truncate_restarted_metrics.py exists to clean this up
+        after the fact; this prevents it instead).
+      * step_NNNN/ overwrite only as far as the NEW run gets. On 2026-09-01 an
+        expert_thoughts_all re-run early-stopped at b120, so b130/b140 survived as the
+        PREVIOUS (invalid) run's weights inside the live dir -- a glob over step_* then
+        mixes two models into one curve.
+    generations.jsonl already rotates in generator/act_prm/base.py; this closes the rest.
+    """
+    import os
+    import shutil
+
+    log_path = cfg.get("log_path") if cfg is not None else None
+    if log_path:
+        m = os.path.join(log_path, "metrics.jsonl")
+        if os.path.exists(m) and os.path.getsize(m) > 0:
+            n = 0
+            while os.path.exists(f"{m}.prev{n}"):
+                n += 1
+            os.rename(m, f"{m}.prev{n}")
+            print(f"NOTE: rotated a previous run's metrics.jsonl -> metrics.jsonl.prev{n}")
+    if checkpoint_path and os.path.isdir(checkpoint_path):
+        stale = sorted(
+            d for d in os.listdir(checkpoint_path)
+            if d.startswith("step_") and os.path.isdir(os.path.join(checkpoint_path, d))
+        )
+        if stale:
+            k = 0
+            while os.path.exists(os.path.join(checkpoint_path, f"prev_run_{k}")):
+                k += 1
+            dst = os.path.join(checkpoint_path, f"prev_run_{k}")
+            os.makedirs(dst, exist_ok=True)
+            for d in stale:
+                shutil.move(os.path.join(checkpoint_path, d), os.path.join(dst, d))
+            print(f"NOTE: moved {len(stale)} previous-run snapshot(s) -> prev_run_{k}/")

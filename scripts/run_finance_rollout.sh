@@ -42,11 +42,19 @@ HARD=$(python3 -c "import json;print(' '.join(json.load(open('data/splits/snorke
 log "=== finance rollout: fair=$(echo $FAIR|wc -w) questions, hard=$(echo $HARD|wc -w) questions ==="
 
 for arm in $ARMS; do
-  CK=$(newest "checkpoints_lora/act_prm_snorkel_finance_split/$MODEL/snorkel_finance_split_s2_${arm}_v3_lr3e_3_nb${NB}_heldout-*/step_best")
+  # CKPT_PAT / CKPT_STEP select WHICH Stage-2 generation and snapshot to roll out. The
+  # pattern was hardcoded to the SGD-era v3_lr3e_3 checkpoints; the 2026-09-01 lr 1e-4 runs
+  # are lr1e_4_adamw_nb200_flat32, and step_best is NOT the checkpoint we want (on retail
+  # it scored 0/42 while step_0020 scored 5/42).
+  CK=$(newest "checkpoints_lora/act_prm_snorkel_finance_split/$MODEL/snorkel_finance_split_s2_${arm}_${CKPT_PAT:-v3_lr3e_3_nb${NB}}_heldout-*/${CKPT_STEP:-step_best}")
   [ -z "$CK" ] && { log "finance/$arm: no v3 checkpoint, skip"; continue; }
   for setname in fair hard; do
     IDS=$FAIR; [ "$setname" = hard ] && IDS=$HARD
-    TAG="finance_rollout_${arm}_v3_${setname}"
+    # TAG must encode the checkpoint generation AND snapshot, or a new rollout collides
+    # with the SGD-era one: same log dir (metrics appended) and same .done marker (the arm
+    # gets silently skipped). That exact collision hid the actions_only baseline on
+    # 2026-08-31 until the tag was fixed.
+    TAG="finance_rollout_${arm}_${CKPT_TAG:-v3}${CKPT_STEP:+_${CKPT_STEP}}_${setname}"
     [ -f "$MDIR/${TAG}.done" ] && { log "$TAG: done, skip"; continue; }
     log "ROLLOUT $TAG ($(echo $IDS|wc -w) questions)"
     wait_gpu_free

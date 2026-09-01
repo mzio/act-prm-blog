@@ -53,6 +53,7 @@ from act_prm.replay_buffer.types import EpisodeStep, Trajectory
 from act_prm.utils.logging import timed
 
 from ..train import prepare_minibatch
+from ..utils import rotate_stale_run_artifacts
 from .rl import _lower_is_better, is_better
 from .sft import SFTTrainer
 
@@ -254,6 +255,7 @@ class SFTFlatTrainer(SFTTrainer):
         llm = llm or self.llm
         optimizer = optimizer or self.optimizer
         cfg = cfg or self.cfg
+        rotate_stale_run_artifacts(cfg, self.checkpoint_path)
         env = env or self.env
         eval_env = eval_env or self.eval_env
         hf_tokenizer = self.hf_tokenizer

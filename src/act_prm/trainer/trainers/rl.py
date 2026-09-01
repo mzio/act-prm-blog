@@ -32,6 +32,7 @@ from act_prm.llm_handlers import HuggingFaceLLM
 from act_prm.lora import load_lora, save_lora
 from act_prm.replay_buffer.types import Trajectory
 from act_prm.utils.display import display_metrics
+from act_prm.trainer.utils import rotate_stale_run_artifacts
 from act_prm.utils.logging import timed
 
 from ..train import run_rollouts
@@ -212,6 +213,9 @@ class RLTrainer(BaseTrainer):
         optimizer = optimizer or self.optimizer
 
         cfg = cfg or self.cfg
+        # Archive a previous run's metrics/snapshots before writing into this dir (see
+        # trainer/utils.py). Inherited by SFTTrainer, so the sft path is covered too.
+        rotate_stale_run_artifacts(cfg, getattr(self, "checkpoint_path", None))
         env = env or self.env
         eval_env = eval_env or self.eval_env
         # Evaluation
