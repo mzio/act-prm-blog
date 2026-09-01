@@ -34,7 +34,7 @@ for wordiness rather than for mispredicting the action, which inverts the rankin
 | expert_thoughts_lr1e_3_adamw_nb100 | hide | 1.6634 | 0.8463 | 30 | 2.5272 | 0.7399 | 30 | 0.0016 |
 | expert_thoughts_lr1e_3_adamw_nb200_flat32 | hide | 1.6409 | 0.8508 | 55 | — | — | — | 0.3253 |
 | expert_thoughts_lr1e_3_adamw_nb6_validate | hide | 2.0729 | 0.7990 | 5 | — | — | — | 0.4444 |
-| expert_thoughts_lr1e_4_adamw_nb200_flat32 | hide | 1.6872 | 0.8422 | 80 | — | — | — | 0.7019 |
+| expert_thoughts_lr1e_4_adamw_nb200_flat32 | hide | 1.6373 | 0.8487 | 115 | — | — | — | 0.4341 |
 | expert_thoughts_lr3e_3_nb150 | hide | 2.1071 | 0.7973 | 149 | 3.2141 | 0.6958 | 149 | 0.5808 |
 | thoughts_base_last | hide | 3.1928 | 0.7784 | 59 | 3.6738 | 0.7401 | 59 | 0.9956 |
 | thoughts_base_lr3e_3_nb150 | hide | 2.2003 | 0.7890 | 149 | 2.3705 | 0.7610 | 149 | 0.6979 |
