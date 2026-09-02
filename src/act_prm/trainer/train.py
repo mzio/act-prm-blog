@@ -48,7 +48,20 @@ def _dump_per_task_records(
         try:
             _tasks = env.datasets[env.split]
             _task = _tasks[sample_id % len(_tasks)]
-            task_id = getattr(_task, "id", None)
+            # tau2 tasks are objects with .id; the snorkel envs (insurance, finance) hold
+            # plain dicts keyed by query_id/company_task_id. getattr(dict, "id") is None,
+            # which silently produced task_id=null for every insurance row -- and any
+            # scorer deduping on task_id then collapses all 40 tasks into one bucket.
+            if isinstance(_task, dict):
+                for _k in ("id", "query_id", "company_task_id", "task_id"):
+                    if _task.get(_k) is not None:
+                        task_id = _task[_k]
+                        break
+            else:
+                for _k in ("id", "query_id", "company_task_id", "task_id"):
+                    if getattr(_task, _k, None) is not None:
+                        task_id = getattr(_task, _k)
+                        break
         except Exception:  # noqa: BLE001
             pass
 
