@@ -48,7 +48,9 @@ for arm in $ARMS; do
   # it scored 0/42 while step_0020 scored 5/42).
   CK=$(newest "checkpoints_lora/act_prm_snorkel_finance_split/$MODEL/snorkel_finance_split_s2_${arm}_${CKPT_PAT:-v3_lr3e_3_nb${NB}}_heldout-*/${CKPT_STEP:-step_best}")
   [ -z "$CK" ] && { log "finance/$arm: no v3 checkpoint, skip"; continue; }
-  for setname in fair hard; do
+  # SETS restricts which question sets run. Default keeps both (historical behaviour);
+  # SETS=fair is the cross-domain-comparable one and halves the cost of a sweep.
+  for setname in ${SETS:-fair hard}; do
     IDS=$FAIR; [ "$setname" = hard ] && IDS=$HARD
     # TAG must encode the checkpoint generation AND snapshot, or a new rollout collides
     # with the SGD-era one: same log dir (metrics appended) and same .done marker (the arm
@@ -80,8 +82,10 @@ done
 # and the guard advanced past them.
 _missing=0
 for arm in $ARMS; do
-  for setname in fair hard; do
-    [ -f "$MDIR/finance_rollout_${arm}_v3_${setname}.done" ] || _missing=$((_missing+1))
+  # Must mirror the SETS filter above, or the gate demands .done markers for sets that
+  # were deliberately not run and never reports completion.
+  for setname in ${SETS:-fair hard}; do
+    [ -f "$MDIR/finance_rollout_${arm}_${CKPT_TAG:-v3}${CKPT_STEP:+_${CKPT_STEP}}_${setname}.done" ] || _missing=$((_missing+1))
   done
 done
 if [ "$_missing" -eq 0 ]; then
