@@ -42,7 +42,7 @@ for lr in $LRS; do
   for arm in $ARMS; do
     { echo "======== sgd $lr / $arm"
       uv run --no-project python scripts/report_checkpoint_grid.py \
-        --run "retail_s2_${arm}_${lrtag}_sgd_nb200_flat32sgd_heldout-*" 2>&1
+        --run "retail_s2_${arm}_${lrtag}_nb200_flat32sgd_heldout-*" 2>&1
     } >> "$MDIR/grids.txt"
   done
 done
@@ -54,10 +54,10 @@ for lr in $LRS; do
     for step in step_0020 step_best; do
       key="$lrtag.$arm.$step"
       [ -f "$MDIR/roll_$key.done" ] && { log "rollout $key done, skip"; continue; }
-      ck=$(ls -d checkpoints_lora/act_prm_tau2_retail/hf_qwen3_4b_instruct/retail_s2_${arm}_${lrtag}_sgd_nb200_flat32sgd_heldout-*/${step} 2>/dev/null | head -1)
+      ck=$(ls -d checkpoints_lora/act_prm_tau2_retail/hf_qwen3_4b_instruct/retail_s2_${arm}_${lrtag}_nb200_flat32sgd_heldout-*/${step} 2>/dev/null | head -1)
       [ -z "$ck" ] && { log "$key: no checkpoint, skip"; continue; }
       log "ROLLOUT $key"
-      VARIANTS="$arm" CKPT_PAT="${lrtag}_sgd_nb200_flat32sgd" CKPT_TAG="sgd${lrtag}" CKPT_STEP="$step" \
+      VARIANTS="$arm" CKPT_PAT="${lrtag}_nb200_flat32sgd" CKPT_TAG="sgd${lrtag}" CKPT_STEP="$step" \
         ./scripts/run_sft_rollout_eval.sh >> "$L" 2>&1 || log "  $key FAILED"
       touch "$MDIR/roll_$key.done"
       for p in $(ps -eo pid,args | awk '$2=="bash" && $3 ~ /run_sft_rollout_eval\.sh$/ {print $1}'); do kill -9 "$p" 2>/dev/null; done
