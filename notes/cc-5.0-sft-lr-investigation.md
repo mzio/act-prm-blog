@@ -392,11 +392,11 @@ snorkel_finance_split/expert_thoughts_lr1e_3_adamw_nb100 hide   80     1.6835 ->
 snorkel_finance_split/expert_thoughts_lr1e_3_adamw_nb200_flat32 hide  105     1.8436 ->   1.6628   9.80%  0.8694        1.2493  <running>
 snorkel_finance_split/thoughts_policy_adamw30_lr1e_3_adamw_nb100 hide   80     1.7302 ->   1.6604   4.03%  0.8707        1.0391  <running>
 snorkel_finance_split/thoughts_policy_adamw30_lr1e_3_adamw_nb200_flat32 hide  115     1.9037 ->   1.6815  11.67%  0.8675        1.0747  <running>
-snorkel_finance_split/thoughts_policy_adamw30_lr1e_3_nb200_flat32sgd hide   89     2.5260 ->   2.3742   6.01%  0.8363        2.0671  <running>
+snorkel_finance_split/thoughts_policy_adamw30_lr1e_3_nb200_flat32sgd hide  124     2.5260 ->   2.2482  11.00%  0.8371        2.6074  <running>
 
 10/30 arms complete   (Δ% = held-out action-subspan PPL improvement, higher is better)
 ```
-_last refreshed: 2026-09-02 10:40_
+_last refreshed: 2026-09-02 11:00_
 <!--/RESULTS-->
 
 ## Infrastructure
