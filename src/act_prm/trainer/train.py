@@ -81,6 +81,35 @@ def _dump_per_task_records(
         with open(os.path.join(log_path, "rollouts_per_task.jsonl"), "a") as f:
             for row in rows:
                 f.write(json.dumps(row) + "\n")
+
+        # Opt-in full-conversation dump. Gated by an env var rather than a cfg key on
+        # purpose: update_configs only applies a CLI flag whose key ALREADY exists in the
+        # target yaml, so a new cfg key would be silently dropped for every config that
+        # doesn't declare it. Off unless ACT_PRM_DUMP_TRAJECTORIES=1.
+        if os.environ.get("ACT_PRM_DUMP_TRAJECTORIES", "") == "1":
+            with open(os.path.join(log_path, "trajectories.jsonl"), "a") as f:
+                for _tg in group_dict.get(key, []) or []:
+                    for gen_id, _traj in enumerate(getattr(_tg, "trajectories", []) or []):
+                        steps = getattr(_traj, "episode_steps", []) or []
+                        if not steps:
+                            continue
+                        last = steps[-1]
+                        # state + action + next_obs on the FINAL step is the whole
+                        # conversation: state already re-includes every prior turn.
+                        msgs = list(last.state) + [last.action] + list(last.next_obs)
+                        f.write(json.dumps({
+                            "split": split,
+                            "batch": batch_id,
+                            "try": try_idx,
+                            "sample_id": sample_id,
+                            "task_id": task_id,
+                            "gen_id": gen_id,
+                            "checkpoint_name": checkpoint_name,
+                            "final_reward": float(getattr(_traj, "final_reward", 0.0) or 0.0),
+                            "n_steps": len(steps),
+                            "system_prompt": getattr(last, "system_prompt", None),
+                            "messages": msgs,
+                        }, default=str) + "\n")
     except Exception:  # noqa: BLE001
         pass  # per-task dumping is diagnostics only -- never break a run
 

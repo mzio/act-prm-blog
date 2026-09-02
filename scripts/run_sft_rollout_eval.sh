@@ -28,6 +28,10 @@ export PATH="$HOME/.local/bin:$HOME/.cargo/bin:/usr/local/bin:$PATH"
 # wandb.init and then dies on a broken CONNECT tunnel. Falls back to WANDB_MODE=offline.
 [ -f scripts/wandb_preflight.sh ] && . scripts/wandb_preflight.sh
 export PYTHONUNBUFFERED=1
+# Dump the full conversation per rollout to <log_path>/trajectories.jsonl alongside the
+# scores in rollouts_per_task.jsonl. Each rollout writes into its OWN run dir (the tag
+# carries CKPT_TAG/CKPT_STEP), so this never overwrites prior work.
+export ACT_PRM_DUMP_TRAJECTORIES="${ACT_PRM_DUMP_TRAJECTORIES:-1}"
 MODEL="${MODEL_CFG:-hf_qwen3_4b_instruct}"; export MODEL_CFG="$MODEL"
 MDIR=/tmp/aprm/rollout; mkdir -p "$MDIR"
 SMOKE="${SMOKE:-0}"
