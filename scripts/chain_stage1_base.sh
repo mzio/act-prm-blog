@@ -86,9 +86,12 @@ one_domain(){  # $1=envcfg $2=dom $3=corpusdir $4=relabel_nb $5=source_pool
   log "$dom: exported $out  train=$nt"
 }
 
-log "=== Stage-1 base-scored corpora: airline -> retail -> insurance -> finance ==="
+log "=== Stage-1 base-scored corpora: airline -> retail -> insurance (finance dropped) ==="
 one_domain act_prm/tau2_airline          airline   tau2_airline           6  data/tau2_airline            || true
 one_domain act_prm/tau2_retail           retail    tau2_retail           13  data/tau2_retail             || true
 one_domain act_prm/snorkel_insurance     insurance snorkel_insurance     45  data/snorkel_insurance_split || true
-one_domain act_prm/snorkel_finance_split finance   snorkel_finance_split 29  data/snorkel_finance_split_v3 || true
+# FINANCE DROPPED 2026-09-03 (MZ approved). 19.6h of the 41.8h total, and its rollout eval
+# cannot discriminate between arms (floor effect: 9 of 10 finance fair-set rollouts ever run
+# scored 0/10; cc-13.0 challenge #6). Re-enable if the finance eval is ever fixed.
+# one_domain act_prm/snorkel_finance_split finance   snorkel_finance_split 29  data/snorkel_finance_split_v3 || true
 log "=== Stage-1 base-scored corpora complete ==="
