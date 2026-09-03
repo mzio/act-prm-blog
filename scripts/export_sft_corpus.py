@@ -100,19 +100,40 @@ def _resolve_source(pool: list[dict[str, Any]], steps: dict[int, str]) -> int | 
     return cands[0] if len(cands) == 1 else None
 
 
-def _committed_target(row: dict[str, Any]) -> str:
-    """Best-scored (thought + action) target for one logged step.
+def _ranked_indices(row: dict[str, Any]) -> list[int]:
+    """Candidate thought indices ordered best-first by reward.
 
-    ``best`` is the selected candidate index the generator already marks; for
-    actions-only rows (no thoughts) the target is the bare logged action.
+    Ranks on ``rewards`` (== ``likelihoods``, the length-penalised p(x|s,z) the
+    E-step scored each candidate with). Falls back to the generator's own ``best``
+    index first when rewards are absent, so rank 0 always agrees with the previous
+    top-1-only behaviour.
+    """
+    thoughts = row.get("thoughts") or []
+    if not thoughts:
+        return []
+    rewards = row.get("rewards") or row.get("likelihoods") or []
+    if len(rewards) == len(thoughts):
+        return sorted(range(len(thoughts)), key=lambda i: -float(rewards[i]))
+    best = int(row.get("best", 0))
+    best = best if 0 <= best < len(thoughts) else 0
+    return [best] + [i for i in range(len(thoughts)) if i != best]
+
+
+def _committed_target(row: dict[str, Any], rank: int = 0) -> str:
+    """The ``rank``-th best (thought + action) target for one logged step.
+
+    rank=0 reproduces the historical behaviour exactly. For a step with fewer than
+    ``rank+1`` candidates the LAST available candidate is reused rather than dropping
+    the step, so every variant trajectory keeps the same number of actions -- dropping
+    would silently change the trained token count between top-k arms.
     """
     thoughts = row.get("thoughts") or []
     action = row["target_action"]
     if not thoughts:
         return action
-    best = int(row.get("best", 0))
-    best = best if 0 <= best < len(thoughts) else 0
-    return f"{thoughts[best]}\n\n{action}"
+    order = _ranked_indices(row)
+    idx = order[min(rank, len(order) - 1)]
+    return f"{thoughts[idx]}\n\n{action}"
 
 
 def export(
@@ -122,6 +143,7 @@ def export(
     splits: list[str],
     strict: bool = False,
     min_coverage: float = 0.9,
+    top_k: int = 1,
 ) -> dict[str, int]:
     """Build {split}.json pools; return per-split trajectory counts."""
     rows = _load_rows(gen_file)
@@ -161,25 +183,30 @@ def export(
                 )
             continue
         resolved_idx[split].add(src_idx)
-        traj = copy.deepcopy(pool[src_idx])
-        messages = traj["messages"]
-        action_indices = [i for i, m in enumerate(messages) if m.get("role") == "assistant"]
-        for t, row in sorted(steps.items()):
-            if t >= len(action_indices):
-                continue  # relabel covered more steps than this source traj has
-            idx = action_indices[t]
-            # Sanity: the row's target_action should match the source's stripped
-            # action at this step (with the seq-match join this should be ~0).
-            src_action = extract_action(messages[idx].get("content") or "") or messages[idx].get("content")
-            if src_action != row["target_action"]:
-                n_mismatch += 1
-                if strict:
-                    raise SystemExit(
-                        f"target_action mismatch at {split} sample {sample_id} step {t}:\n"
-                        f"  source: {src_action!r}\n  row:    {row['target_action']!r}"
-                    )
-            messages[idx]["content"] = _committed_target(row)
-        out[split].append(traj)
+        # top_k>1 emits K COPIES of the trajectory, copy k using each step's k-th best
+        # thought. Task coverage is therefore identical across arms and only the number
+        # of distilled thoughts per action changes -- which is the variable under test.
+        for _rank in range(max(1, top_k)):
+          traj = copy.deepcopy(pool[src_idx])
+          messages = traj["messages"]
+          action_indices = [i for i, m in enumerate(messages) if m.get("role") == "assistant"]
+          for t, row in sorted(steps.items()):
+              if t >= len(action_indices):
+                  continue  # relabel covered more steps than this source traj has
+              idx = action_indices[t]
+              # Sanity: the row's target_action should match the source's stripped
+              # action at this step (with the seq-match join this should be ~0).
+              src_action = extract_action(messages[idx].get("content") or "") or messages[idx].get("content")
+              if src_action != row["target_action"]:
+                  if _rank == 0:
+                      n_mismatch += 1
+                  if strict:
+                      raise SystemExit(
+                          f"target_action mismatch at {split} sample {sample_id} step {t}:\n"
+                          f"  source: {src_action!r}\n  row:    {row['target_action']!r}"
+                      )
+              messages[idx]["content"] = _committed_target(row, _rank)
+          out[split].append(traj)
 
     # COVERAGE GUARD. The failure this exists for (08-28, finance): the run's env
     # dataset_path and the driver's --source-pools pointed at two DIFFERENT finance
@@ -256,6 +283,14 @@ def main() -> None:
     )
     ap.add_argument("--out", required=True, help="Output dir for {train,eval}.json pools.")
     ap.add_argument(
+        "--top_k", type=int, default=1,
+        help="How many thoughts per action to distil. K>1 emits K copies of each "
+             "trajectory, copy k using each step's k-th best thought (ranked by the "
+             "E-step reward). Task coverage is identical across K; only the number of "
+             "thoughts per action changes. Requires the relabel to have generated at "
+             "least K candidates (--group_size).",
+    )
+    ap.add_argument(
         "--splits",
         default="train,eval",
         help="Comma-separated splits to export (default: train,eval).",
@@ -278,7 +313,7 @@ def main() -> None:
     gen_file = _find_generations(args.generations)
     splits = [s.strip() for s in args.splits.split(",") if s.strip()]
     counts = export(gen_file, args.source_pools, args.out, splits, strict=args.strict,
-                    min_coverage=args.min_coverage)
+                    min_coverage=args.min_coverage, top_k=args.top_k)
     total = sum(counts.values())
     print(f"Exported {total} trajectories to {args.out}")
     for s in splits:
