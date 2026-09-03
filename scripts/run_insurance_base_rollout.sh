@@ -14,6 +14,13 @@ export PATH="$HOME/.local/bin:$HOME/.cargo/bin:/usr/local/bin:$PATH"
 export https_proxy="${https_proxy:-http://fwdproxy:8080}"
 export http_proxy="${http_proxy:-http://fwdproxy:8080}"
 export HF_TOKEN="${HF_TOKEN:-$(cat "$HOME/models/token" 2>/dev/null || true)}"
+# fwdproxy began 403-ing huggingface.co on 2026-09-03, which killed model loading in
+# load_hf_model_and_tokenizer -> hf_hub list_repo_tree (all 4 expert_thoughts_all runs
+# and the insurance base rollout died in ~25s). The weights are cached locally under
+# HF_HOME, so go offline and never touch the Hub. Verified: AutoConfig+AutoTokenizer
+# for Qwen3-4B-Instruct-2507 load fine with HF_HUB_OFFLINE=1.
+export HF_HUB_OFFLINE="${HF_HUB_OFFLINE:-1}"
+export HF_HOME="${HF_HOME:-/data/users/mzio/models/hf_cache}"
 export ACT_PRM_DUMP_TRAJECTORIES=1
 MODEL="${MODEL_CFG:-hf_qwen3_4b_instruct}"; export MODEL_CFG="$MODEL"
 MDIR=/tmp/aprm/insurance_rollout; mkdir -p "$MDIR"

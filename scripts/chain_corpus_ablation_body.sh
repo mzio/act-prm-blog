@@ -24,15 +24,11 @@ export PATH="$HOME/.local/bin:$HOME/.cargo/bin:/usr/local/bin:$PATH"
 export PYTHONUNBUFFERED=1 HF_HOME=/data/users/mzio/models/hf_cache
 export ACT_PRM_DUMP_TRAJECTORIES=1
 
-WAIT_PID="${WAIT_PID:?set WAIT_PID}"
 G=/tmp/aprm/corpus_abl; mkdir -p "$G"
 LOG="$G/chain.log"
 log(){ echo "[$(date '+%m-%d %H:%M:%S')] $*" | tee -a "$LOG"; }
 reap(){ for p in $(pgrep -f 'main_pytorch\.py'); do kill -9 "$p" 2>/dev/null; done; sleep 20; }
 
-log "waiting on pid=$WAIT_PID"
-while kill -0 "$WAIT_PID" 2>/dev/null; do sleep 60; done
-log "pid $WAIT_PID exited"; reap
 
 # CORPUS_VARIANTS="" -> label "thoughts_policy", dataset_path data/sft_corpus/<env>/policy
 # (the OLD relabel). VARIANTS must match that LABEL exactly -- passing the wrong label is
