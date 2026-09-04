@@ -116,9 +116,10 @@ uncapped Act-PRM EM peaks ~72 GiB/run (one per GPU); cap with `--obs_max_chars` 
 
 - **ROLLOUT REPEATS MUST VARY `--seed`.** The snorkel gyms (insurance, finance) have no
   simulated user — only tools + an LLM judge — so a rollout is **deterministic given a
-  seed**. Re-running the same checkpoint at the default `seed=42` re-derives the identical
-  result and measures nothing: insurance `step_best` run-1 vs "repeat" agreed on **40/40
-  tasks (100%)**, and 3 of 4 configs reproduced their score exactly. tau2 (retail, airline)
+  seed**. Re-running the same checkpoint at the default `seed=42` re-derives essentially
+  the identical result: insurance `step_best` run-1 vs "repeat" agreed on **40/40 tasks
+  (100%)** and `step_0020` on **39/40 (97.5%)** -- so the snorkel same-seed noise floor is
+  **~2.5 points (1 task, the LLM judge on a borderline answer)**. tau2 (retail, airline)
   is different — it calls an **external Claude user simulator that we do not seed**, which
   is why two *numerically identical* LoRA checkpoints (adapter diff 0.0000) scored 31.0%
   and 16.7% on the same 42 retail tasks, a 14.3pt swing. So:
