@@ -114,6 +114,21 @@ uncapped Act-PRM EM peaks ~72 GiB/run (one per GPU); cap with `--obs_max_chars` 
 
 ## Gotchas
 
+- **ROLLOUT REPEATS MUST VARY `--seed`.** The snorkel gyms (insurance, finance) have no
+  simulated user — only tools + an LLM judge — so a rollout is **deterministic given a
+  seed**. Re-running the same checkpoint at the default `seed=42` re-derives the identical
+  result and measures nothing: insurance `step_best` run-1 vs "repeat" agreed on **40/40
+  tasks (100%)**, and 3 of 4 configs reproduced their score exactly. tau2 (retail, airline)
+  is different — it calls an **external Claude user simulator that we do not seed**, which
+  is why two *numerically identical* LoRA checkpoints (adapter diff 0.0000) scored 31.0%
+  and 16.7% on the same 42 retail tasks, a 14.3pt swing. So:
+  - snorkel domains → vary `--seed` to get independent samples;
+  - tau2 domains → plain repeats are already independent (external user sim), and the
+    single-run noise floor is **~14 points** — do not rank checkpoints on differences
+    smaller than that from one rollout each.
+  - `run_insurance_rollout.sh` / `run_finance_rollout.sh` have **no EXTRA_ARGS
+    passthrough**, so a `--seed` handed to them is silently dropped; use `SEED=` (wired
+    2026-09-03) or call `main_pytorch.py` directly.
 - The env tokenizer is loaded from `pretrained_model_config` then overwritten with
   `llm.tokenizer` in `main_pytorch.py` — keep them consistent (same model).
 - `llm_handlers/__init__.py`, `generator/__init__.py`, `environments/__init__.py`

@@ -39,6 +39,35 @@ LOGROOT=logs/act_prm_tau2_retail/hf_qwen3_4b_instruct
 S1=$(newest "$CKROOT/retail_s1em_policy_adamw30-*/step_best")
 [ -z "$S1" ] && { log "FATAL: no retail_s1em_policy_adamw30 step_best"; exit 1; }
 
+
+# ---- 0. SEED-VARIED insurance repeats (prepended 2026-09-03)
+# The phase-2 "repeats" measured NOTHING for insurance: per-task agreement between run 1
+# and rep2 was 40/40 = 100% with identical seed=42. The snorkel gyms are deterministic
+# given a seed -- unlike tau2, which calls an EXTERNAL Claude user simulator we do not seed
+# (that is where retail's 14pt swing between two numerically identical checkpoints came
+# from). To measure insurance's real rollout variance the SEED has to change.
+# Targeted at the two configs carrying the headline 52.5% -> 15.0% result.
+# Calls main_pytorch DIRECTLY: run_insurance_rollout.sh has no EXTRA_ARGS passthrough, so
+# a --seed handed to it would be SILENTLY DROPPED and we would just produce more duplicates.
+INS_IDS=$(python3 -c "import json;print(' '.join(str(i) for i in json.load(open('data/splits/snorkel_insurance_uid_to_task.json'))['eval_task_ids']))")
+for SEED in 1234 777; do
+  for step in step_0020 step_best; do
+    m="$G/seedvar.$SEED.$step.done"; [ -f "$m" ] && continue
+    CK=$(newest "checkpoints_lora/act_prm_snorkel_insurance/hf_qwen3_4b_instruct/snorkel_insurance_s2_thoughts_policy_adamw30_lr1e_3_nb200_flat32sgd_heldout-*/$step")
+    [ -z "$CK" ] && { log "SEED-VAR $step: no checkpoint, skip"; touch "$m"; continue; }
+    TAG="insurance_rollout_thoughts_policy_adamw30_seed${SEED}_${step}"
+    log "SEED-VAR insurance thoughts_policy/$step seed=$SEED"
+    CLAUDECODE= UV_PROJECT_ENVIRONMENT=.venv-tau2 uv run --no-sync python main_pytorch.py \
+        --env_config act_prm/snorkel_insurance_gym --model_config hf_qwen3_4b_instruct \
+        --lora_config r8_a16_linear --generator_config hf_grpo --trainer_config pg \
+        --replay_buffer_config default --resume_from "$CK" \
+        --no_train --num_batches 1 --eval_every 1 --group_size 2 --batch_size 1 \
+        --max_tokens 2048 --hide_observations --run_tag "$TAG" \
+        --eval_task_ids $INS_IDS --seed "$SEED" --verbose >>"$G/seedvar.log" 2>&1
+    log "  rc=$?"; touch "$m"; reap
+  done
+done
+
 # ---- 1. relabel at group_size 8 (52 retail train trajectories / batch 4 = 13 batches)
 if [ ! -f "$G/relabel.done" ]; then
   log "RELABEL retail @ group_size 8  <- $S1"
