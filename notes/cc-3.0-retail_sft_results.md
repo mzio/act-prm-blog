@@ -51,7 +51,7 @@ for wordiness rather than for mispredicting the action, which inverts the rankin
 | thoughts_policy_adamw30_lr3e_3_nb200_flat32sgd | hide | 2.2822 | 0.7809 | 199 | — | — | — | 0.6983 |
 | thoughts_policy_g8top1_lr1e_3_nb200_flat32sgd | hide | 2.4454 | 0.7748 | 199 | — | — | — | 0.8150 |
 | thoughts_policy_g8top2_lr1e_3_nb200_flat32sgd | hide | 2.4384 | 0.7753 | 199 | — | — | — | 1.0032 |
-| thoughts_policy_g8top4_lr1e_3_nb200_flat32sgd | hide | 3.0427 | 0.7720 | 35 | — | — | — | 1.2963 |
+| thoughts_policy_g8top4_lr1e_3_nb200_flat32sgd | hide | 2.9493 | 0.7737 | 60 | — | — | — | 1.1563 |
 | thoughts_policy_last | hide | 3.2078 | 0.7825 | 40 | 3.7470 | 0.7390 | 10 | 1.5987 |
 | thoughts_policy_lr3e_3_nb150 | hide | 2.2059 | 0.7925 | 149 | 2.3959 | 0.7609 | 149 | 0.8757 |
 | actions_only_lr3e_3_nb150 | full | 2.9830 | 0.8021 | 40 | 2.9830 | 0.8021 | 40 | 0.4462 |
