@@ -30,6 +30,7 @@ for wordiness rather than for mispredicting the action, which inverts the rankin
 | actions_only_lr1e_4 | hide | 3.8346 | 0.7606 | 50 | 3.8346 | 0.7606 | 50 | 0.5078 |
 | actions_only_lr3e_3_nb150 | hide | 2.3422 | 0.7726 | 149 | 2.3422 | 0.7726 | 149 | 0.5186 |
 | actions_only_lr3e_3_nb200_flat32sgd | hide | 2.2983 | 0.7751 | 199 | — | — | — | 0.4959 |
+| expert_thoughts_all_lr1e_3_nb200_flat32sgd | hide | 2.9429 | 0.7889 | 20 | — | — | — | 1.8042 |
 | expert_thoughts_all_lr1e_4_adamw_nb200_flat32 | hide | 1.6340 | 0.8492 | 115 | — | — | — | 0.5853 |
 | expert_thoughts_all_lr3e_3_nb150 | hide | 2.2503 | 0.7771 | 149 | 3.5330 | 0.6704 | 149 | 1.3412 |
 | expert_thoughts_all_lr3e_3_nb150_fixeval | hide | 2.1192 | 0.7947 | 149 | 3.1807 | 0.6974 | 149 | 1.3447 |
@@ -85,6 +86,7 @@ that saved step:
 | actions_only_lr1e_4 | hide | 3.8346 | 0.7606 |
 | actions_only_lr3e_3_nb150 | hide | 2.3422 | 0.7726 |
 | actions_only_lr3e_3_nb200_flat32sgd | hide | — | — |
+| expert_thoughts_all_lr1e_3_nb200_flat32sgd | hide | — | — |
 | expert_thoughts_all_lr1e_4_adamw_nb200_flat32 | hide | — | — |
 | expert_thoughts_all_lr3e_3_nb150 | hide | 2.2503 | 0.7771 |
 | expert_thoughts_all_lr3e_3_nb150_fixeval | hide | 2.1192 | 0.7947 |
