@@ -369,7 +369,7 @@ retail/actions_only_lr1e_3_adamw_nb6_validate        hide    5     2.4827 ->   2
 retail/actions_only_lr1e_3                           hide   59     3.8355 ->   3.6702   4.31%  0.7609        1.6094
 retail/actions_only_lr1e_3_nb150                     hide  149     3.8307 ->   3.0719  19.81%  0.7652        2.1719
 retail/actions_only_lr1e_3_nb200_flat32sgd           hide  199     3.8470 ->   2.7517  28.47%  0.7681        2.2034
-retail/expert_thoughts_all_lr1e_3_nb200_flat32sgd    hide  195     2.9671 ->   2.2882  22.88%  0.7932        1.8291  <running>
+retail/expert_thoughts_all_lr1e_3_nb200_flat32sgd    hide  199     2.9671 ->   2.2837  23.03%  0.7943        2.0471
 retail/expert_thoughts_lr1e_3_adamw_nb100            hide   60     1.8014 ->   1.7078   5.20%  0.8487        1.0000  <running>
 retail/expert_thoughts_lr1e_3_adamw_nb100            hide   30     1.7999 ->   1.6634   7.58%  0.8463        1.0000  <running>
 retail/expert_thoughts_lr1e_3_adamw_nb200_flat32     hide   85     1.9852 ->   1.7020  14.27%  0.8509        1.2054  <running>
@@ -385,6 +385,7 @@ retail/thoughts_policy_g8top4_lr1e_3_nb200_flat32sgd hide  199     3.1084 ->   2
 airline/actions_only_lr1e_3_adamw_nb100              hide   50     2.1901 ->   3.3899 -54.78%  0.7893        1.0000  <running>
 airline/actions_only_lr1e_3_adamw_nb200_flat32       hide   45     2.2776 ->   2.9850 -31.06%  0.7882        1.0679  <running>
 airline/actions_only_lr1e_3_nb200_flat32sgd          hide  199     4.1913 ->   2.8307  32.46%  0.7557        2.6028
+airline/expert_thoughts_all_lr1e_3_nb200_flat32sgd   hide   31     3.4458 ->   3.3832   1.82%  0.7632        2.2620  <running>
 airline/expert_thoughts_lr1e_3_adamw_nb100           hide   50     2.0737 ->   3.1936 -54.00%  0.7913        1.0000  <running>
 airline/expert_thoughts_lr1e_3_adamw_nb200_flat32    hide   50     2.2052 ->   2.2707  -2.97%  0.7989        1.1013  <running>
 airline/thoughts_policy_adamw30_lr1e_3_adamw_nb100   hide   50     2.0724 ->   3.4621 -67.06%  0.7952        1.0000  <running>
@@ -399,9 +400,9 @@ snorkel_finance_split/thoughts_policy_adamw30_lr1e_3_adamw_nb100 hide   80     1
 snorkel_finance_split/thoughts_policy_adamw30_lr1e_3_adamw_nb200_flat32 hide  115     1.9037 ->   1.6815  11.67%  0.8675        1.0747  <running>
 snorkel_finance_split/thoughts_policy_adamw30_lr1e_3_nb200_flat32sgd hide  199     2.5260 ->   2.0800  17.66%  0.8381        3.1304
 
-15/35 arms complete   (Δ% = held-out action-subspan PPL improvement, higher is better)
+16/36 arms complete   (Δ% = held-out action-subspan PPL improvement, higher is better)
 ```
-_last refreshed: 2026-09-04 17:40_
+_last refreshed: 2026-09-04 18:00_
 <!--/RESULTS-->
 
 ## Infrastructure
