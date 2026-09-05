@@ -24,7 +24,7 @@ for wordiness rather than for mispredicting the action, which inverts the rankin
 | actions_only_lr1e_3_nb200_flat32sgd | hide | 2.0637 | 0.8380 | 199 | — | — | — | 0.7394 |
 | actions_only_lr3e_3_nb150 | hide | 1.8930 | 0.8398 | 149 | 1.8930 | 0.8398 | 149 | 0.3245 |
 | actions_only_v3_lr3e_3_nb150 | hide | 1.9282 | 0.8407 | 149 | 1.9282 | 0.8407 | 149 | 0.4563 |
-| expert_thoughts_all_lr1e_3_nb200_flat32sgd | hide | 2.2073 | 0.8373 | 125 | — | — | — | 0.9286 |
+| expert_thoughts_all_lr1e_3_nb200_flat32sgd | hide | 2.0993 | 0.8378 | 160 | — | — | — | 0.8661 |
 | expert_thoughts_all_v3_lr3e_3_nb150 | hide | 1.9557 | 0.8413 | 149 | 1.9918 | 0.8336 | 149 | 1.5311 |
 | expert_thoughts_lr1e_3_adamw_nb100 | hide | 1.5960 | 0.8680 | 50 | 1.6533 | 0.8571 | 50 | 0.5517 |
 | expert_thoughts_lr1e_3_adamw_nb200_flat32 | hide | 1.6337 | 0.8680 | 75 | — | — | — | 0.2104 |
