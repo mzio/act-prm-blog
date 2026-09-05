@@ -54,6 +54,7 @@ for wordiness rather than for mispredicting the action, which inverts the rankin
 | thoughts_policy_g8top2_lr1e_3_nb200_flat32sgd | hide | 2.4384 | 0.7753 | 199 | — | — | — | 1.0032 |
 | thoughts_policy_g8top4_lr1e_3_nb200_flat32sgd | hide | 2.4293 | 0.7749 | 199 | — | — | — | 0.8591 |
 | thoughts_policy_last | hide | 3.2078 | 0.7825 | 40 | 3.7470 | 0.7390 | 10 | 1.5987 |
+| thoughts_policy_lr1e_3_nb200_flat32sgdOLDC | hide | 3.1841 | 0.7820 | 5 | — | — | — | 1.1460 |
 | thoughts_policy_lr3e_3_nb150 | hide | 2.2059 | 0.7925 | 149 | 2.3959 | 0.7609 | 149 | 0.8757 |
 | actions_only_lr3e_3_nb150 | full | 2.9830 | 0.8021 | 40 | 2.9830 | 0.8021 | 40 | 0.4462 |
 | thoughts_base_last | full | 2.9816 | 0.8027 | 59 | 3.4170 | 0.7653 | 59 | 1.0100 |
@@ -110,6 +111,7 @@ that saved step:
 | thoughts_policy_g8top2_lr1e_3_nb200_flat32sgd | hide | — | — |
 | thoughts_policy_g8top4_lr1e_3_nb200_flat32sgd | hide | — | — |
 | thoughts_policy_last | hide | 3.2100 | 0.7810 |
+| thoughts_policy_lr1e_3_nb200_flat32sgdOLDC | hide | — | — |
 | thoughts_policy_lr3e_3_nb150 | hide | 2.2059 | 0.7925 |
 | actions_only_lr3e_3_nb150 | full | 2.9830 | 0.8021 |
 | thoughts_base_last | full | 2.9816 | 0.8027 |
