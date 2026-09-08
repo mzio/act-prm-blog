@@ -1,0 +1,50 @@
+# tau2-bench BANKING_KNOWLEDGE domain for RLVR — identical to retail.yaml EXCEPT
+# negative_rewards: false, so the terminal reward is {+1 success, 0 failure}
+# (pure verifiable reward) instead of {+1, -1}. Pair with generator hf_rlvr
+# (mean_center: false) and trainer --discount_factor 1.0 for REINFORCE-style
+# RLVR: advantage = the raw binary reward on every token of the trajectory.
+name: "tau2bench"
+data_path: "tau2-bench/data"
+domain: "banking_knowledge"
+task_split: null
+is_async: true
+negative_rewards: false      # RLVR: {+1 correct, 0 fail} (retail_rlvr parity -> {+1,-1})
+eval_splits: ["eval"]
+
+# User simulator + judge (Claude Agent SDK; ambient Claude Code OAuth on a devserver).
+user_llm: "claude_agent_sdk/claude-haiku-4-5"
+user_llm_args: {temperature: 0.0, max_tokens: 512}
+nl_assertions_llm: "claude_agent_sdk/claude-haiku-4-5"
+env_interface_llm: "claude_agent_sdk/claude-haiku-4-5"
+
+max_steps: 50               # tau2 AgentGymEnv step cap
+num_train_tasks: 78
+num_val_tasks: null
+num_test_tasks: 19
+
+# Explicit task-id selection (filled by the driver from the uid->tau2id split).
+train_task_ids: null
+eval_task_ids: null
+
+# State compaction (wrapper-level). last_obs_to_show=1 keeps the MOST RECENT
+# tool/user observation visible (base.py:160 hides user/tool msgs with
+# first_obs_to_show <= idx < num_messages - last_obs_to_show). With 0 the policy
+# was BLIND to all tool results during rollouts (~4% success, flailing episodes);
+# 1 shows the last tool response so the agent can act, and matches the trainer's
+# loss-side default (pg_base.py:147) so generation and training stay consistent.
+# The env keeps system + initial user message visible via first_obs_to_show set
+# at reset (env.py:604 = len(initial messages)+1); this yaml key is a fallback.
+hide_observations: false
+hidden_obs_content: "..."
+first_obs_to_show: 1
+last_obs_to_show: 1
+
+max_turns: 30               # stronger-RL default (override via --max_turns)
+num_tries: 1
+eval_num_tries: 1
+seed: 0
+data_seed: 0
+split: "train"
+system_prompt: "You are a helpful customer service agent."
+truncation_message: "Sorry, you have reached the maximum number of steps. Please try again."
+verbose: false
