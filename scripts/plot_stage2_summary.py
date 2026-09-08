@@ -147,6 +147,7 @@ def fig_fit_vs_behaviour():
         ax.annotate(lbl, (x, y), textcoords="offset points", xytext=off,
                     ha="center", fontsize=8, color="#333333")
     ax.invert_xaxis()  # left-to-right = deeper fit
+    ax.set_xlim(3.98, 1.58)  # margin so the AdamW labels do not touch the edge
     ax.set_xlabel("eval action-token PPL   (→ deeper fit)")
     ax.set_ylabel("task completion (%)")
     ax.set_ylim(-9, 40)

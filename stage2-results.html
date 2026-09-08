@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Stage-2 SFT results — Act-PRM</title>
+<meta name="description" content="Act-PRM Stage-2 SFT: light supervised fine-tuning on inferred thoughts beats the base model by ~20 points, training to the perplexity optimum lands well below it, and which thought corpus you use makes no measurable difference.">
+
+<link rel="preconnect" href="https://cdn.jsdelivr.net">
+<link rel="stylesheet" href="assets/css/style.css?v=9">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>💭</text></svg>">
+<style>
+  .r-wrap{max-width:60rem;margin:0 auto;padding:2rem 1.25rem 5rem}
+  .r-wrap h2{margin-top:3rem}
+  .r-wrap h3{margin-top:2rem;font-size:1.05rem}
+  table.r{border-collapse:collapse;width:100%;font-size:.9rem;margin:1rem 0}
+  table.r th,table.r td{border-bottom:1px solid #e5e5e5;padding:.45rem .6rem;text-align:left}
+  table.r th{font-weight:600;background:#fafafa}
+  table.r td.num{text-align:right;font-variant-numeric:tabular-nums}
+  .hi{background:#eef6fc}
+  .lo{color:#b04a00}
+  .kicker{font-size:.78rem;letter-spacing:.09em;text-transform:uppercase;color:#777}
+  .callout{border-left:3px solid #0072B2;background:#f6fafd;padding:.9rem 1.1rem;margin:1.4rem 0;font-size:.95rem}
+  .caveat{border-left:3px solid #D55E00;background:#fdf7f3;padding:.9rem 1.1rem;margin:1.4rem 0;font-size:.95rem}
+  figure.card img{width:100%;height:auto}
+  .small{font-size:.85rem;color:#666}
+</style>
+</head>
+<body>
+
+<div class="r-wrap">
+
+  <div class="kicker">Act-PRM · experimental log</div>
+  <h1 style="margin-top:.4rem">Stage-2 SFT: when you stop matters, what you distil doesn't</h1>
+  <p class="small">Qwen3-4B-Instruct-2507 · LoRA r8/a16 · SGD 1e-3 · <code>sft_flat</code>, 200 batches ×
+  32 steps · hide-observations · four domains (tau2 retail/airline, Snorkel finance/insurance).
+  Runs 2026-09-01 → 09-08. Full detail in <code>notes/cc-12.0</code>, <code>cc-13.0</code>,
+  <code>cc-14.0</code>.</p>
+
+  <div class="callout">
+    <strong>The result.</strong> A <em>lightly</em> fine-tuned Stage-2 checkpoint beats the
+    untrained model by roughly <strong>20 points</strong> of task completion. Continuing to the
+    perplexity optimum — the checkpoint any standard early-stopping rule would select — costs
+    about <strong>20 more</strong> and lands <em>below</em> the untrained model. Across eight
+    different thought corpora, <strong>which</strong> thoughts you distil changes almost nothing.
+  </div>
+
+  <!-- ===================== 1. headline ===================== -->
+  <h2>1. Every corpus behaves the same; only the stopping point matters</h2>
+
+  <figure class="card">
+    <img src="assets/img/stage2-inverted-u.png" alt="Bar chart: insurance task completion for eight Stage-2 arms at step_0020 versus step_best, against a 30% base model line. Every arm is roughly 45-53% at step_0020 and 10-20% at step_best.">
+    <figcaption>Insurance, 40 held-out tasks. Eight independently-built thought corpora. Every one
+    of them lands ~18–25 points above the untrained base at <code>step_0020</code>, and 10–20 points
+    <em>below</em> it at <code>step_best</code>.</figcaption>
+  </figure>
+
+  <p>Insurance is the domain used for every quantitative claim here, because it is the only one
+  with the measurement precision to support one (§4). Base model, no Stage-2: <strong>30.0%</strong>
+  (12/40).</p>
+
+  <table class="r">
+    <thead><tr><th>arm</th><th class="num">step_0020</th><th class="num">step_best</th></tr></thead>
+    <tbody>
+      <tr><td><code>thoughts_policy</code> <span class="small">(4 seeds)</span></td><td class="num hi">52.5%</td><td class="num lo">15.0%</td></tr>
+      <tr><td><code>actions_only</code> <span class="small">(no thoughts at all)</span></td><td class="num hi">50.0%</td><td class="num lo">10.0%</td></tr>
+      <tr><td><code>expert_thoughts_all</code> <span class="small">(human reasoning)</span></td><td class="num hi">47.5%</td><td class="num lo">10.0%</td></tr>
+      <tr><td><code>thoughts_base</code> <span class="small">(base-scored E-step)</span></td><td class="num hi">47.5%</td><td class="num lo">20.0%</td></tr>
+      <tr><td>top-1 / top-2 / top-4 / top-8 <span class="small">(thoughts per action)</span></td><td class="num hi">37.5 / 50.0 / 45.0 / 52.5%</td><td class="num lo">10.0 / 12.5 / 10.0 / 15.0%</td></tr>
+      <tr><td><strong>base — no Stage-2</strong></td><td class="num" colspan="2"><strong>30.0%</strong></td></tr>
+    </tbody>
+  </table>
+
+  <p>Pooled over three seeds of <code>thoughts_policy</code>: <code>step_0020</code> 84/160 =
+  <strong>52.5%</strong> vs <code>step_best</code> 24/160 = <strong>15.0%</strong>,
+  Fisher <strong>p&nbsp;=&nbsp;1.1×10<sup>−12</sup></strong>.</p>
+
+  <p><strong>Variance decomposition across the eight arms:</strong> between-arm sd = 4.6 pt,
+  within-arm (seed) sd = 3.1 pt, so the excess attributable to the choice of corpus is
+  <strong>3.4 pt</strong> against a 48% mean. Picking a corpus moves the result about as much as
+  re-running one unchanged checkpoint under a different seed.</p>
+
+  <!-- ===================== 2. fit vs behaviour ===================== -->
+  <h2>2. The SFT objective is anti-correlated with agentic competence</h2>
+
+  <figure class="card">
+    <img src="assets/img/stage2-fit-vs-behaviour.png" alt="Scatter plot of retail task completion against eval action-token perplexity, with perplexity decreasing left to right. Completion rises from 14.3% at base to 31% at a light fit, then falls monotonically to 0% at the best perplexity.">
+    <figcaption>Retail. Each point is a checkpoint; the x-axis runs toward <em>deeper</em> fit.
+    Completion peaks at a very light fit (PPL 3.08, barely below the untrained 3.84) and decays to
+    zero as the objective is optimised.</figcaption>
+  </figure>
+
+  <p>Two independent knobs — learning rate and optimiser — trace the same curve, which is what
+  makes it a statement about <em>fit depth</em> rather than about either knob:</p>
+
+  <ul>
+    <li><strong>The optimiser is not protective.</strong> SGD at 3e-3 (PPL 2.28) scored 9.5%,
+    <em>worse</em> than AdamW at PPL 1.78 (11.9%) despite fitting less far. Earlier results where
+    SGD "looked good" were under-fitting in disguise.</li>
+    <li><strong>Confirmed out-of-sample.</strong> We predicted, before running it, that a
+    checkpoint reached by a completely different route (1000 batches @1e-3, PPL 2.2433) would score
+    like SGD 3e-3 (PPL 2.2822, 9.5%). It scored <strong>7.1%</strong>.</li>
+    <li><strong>Perplexity gains do not transfer.</strong> <code>expert_thoughts_all</code> fits
+    insurance 0.42 PPL better than <code>thoughts_policy</code> and rolls out slightly
+    <em>worse</em>.</li>
+  </ul>
+
+  <div class="caveat">
+    <strong>Practical consequence.</strong> <code>step_best</code> — selected on eval perplexity —
+    is the <em>wrong</em> checkpoint in every domain we measured. Any selection rule based on the
+    Stage-2 objective picks the worse policy.
+  </div>
+
+  <!-- ===================== 3. training curves ===================== -->
+  <h2>3. Training curves</h2>
+
+  <figure class="card">
+    <img src="assets/img/stage2-curves-ppl.png" alt="Four panels, one per domain, showing eval action-token perplexity against training batch for four Stage-2 arms. All curves descend smoothly; thought arms start lower than actions_only.">
+    <figcaption>Eval <em>action-token</em> perplexity — the action sub-span only, which is the sole
+    span comparable across arms (<code>actions_only</code> has no reasoning prefix). ★ marks each
+    arm's <code>step_best</code>. The dotted line marks <code>step_0020</code>, the checkpoint that
+    actually behaves best.</figcaption>
+  </figure>
+
+  <p>The thought arms start markedly lower than <code>actions_only</code> — a thought in context
+  genuinely makes the expert's next action more predictable — and the gap persists to the end.
+  On the objective, thoughts clearly help. That advantage simply does not appear in rollouts.</p>
+
+  <table class="r">
+    <thead><tr><th>domain</th><th class="num">actions_only</th><th class="num">thoughts_policy</th><th class="num">expert_thoughts_all</th><th class="num">thoughts_base</th></tr></thead>
+    <tbody>
+      <tr><td>retail</td><td class="num">2.7517</td><td class="num">2.4625</td><td class="num hi">2.2837</td><td class="num">2.5499</td></tr>
+      <tr><td>airline</td><td class="num">2.8307</td><td class="num hi">2.5375</td><td class="num">2.5772</td><td class="num">2.6673</td></tr>
+      <tr><td>finance</td><td class="num">2.0637</td><td class="num">2.0800</td><td class="num hi">2.0437</td><td class="num">—</td></tr>
+      <tr><td>insurance</td><td class="num">2.8049</td><td class="num">2.9952</td><td class="num hi">2.5750</td><td class="num">2.9982</td></tr>
+    </tbody>
+  </table>
+
+  <h3>How many thoughts per action should you distil?</h3>
+  <p>From a <code>group_size 8</code> relabel we exported the best 1, 2, 4 and 8 candidates per
+  action — identical task coverage, only the number of distilled thoughts changing. Perplexity
+  improves monotonically with K and the total effect is negligible: retail 2.4454 → 2.4293 (K=1→4),
+  insurance 3.0170 → 3.0095 (K=1→8), a <strong>0.0075</strong> range across an 8× data increase.
+  Rollouts are indistinguishable (top-1 vs top-8, p&nbsp;=&nbsp;0.261).
+  <strong>Best-of-1 is as good as keeping all eight.</strong></p>
+
+  <!-- ===================== 4. measurement ===================== -->
+  <h2>4. Why only one domain gets to make claims</h2>
+
+  <figure class="card">
+    <img src="assets/img/stage2-noise-floors.png" alt="Dot plot of repeated rollouts of the same unchanged checkpoint for insurance, retail and airline, showing spreads of 7.5, 16.6 and 22.2 points respectively.">
+    <figcaption>Repeated rollouts of <em>unchanged</em> checkpoints. The retail points come from
+    LoRA adapters verified numerically identical (mean|A−B|/mean|A| = 0.0000) and still span
+    16.6 points.</figcaption>
+  </figure>
+
+  <p>τ²-bench drives its user turns with an <strong>external LLM simulator that we do not seed</strong>,
+  so two runs of the same weights genuinely differ. The Snorkel gyms have no simulated user — only
+  tools and a judge — and are near-deterministic given a seed (the residual ~2.5 pt is the judge
+  flipping on a borderline answer).</p>
+
+  <table class="r">
+    <thead><tr><th>harness</th><th class="num">n</th><th class="num">noise on a fixed checkpoint</th><th class="num">smallest detectable Δ</th><th class="num">runs needed for a 5 pt effect</th></tr></thead>
+    <tbody>
+      <tr class="hi"><td>insurance (Snorkel)</td><td class="num">40</td><td class="num">sd 3.1</td><td class="num">~8 pt</td><td class="num">6</td></tr>
+      <tr><td>retail (τ²)</td><td class="num">42</td><td class="num">sd 9.0</td><td class="num">~18 pt</td><td class="num">51</td></tr>
+      <tr><td>airline (τ²)</td><td class="num">18</td><td class="num">22.2 pt</td><td class="num">~25 pt</td><td class="num">77</td></tr>
+      <tr><td>finance</td><td class="num">10</td><td class="num">floor — 9/10 runs scored 0</td><td class="num">none</td><td class="num">—</td></tr>
+    </tbody>
+  </table>
+
+  <div class="caveat">
+    <strong>Rollout repeats must vary the seed on the Snorkel gyms.</strong> Re-running at the
+    default <code>seed=42</code> reproduces the identical result — insurance agreed 40/40 on tasks
+    between "repeats". Our first repeat experiment measured nothing for exactly this reason.
+  </div>
+
+  <!-- ===================== 5. retractions ===================== -->
+  <h2>5. Claims we withdrew</h2>
+  <p class="small">Listed because several were reported before the data justified them.</p>
+  <table class="r">
+    <thead><tr><th>claim</th><th>why it fell</th></tr></thead>
+    <tbody>
+      <tr><td>user-turns/episode is the collapse mechanism</td><td>Monotone <em>between</em> checkpoints, but within one, solved and failed episodes are identical (6.20 vs 6.22) or reversed (5.22 vs 6.39).</td></tr>
+      <tr><td>SGD makes train PPL worse</td><td>Two noisy single batches. Windowed, every run improves (2.42 → 1.79).</td></tr>
+      <tr><td>retail <code>step_0020</code> &gt; <code>step_best</code> is a result</td><td>31.0 vs 23.8 sits inside retail's own 16.6 pt same-checkpoint spread.</td></tr>
+      <tr><td>expert thoughts lift the whole curve</td><td>Called at 6/10 tasks; the full n=40 came in <em>below</em> <code>thoughts_policy</code>.</td></tr>
+      <tr><td>the Stage-1 corpus regression</td><td>Ablation was null — the old corpus rolls out inside the range the new one spans.</td></tr>
+    </tbody>
+  </table>
+
+  <!-- ===================== 6. open ===================== -->
+  <h2>6. What we still don't know</h2>
+  <ul>
+    <li><strong>Why light Stage-2 helps at all.</strong> We know ~640 gradient steps buy ~20 points
+    and that the corpus is irrelevant — but not what those steps fix. Format adherence? Tool-call
+    syntax? An <code>actions_only</code>-vs-base behavioural diff at b20 is the cheapest probe.</li>
+    <li><strong>Where the peak is.</strong> <code>step_0020</code> is the earliest checkpoint we
+    roll out; <code>step_0010</code> exists and has never been evaluated.</li>
+    <li><strong>Finance is uninformative</strong> — not the turn cap, not a missing answer, not a
+    broken grader; the 4B policy's qualitative answers are simply judged wrong. Needs the
+    quantitative <code>finqa</code> split.</li>
+  </ul>
+
+  <p class="small" style="margin-top:3rem">Datasets:
+  <code>mzio/aprm-sft-thoughts-{tau2-retail,tau2-airline,snorkel-finance,snorkel-insurance}-policy_best-adamw30-lp0</code>
+  and the base-scored <code>…-base_best-adamw30-lp0</code> counterparts on the Hugging Face Hub.
+  &nbsp;·&nbsp; <a href="index.html">← back to the main post</a></p>
+
+</div>
+</body>
+</html>
