@@ -73,6 +73,12 @@ run_one(){  # $1=domain  $2=variant  $3=eval ids  $4=throwaway train id
   # markers made actions_only "done, skip" (losing the baseline) and their log dirs would
   # have been appended to. CKPT_TAG defaults to the historical name for back-compat.
   local tag="${dom}_rollout_${v}_${CKPT_TAG:-lr3e_3}${CKPT_STEP:+_${CKPT_STEP}}${RTAG}"
+  # SEED (added 2026-09-09): tau2's user simulator is an external Claude call we do not
+  # seed, so plain repeats are already independent -- but --seed also varies the POLICY's
+  # sampling, giving a second independent source and matching how the snorkel domains get
+  # their repeats. main_pytorch puts the seed in the run dir name (s=<N>), so distinct
+  # seeds cannot collide. Unset => the historical default (42), unchanged.
+  local seed_args=(); [ -n "${SEED:-}" ] && seed_args=(--seed "$SEED")
   [ "$SMOKE" = 1 ] && tag="${tag}_smoke"
   if [ -f "$MDIR/${tag}.done" ]; then log "ROLLOUT $dom/$v: done, skip"; return; fi
   local nb=(--num_batches 1 --eval_every 1) turns=(--max_turns "$MAX_TURNS")
@@ -83,7 +89,7 @@ run_one(){  # $1=domain  $2=variant  $3=eval ids  $4=throwaway train id
       --generator_config hf_rlvr --env_config "tau2bench/${dom}_rlvr" \
       --no_train "${nb[@]}" --group_size 2 --batch_size 1 \
       "${turns[@]}" --max_tokens 2048 --discount_factor 1.0 "${HIDE_ARGS[@]}" \
-      --train_task_ids "$tid" --eval_task_ids $ids \
+      --train_task_ids "$tid" --eval_task_ids $ids "${seed_args[@]}" \
       > "$MDIR/${tag}.log" 2>&1 \
     || { log "ROLLOUT $dom/$v: FAILED (see $MDIR/${tag}.log)"; return; }
   # Validity gate. A transient Claude Agent SDK outage makes every episode die on turn 1,
