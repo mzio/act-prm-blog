@@ -248,6 +248,7 @@ Not queued, but higher value than 2h/2z: **the interleaved rollout fix** (cc-8.0
 - **The judge defaults to "no" on any unparsed verdict.** 67% of finance verdicts hit that
   default. `parse_verdict` now falls through several shapes;
   `scripts/check_judge_parse_rate.py` gates every insurance rollout.
+<<<<<<< HEAD
 
 ---
 
@@ -471,3 +472,5 @@ crashed with `KeyError: 'dataset'` because the derived pool path did not exist a
 only 3/25 eval trajectories because the run and the export pointed at different splits.
 Three separate incidents, one cause: **paths derived by string convention, with no
 assertion that the resolved data is the data intended.** The gate now covers all of them.
+=======
+>>>>>>> a588bf289485252b715d699604b5a28688f50be9

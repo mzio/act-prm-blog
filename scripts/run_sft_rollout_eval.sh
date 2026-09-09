@@ -22,6 +22,7 @@
 # Usage: setsid nohup ./scripts/run_sft_rollout_eval.sh > /tmp/aprm/rollout/driver.log 2>&1 &
 #   SMOKE=1  one checkpoint, 1 task, 4 turns -- validates the tau2 user-sim path
 set -uo pipefail
+<<<<<<< HEAD
 # fwdproxy began 403-ing huggingface.co on 2026-09-03, which killed model loading in
 # load_hf_model_and_tokenizer -> hf_hub list_repo_tree (all 4 expert_thoughts_all runs
 # and the insurance base rollout died in ~25s). The weights are cached locally under
@@ -39,6 +40,10 @@ export PYTHONUNBUFFERED=1
 # scores in rollouts_per_task.jsonl. Each rollout writes into its OWN run dir (the tag
 # carries CKPT_TAG/CKPT_STEP), so this never overwrites prior work.
 export ACT_PRM_DUMP_TRAJECTORIES="${ACT_PRM_DUMP_TRAJECTORIES:-1}"
+=======
+cd "$(dirname "$0")/.."
+export PATH="$HOME/.local/bin:$HOME/.cargo/bin:/usr/local/bin:$PATH"
+>>>>>>> a588bf289485252b715d699604b5a28688f50be9
 MODEL="${MODEL_CFG:-hf_qwen3_4b_instruct}"; export MODEL_CFG="$MODEL"
 MDIR=/tmp/aprm/rollout; mkdir -p "$MDIR"
 SMOKE="${SMOKE:-0}"
@@ -63,6 +68,7 @@ AIRLINE_TRAIN=$(python3 -c "import json;print(json.load(open('data/splits/tau2_a
 run_one(){  # $1=domain  $2=variant  $3=eval ids  $4=throwaway train id
   local dom=$1 v=$2 ids=$3 tid=$4
   local envdir="act_prm_tau2_${dom}"
+<<<<<<< HEAD
   # CKPT_PAT selects WHICH Stage-2 generation to roll out. Default is the historical
   # SGD-era lr3e_3/nb150 set; the 08-31 sft_flat arms are lr1e_3_adamw_nb200_flat32.
   # Hardcoding it silently evaluated obsolete checkpoints for hours on 08-29.
@@ -79,6 +85,11 @@ run_one(){  # $1=domain  $2=variant  $3=eval ids  $4=throwaway train id
   # their repeats. main_pytorch puts the seed in the run dir name (s=<N>), so distinct
   # seeds cannot collide. Unset => the historical default (42), unchanged.
   local seed_args=(); [ -n "${SEED:-}" ] && seed_args=(--seed "$SEED")
+=======
+  local ck; ck=$(newest "checkpoints_lora/$envdir/$MODEL/${dom}_s2_${v}_lr3e_3_nb150_heldout-*/step_best")
+  [ -z "$ck" ] && { log "ROLLOUT $dom/$v: no checkpoint, skip"; return; }
+  local tag="${dom}_rollout_${v}_lr3e_3${RTAG}"
+>>>>>>> a588bf289485252b715d699604b5a28688f50be9
   [ "$SMOKE" = 1 ] && tag="${tag}_smoke"
   if [ -f "$MDIR/${tag}.done" ]; then log "ROLLOUT $dom/$v: done, skip"; return; fi
   local nb=(--num_batches 1 --eval_every 1) turns=(--max_turns "$MAX_TURNS")
@@ -89,7 +100,11 @@ run_one(){  # $1=domain  $2=variant  $3=eval ids  $4=throwaway train id
       --generator_config hf_rlvr --env_config "tau2bench/${dom}_rlvr" \
       --no_train "${nb[@]}" --group_size 2 --batch_size 1 \
       "${turns[@]}" --max_tokens 2048 --discount_factor 1.0 "${HIDE_ARGS[@]}" \
+<<<<<<< HEAD
       --train_task_ids "$tid" --eval_task_ids $ids "${seed_args[@]}" \
+=======
+      --train_task_ids "$tid" --eval_task_ids $ids \
+>>>>>>> a588bf289485252b715d699604b5a28688f50be9
       > "$MDIR/${tag}.log" 2>&1 \
     || { log "ROLLOUT $dom/$v: FAILED (see $MDIR/${tag}.log)"; return; }
   # Validity gate. A transient Claude Agent SDK outage makes every episode die on turn 1,

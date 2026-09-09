@@ -238,3 +238,6 @@ _quarantine_stubs/
 data/snorkel_insurance/_repo/
 data/snorkel_insurance/resources/
 data/snorkel_insurance/tool_data/
+
+# cron completion markers (runtime state, not source)
+.guard_markers/
