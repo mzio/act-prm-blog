@@ -62,11 +62,7 @@ if pgrep -f '[m]ain_pytorch.py' >/dev/null 2>&1; then exit 0; fi
 # Any of OUR driver shells mid-launch -> let it be. This list must include every driver
 # the guard can start; omitting one (run_matched_control) let cron launch a SECOND copy
 # of a control run that was already going, and both appended to the same metrics.jsonl.
-<<<<<<< HEAD
 if ps -eo args | grep -qE 'scripts/(run_sft_lr_matrix|run_sft_sweep|probe_sft_lr|run_matched_control|run_expert_all|run_sft_rollout_eval|run_finance_v3|run_finance_rollout|run_bestgen_sft|run_multirollout|run_base_rollout|run_insurance_pipeline|run_x1_replicate|probe_stage1_lora_rank|run_stage1_r32|run_stage2_adamw)\.sh'; then exit 0; fi
-=======
-if ps -eo args | grep -qE 'scripts/(run_sft_lr_matrix|run_sft_sweep|probe_sft_lr|run_matched_control|run_expert_all|run_sft_rollout_eval|run_finance_v3|run_finance_rollout|run_bestgen_sft|run_multirollout|run_base_rollout|run_insurance_pipeline|run_x1_replicate|probe_stage1_lora_rank|run_stage1_r32)\.sh'; then exit 0; fi
->>>>>>> a588bf289485252b715d699604b5a28688f50be9
 
 # 2. thoughts_base LR probe (once)
 if [ ! -f "$G/lrprobe/thoughts_base.done" ]; then

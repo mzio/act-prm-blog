@@ -29,7 +29,6 @@ export PATH="$HOME/.local/bin:$HOME/.cargo/bin:/usr/local/bin:$PATH"
 export https_proxy="${https_proxy:-http://fwdproxy:8080}"
 export http_proxy="${http_proxy:-http://fwdproxy:8080}"
 export HF_TOKEN="${HF_TOKEN:-$(cat "$HOME/models/token" 2>/dev/null || true)}"
-<<<<<<< HEAD
 # fwdproxy began 403-ing huggingface.co on 2026-09-03, which killed model loading in
 # load_hf_model_and_tokenizer -> hf_hub list_repo_tree (all 4 expert_thoughts_all runs
 # and the insurance base rollout died in ~25s). The weights are cached locally under
@@ -37,8 +36,6 @@ export HF_TOKEN="${HF_TOKEN:-$(cat "$HOME/models/token" 2>/dev/null || true)}"
 # for Qwen3-4B-Instruct-2507 load fine with HF_HUB_OFFLINE=1.
 export HF_HUB_OFFLINE="${HF_HUB_OFFLINE:-1}"
 export HF_HOME="${HF_HOME:-/data/users/mzio/models/hf_cache}"
-=======
->>>>>>> a588bf289485252b715d699604b5a28688f50be9
 MODEL="${MODEL_CFG:-hf_qwen3_4b_instruct}"; export MODEL_CFG="$MODEL"
 MDIR=/tmp/aprm/finance_rollout; mkdir -p "$MDIR"
 NB="${NUM_BATCHES:-150}"
@@ -52,7 +49,6 @@ HARD=$(python3 -c "import json;print(' '.join(json.load(open('data/splits/snorke
 log "=== finance rollout: fair=$(echo $FAIR|wc -w) questions, hard=$(echo $HARD|wc -w) questions ==="
 
 for arm in $ARMS; do
-<<<<<<< HEAD
   # CKPT_PAT / CKPT_STEP select WHICH Stage-2 generation and snapshot to roll out. The
   # pattern was hardcoded to the SGD-era v3_lr3e_3 checkpoints; the 2026-09-01 lr 1e-4 runs
   # are lr1e_4_adamw_nb200_flat32, and step_best is NOT the checkpoint we want (on retail
@@ -68,13 +64,6 @@ for arm in $ARMS; do
     # gets silently skipped). That exact collision hid the actions_only baseline on
     # 2026-08-31 until the tag was fixed.
     TAG="finance_rollout_${arm}_${CKPT_TAG:-v3}${CKPT_STEP:+_${CKPT_STEP}}_${setname}"
-=======
-  CK=$(newest "checkpoints_lora/act_prm_snorkel_finance_split/$MODEL/snorkel_finance_split_s2_${arm}_v3_lr3e_3_nb${NB}_heldout-*/step_best")
-  [ -z "$CK" ] && { log "finance/$arm: no v3 checkpoint, skip"; continue; }
-  for setname in fair hard; do
-    IDS=$FAIR; [ "$setname" = hard ] && IDS=$HARD
-    TAG="finance_rollout_${arm}_v3_${setname}"
->>>>>>> a588bf289485252b715d699604b5a28688f50be9
     [ -f "$MDIR/${TAG}.done" ] && { log "$TAG: done, skip"; continue; }
     log "ROLLOUT $TAG ($(echo $IDS|wc -w) questions)"
     wait_gpu_free
@@ -100,15 +89,10 @@ done
 # and the guard advanced past them.
 _missing=0
 for arm in $ARMS; do
-<<<<<<< HEAD
   # Must mirror the SETS filter above, or the gate demands .done markers for sets that
   # were deliberately not run and never reports completion.
   for setname in ${SETS:-fair hard}; do
     [ -f "$MDIR/finance_rollout_${arm}_${CKPT_TAG:-v3}${CKPT_STEP:+_${CKPT_STEP}}_${setname}.done" ] || _missing=$((_missing+1))
-=======
-  for setname in fair hard; do
-    [ -f "$MDIR/finance_rollout_${arm}_v3_${setname}.done" ] || _missing=$((_missing+1))
->>>>>>> a588bf289485252b715d699604b5a28688f50be9
   done
 done
 if [ "$_missing" -eq 0 ]; then

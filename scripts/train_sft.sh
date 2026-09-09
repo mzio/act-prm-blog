@@ -86,14 +86,10 @@ case "$VARIANT" in
     # the targets keeps every turn in the context, so trajectories stay coherent.
     GEN="act_prm_actions_only"; MODE=(--keep_expert_thoughts --require_thought)
     if [ "$HAS_DATASET_PATH" = 0 ]; then
-<<<<<<< HEAD
       # EXPERT_POOL, as in the expert_thoughts branch: the derived path resolves to a pool
       # whose eval set differs from the base (retail 10 vs 8; finance 3/25 overlap), which
       # silently makes the arm non-comparable.
       MODE+=(--dataset_path "${EXPERT_POOL:-data/${ENVNAME}_expert_thoughts}")
-=======
-      MODE+=(--dataset_path "data/${ENVNAME}_expert_thoughts")
->>>>>>> a588bf289485252b715d699604b5a28688f50be9
     fi
     ;;
   expert_thoughts)
