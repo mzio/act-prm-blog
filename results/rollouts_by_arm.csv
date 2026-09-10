@@ -1,0 +1,110 @@
+domain,arm,recipe,snapshot,n_runs,mean_pct,sd_pct,min_pct,max_pct,pooled_solved,pooled_n,pooled_pct,seeds
+airline,actions_only,flat32,step_best,1,0.0,,0.0,0.0,0,18,0.0,42
+airline,actions_only,lr3e_3,step_best,1,50.0,,50.0,50.0,9,18,50.0,42
+airline,actions_only,sgdlr1e_3,step_0020,3,53.71,2.62,50.0,55.56,29,54,53.7,42 777 1234
+airline,actions_only,sgdlr1e_3,step_best,1,61.11,,61.11,61.11,11,18,61.11,42
+airline,actions_only,x1seed0,step_best,1,55.56,,55.56,55.56,10,18,55.56,42
+airline,actions_only,x1seed1,step_best,1,38.89,,38.89,38.89,7,18,38.89,42
+airline,actions_only,x1seed42,step_best,1,33.33,,33.33,33.33,6,18,33.33,42
+airline,actions_only,x1seed7,step_best,1,33.33,,33.33,33.33,6,18,33.33,42
+airline,actions_only,x3,step_best,1,55.56,,55.56,55.56,10,18,55.56,42
+airline,base,base,step_best,1,55.56,,55.56,55.56,10,18,55.56,42
+airline,expert_thoughts,lr3e_3,step_best,1,33.33,,33.33,33.33,6,18,33.33,42
+airline,expert_thoughts,x3,step_best,1,0.0,,0.0,0.0,0,18,0.0,42
+airline,expert_thoughts_all,lr3e_3,step_best,1,50.0,,50.0,50.0,9,18,50.0,42
+airline,expert_thoughts_all,lr3e_3_fixeval,step_best,1,27.78,,27.78,27.78,5,18,27.78,42
+airline,expert_thoughts_all,sgdlr1e_3,step_0020,3,70.37,6.93,61.11,77.78,38,54,70.37,42 777 1234
+airline,expert_thoughts_all,sgdlr1e_3,step_best,1,55.56,,55.56,55.56,10,18,55.56,42
+airline,thoughts_base,lr3e_3,step_best,1,44.44,,44.44,44.44,8,18,44.44,42
+airline,thoughts_base_adamw30,sgdlr1e_3,step_0020,1,66.67,,66.67,66.67,12,18,66.67,42
+airline,thoughts_base_adamw30,sgdlr1e_3,step_best,1,61.11,,61.11,61.11,11,18,61.11,42
+airline,thoughts_policy,lr3e_3,step_best,1,72.22,,72.22,72.22,13,18,72.22,42
+airline,thoughts_policy,x1seed0,step_best,1,50.0,,50.0,50.0,9,18,50.0,42
+airline,thoughts_policy,x1seed1,step_best,1,44.44,,44.44,44.44,8,18,44.44,42
+airline,thoughts_policy,x1seed42,step_best,1,55.56,,55.56,55.56,10,18,55.56,42
+airline,thoughts_policy,x1seed7,step_best,1,44.44,,44.44,44.44,8,18,44.44,42
+airline,thoughts_policy,x3,step_best,1,55.56,,55.56,55.56,10,18,55.56,42
+airline,thoughts_policy_adamw30,flat32,step_best,1,55.56,,55.56,55.56,10,18,55.56,42
+airline,thoughts_policy_adamw30,sgdlr1e_3,step_0020,3,61.11,13.61,44.44,77.78,33,54,61.11,42 777 1234
+airline,thoughts_policy_adamw30,sgdlr1e_3,step_best,1,44.44,,44.44,44.44,8,18,44.44,42
+airline,thoughts_policy_adamw30,sgdlr1e_3_rep3,step_0020,1,83.33,,83.33,83.33,15,18,83.33,42
+finance,actions_only,sgdlr1e_3,step_0020,1,10.0,,10.0,10.0,1,10,10.0,42
+finance,actions_only,sgdlr1e_3,step_best,1,0.0,,0.0,0.0,0,10,0.0,42
+finance,actions_only,v3_fair,step_best,1,0.0,,0.0,0.0,0,10,0.0,42
+finance,actions_only,v3_hard,step_best,1,0.0,,0.0,0.0,0,16,0.0,42
+finance,expert_thoughts,v3_fair,step_best,1,0.0,,0.0,0.0,0,10,0.0,42
+finance,expert_thoughts,v3_hard,step_best,1,0.0,,0.0,0.0,0,29,0.0,42
+finance,expert_thoughts_all,sgdlr1e_3,step_0020,1,10.0,,10.0,10.0,1,10,10.0,42
+finance,expert_thoughts_all,sgdlr1e_3,step_best,1,0.0,,0.0,0.0,0,10,0.0,42
+finance,expert_thoughts_all,v3_fair,step_best,1,0.0,,0.0,0.0,0,10,0.0,42
+finance,expert_thoughts_all,v3_hard,step_best,1,0.0,,0.0,0.0,0,29,0.0,42
+finance,thoughts_base,v3_fair,step_best,1,20.0,,20.0,20.0,2,10,20.0,42
+finance,thoughts_base,v3_hard,step_best,1,0.0,,0.0,0.0,0,29,0.0,42
+finance,thoughts_policy,v3_fair,step_best,1,0.0,,0.0,0.0,0,10,0.0,42
+finance,thoughts_policy,v3_hard,step_best,1,0.0,,0.0,0.0,0,29,0.0,42
+finance,thoughts_policy_adamw30,sgdlr1e_3,step_0020,1,0.0,,0.0,0.0,0,10,0.0,42
+finance,thoughts_policy_adamw30,sgdlr1e_3,step_best,1,0.0,,0.0,0.0,0,10,0.0,42
+insurance,BASE,default,step_best,1,30.0,,30.0,30.0,12,40,30.0,42
+insurance,actions_only,sgdlr1e_3,step_0020,5,53.5,2.55,50.0,57.5,107,200,53.5,42 555 777 999 1234
+insurance,actions_only,sgdlr1e_3,step_best,1,10.0,,10.0,10.0,4,40,10.0,42
+insurance,actions_only,sgdlr1e_3_rep2,step_0020,1,50.0,,50.0,50.0,20,40,50.0,42
+insurance,actions_only,sgdlr1e_3_rep2,step_best,1,10.0,,10.0,10.0,4,40,10.0,42
+insurance,expert_thoughts_all,sgdlr1e_3,step_0020,5,48.5,2.55,45.0,52.5,97,200,48.5,42 555 777 999 1234
+insurance,expert_thoughts_all,sgdlr1e_3,step_best,1,10.0,,10.0,10.0,4,40,10.0,42
+insurance,thoughts_base_adamw30,sgdlr1e_3,step_0020,5,50.5,3.67,45.0,55.0,101,200,50.5,42 555 777 999 1234
+insurance,thoughts_base_adamw30,sgdlr1e_3,step_best,1,20.0,,20.0,20.0,8,40,20.0,42
+insurance,thoughts_policy_adamw30,sgdlr1e_3,step_0020,3,51.67,3.12,47.5,55.0,62,120,51.67,42 777 1234
+insurance,thoughts_policy_adamw30,sgdlr1e_3,step_best,3,15.0,2.04,12.5,17.5,18,120,15.0,42 777 1234
+insurance,thoughts_policy_adamw30,sgdlr1e_3_rep2,step_0020,1,55.0,,55.0,55.0,22,40,55.0,42
+insurance,thoughts_policy_adamw30,sgdlr1e_3_rep2,step_best,1,15.0,,15.0,15.0,6,40,15.0,42
+insurance,thoughts_policy_adamw30,sgdlr1e_3_rep3,step_0020,1,55.0,,55.0,55.0,22,40,55.0,42
+insurance,thoughts_policy_g8top1,g8top1,step_0020,1,37.5,,37.5,37.5,15,40,37.5,42
+insurance,thoughts_policy_g8top1,g8top1,step_best,1,10.0,,10.0,10.0,4,40,10.0,42
+insurance,thoughts_policy_g8top2,g8top2,step_0020,1,50.0,,50.0,50.0,20,40,50.0,42
+insurance,thoughts_policy_g8top2,g8top2,step_best,1,12.5,,12.5,12.5,5,40,12.5,42
+insurance,thoughts_policy_g8top4,g8top4,step_0020,1,45.0,,45.0,45.0,18,40,45.0,42
+insurance,thoughts_policy_g8top4,g8top4,step_best,1,10.0,,10.0,10.0,4,40,10.0,42
+insurance,thoughts_policy_g8top8,g8top8,step_0020,1,52.5,,52.5,52.5,21,40,52.5,42
+insurance,thoughts_policy_g8top8,g8top8,step_best,1,15.0,,15.0,15.0,6,40,15.0,42
+retail,actions_only,flat32,step_0020,1,0.0,,0.0,0.0,0,42,0.0,42
+retail,actions_only,flat32,step_best,1,7.14,,7.14,7.14,3,42,7.14,42
+retail,actions_only,lr1e4,step_best,1,7.14,,7.14,7.14,3,42,7.14,42
+retail,actions_only,lr3e_3,step_best,1,11.9,,11.9,11.9,5,42,11.9,42
+retail,actions_only,sgd3e_3flat,step_best,1,16.67,,16.67,16.67,7,42,16.67,42
+retail,actions_only,sgdlr1e_3,step_0020,3,24.6,4.49,21.43,30.95,31,126,24.6,42 777 1234
+retail,actions_only,sgdlr1e_3,step_best,1,19.05,,19.05,19.05,8,42,19.05,42
+retail,actions_only,x3,step_best,1,14.29,,14.29,14.29,6,42,14.29,42
+retail,base,base,step_best,1,14.29,,14.29,14.29,6,42,14.29,42
+retail,expert_thoughts,flat32,step_best,1,4.76,,4.76,4.76,2,42,4.76,42
+retail,expert_thoughts,lr3e_3,step_best,1,11.9,,11.9,11.9,5,42,11.9,42
+retail,expert_thoughts,x3,step_best,1,9.52,,9.52,9.52,4,42,9.52,42
+retail,expert_thoughts_all,lr1e4,step_best,1,30.95,,30.95,30.95,13,42,30.95,42
+retail,expert_thoughts_all,lr3e_3,step_best,1,21.43,,21.43,21.43,9,42,21.43,42
+retail,expert_thoughts_all,lr3e_3_fixeval,step_best,1,14.29,,14.29,14.29,6,42,14.29,42
+retail,expert_thoughts_all,sgdlr1e_3,step_0020,3,21.43,1.94,19.05,23.81,27,126,21.43,42 777 1234
+retail,expert_thoughts_all,sgdlr1e_3,step_best,1,19.05,,19.05,19.05,8,42,19.05,42
+retail,thoughts_base,lr3e_3,step_best,1,16.67,,16.67,16.67,7,42,16.67,42
+retail,thoughts_base_adamw30,sgdlr1e_3,step_0020,1,26.19,,26.19,26.19,11,42,26.19,42
+retail,thoughts_base_adamw30,sgdlr1e_3,step_best,1,23.81,,23.81,23.81,10,42,23.81,42
+retail,thoughts_policy,lr3e_3,step_best,1,21.43,,21.43,21.43,9,42,21.43,42
+retail,thoughts_policy,sgd1e_3_oldcorpus,step_0020,1,21.43,,21.43,21.43,9,42,21.43,42
+retail,thoughts_policy,sgd1e_3_oldcorpus,step_best,1,19.05,,19.05,19.05,8,42,19.05,42
+retail,thoughts_policy,x3,step_best,1,19.05,,19.05,19.05,8,42,19.05,42
+retail,thoughts_policy_1gen,lr3e_3,step_best,1,19.05,,19.05,19.05,8,42,19.05,42
+retail,thoughts_policy_adamw30,flat32,step_0020,1,11.9,,11.9,11.9,5,42,11.9,42
+retail,thoughts_policy_adamw30,flat32,step_best,1,0.0,,0.0,0.0,0,42,0.0,42
+retail,thoughts_policy_adamw30,lr1e4,step_0020,1,7.14,,7.14,7.14,3,42,7.14,42
+retail,thoughts_policy_adamw30,lr1e4,step_0060,1,9.52,,9.52,9.52,4,42,9.52,42
+retail,thoughts_policy_adamw30,lr1e4,step_best,1,9.52,,9.52,9.52,4,42,9.52,42
+retail,thoughts_policy_adamw30,sgd1e_3_nb1k,step_0020,1,16.67,,16.67,16.67,7,42,16.67,42
+retail,thoughts_policy_adamw30,sgd1e_3_nb1k,step_best,1,7.14,,7.14,7.14,3,42,7.14,42
+retail,thoughts_policy_adamw30,sgd3e_3flat,step_best,1,9.52,,9.52,9.52,4,42,9.52,42
+retail,thoughts_policy_adamw30,sgdlr1e_3,step_0020,3,28.57,3.37,23.81,30.95,36,126,28.57,42 777 1234
+retail,thoughts_policy_adamw30,sgdlr1e_3,step_best,1,23.81,,23.81,23.81,10,42,23.81,42
+retail,thoughts_policy_adamw30,sgdlr1e_3_rep3,step_0020,1,33.33,,33.33,33.33,14,42,33.33,42
+retail,thoughts_policy_g8top1,g8top1,step_0020,1,28.57,,28.57,28.57,12,42,28.57,42
+retail,thoughts_policy_g8top1,g8top1,step_best,1,16.67,,16.67,16.67,7,42,16.67,42
+retail,thoughts_policy_g8top2,g8top2,step_0020,1,16.67,,16.67,16.67,7,42,16.67,42
+retail,thoughts_policy_g8top2,g8top2,step_best,1,19.05,,19.05,19.05,8,42,19.05,42
+retail,thoughts_policy_g8top4,g8top4,step_0020,1,28.57,,28.57,28.57,12,42,28.57,42
+retail,thoughts_policy_g8top4,g8top4,step_best,1,19.05,,19.05,19.05,8,42,19.05,42
