@@ -66,7 +66,7 @@ def parse_tag(tag, domain):
         snap = m.group(1)
     # seed appears either as an explicit _sNNNN / _seedNNNN tag or in the run dir (s=NN)
     seed = None
-    m = re.search(r"_s(?:eed)?(\d{3,})", body)
+    m = re.search(r"_s(?:eed)?(\d+)(?:_|$)", body)
     if m:
         seed = int(m.group(1))
     # RECIPE = the checkpoint generation this rollout used (everything between the arm
@@ -76,6 +76,7 @@ def parse_tag(tag, domain):
     rest = body[len(arm):].lstrip("_") if arm and body.startswith(arm) else body
     rest = re.sub(r"_?(step_\d+|step_best|step_last).*$", "", rest)
     # strip the seed token whether or not a leading underscore survived the lstrip above
+    rest = re.sub(r"_?s(?:eed)?\d{1,}$", "", rest).strip("_")
     rest = re.sub(r"_?s(?:eed)?\d{3,}", "", rest).strip("_")
     # The seed chains (chain_extra_seeds.sh / chain_tau2_seeds.sh) tagged insurance runs
     # as <arm>_seed<N>_step_0020 with no recipe token, but every one of them passed
@@ -84,6 +85,26 @@ def parse_tag(tag, domain):
     if not rest and re.search(r"_s(?:eed)?\d{3,}_step_", body):
         rest = "sgdlr1e_3"
     return arm or body, snap, seed, (rest or "default")
+
+
+# recipe -> (optimizer, stage2_lr). Verified against each rollout's resume_from
+# checkpoint dir, not inferred from the tag:
+#   flat32 -> *_lr1e_3_adamw_nb200_flat32_heldout        (AdamW)
+#   lr1e4  -> *_lr1e_4_adamw_nb200_flat32_heldout        (AdamW)
+#   x3 / lr3e_3 / v3_* -> *_lr3e_3_nb150_heldout          (SGD-era: --optimizer defaulted
+#     to sgd before it was made explicit, so these are SGD despite the untagged name)
+OPTIMIZER = {
+    "sgdlr1e_3": ("sgd", "1e-3"), "sgdlr1e_3_rep2": ("sgd", "1e-3"),
+    "sgdlr1e_3_rep3": ("sgd", "1e-3"), "sgd3e_3flat": ("sgd", "3e-3"),
+    "sgd1e_3_nb1k": ("sgd", "1e-3"), "sgd1e_3_oldcorpus": ("sgd", "1e-3"),
+    "g8top1": ("sgd", "1e-3"), "g8top2": ("sgd", "1e-3"),
+    "g8top4": ("sgd", "1e-3"), "g8top8": ("sgd", "1e-3"),
+    "flat32": ("adamw", "1e-3"), "lr1e4": ("adamw", "1e-4"),
+    "lr3e_3": ("sgd", "3e-3"), "lr3e_3_fixeval": ("sgd", "3e-3"),
+    "lr3e_3_smoke": ("sgd", "3e-3"), "x3": ("sgd", "3e-3"),
+    "x1": ("sgd", "3e-3"), "v3_fair": ("sgd", "3e-3"), "v3_hard": ("sgd", "3e-3"),
+    "base": ("none", ""), "default": ("none", ""),
+}
 
 
 def score(d):
@@ -116,7 +137,9 @@ def main():
             if seed is None and m:
                 seed = int(m.group(1))
             lo, hi = wilson(k, n)
+            opt, s2lr = OPTIMIZER.get(recipe, ("unknown", ""))
             runs.append(dict(domain=domain, harness=harness, arm=arm, recipe=recipe,
+                             optimizer=opt, stage2_lr=s2lr,
                              is_smoke=1 if ("smoke" in tag or n <= 6) else 0, snapshot=snap,
                              seed=seed if seed is not None else 42, solved=k, n_tasks=n,
                              pct=round(100 * k / n, 2), ci_lo=round(lo, 2), ci_hi=round(hi, 2),
@@ -130,7 +153,7 @@ def main():
         r["is_dup"] = 1 if (r["harness"] == "snorkel" and cnt[key] > 1) else 0
 
     runs.sort(key=lambda r: (r["domain"], r["arm"], r["recipe"], r["snapshot"], r["seed"]))
-    cols = ["domain", "harness", "arm", "recipe", "snapshot", "seed", "solved", "n_tasks",
+    cols = ["domain", "harness", "arm", "optimizer", "stage2_lr", "recipe", "snapshot", "seed", "solved", "n_tasks",
             "pct", "ci_lo", "ci_hi", "is_dup", "is_smoke", "run_tag"]
     f1 = os.path.join(OUT, "rollouts_all.csv")
     with open(f1, "w", newline="") as f:
@@ -147,12 +170,12 @@ def main():
     f2 = os.path.join(OUT, "rollouts_by_arm.csv")
     with open(f2, "w", newline="") as f:
         w = csv.writer(f)
-        w.writerow(["domain", "arm", "recipe", "snapshot", "n_runs", "mean_pct", "sd_pct",
+        w.writerow(["domain", "arm", "optimizer", "stage2_lr", "recipe", "snapshot", "n_runs", "mean_pct", "sd_pct",
                     "min_pct", "max_pct", "pooled_solved", "pooled_n", "pooled_pct", "seeds"])
         for (dom, arm, recipe, snap), rs in sorted(g.items()):
             p = [r["pct"] for r in rs]
             ks, ns = sum(r["solved"] for r in rs), sum(r["n_tasks"] for r in rs)
-            w.writerow([dom, arm, recipe, snap, len(rs), round(st.mean(p), 2),
+            w.writerow([dom, arm, rs[0]["optimizer"], rs[0]["stage2_lr"], recipe, snap, len(rs), round(st.mean(p), 2),
                         round(st.pstdev(p), 2) if len(p) > 1 else "",
                         min(p), max(p), ks, ns, round(100 * ks / ns, 2),
                         " ".join(str(r["seed"]) for r in sorted(rs, key=lambda x: x["seed"]))])
