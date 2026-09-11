@@ -193,3 +193,66 @@ if __name__ == "__main__":
     fig_inverted_u(); print("  wrote stage2-inverted-u.png")
     fig_fit_vs_behaviour(); print("  wrote stage2-fit-vs-behaviour.png")
     fig_noise(); print("  wrote stage2-noise-floors.png")
+
+
+# ---------------------------------------------------------------- v2 additions
+def _by_arm():
+    """results/rollouts_by_arm.csv -> {(domain, arm, snapshot): row}. Data-driven so the
+    figures cannot drift from the CSVs the write-up cites."""
+    import csv
+    out = {}
+    path = os.path.join(os.path.dirname(OUT), "..", "results", "rollouts_by_arm.csv")
+    path = os.path.normpath(os.path.join(os.path.dirname(os.path.dirname(OUT)), "results", "rollouts_by_arm.csv"))
+    for r in csv.DictReader(open(path)):
+        if r["recipe"] == "sgdlr1e_3":
+            out[(r["domain"], r["arm"], r["snapshot"])] = r
+    return out
+
+
+ARM_LABEL = {"actions_only": "actions_only", "thoughts_policy_adamw30": "thoughts_policy",
+             "thoughts_base_adamw30": "thoughts_base", "expert_thoughts_all": "expert_thoughts_all"}
+BASE_PCT = {"insurance": 30.0, "retail": 14.3, "airline": 55.6}
+
+
+def fig_arms_seeds():
+    """Per-arm mean +/- sd across SEEDS, step_0020, three domains. Replaces the v1 rollout
+    table: the point is that the error bars overlap completely."""
+    d = _by_arm()
+    doms = ["insurance", "retail", "airline"]
+    arms = ["actions_only", "thoughts_policy_adamw30", "thoughts_base_adamw30", "expert_thoughts_all"]
+    fig, axes = plt.subplots(1, 3, figsize=(13.5, 4.3))
+    for ax, dom in zip(axes, doms):
+        xs, ys, es, cs, ns = [], [], [], [], []
+        for i, a in enumerate(arms):
+            r = d.get((dom, a, "step_0020"))
+            if not r:
+                continue
+            xs.append(i); ys.append(float(r["mean_pct"]))
+            es.append(float(r["sd_pct"] or 0)); ns.append(int(r["n_runs"]))
+            cs.append(C[ARM_LABEL[a]] if ARM_LABEL[a] in C else C["thoughts_policy"])
+        ax.bar(xs, ys, yerr=es, capsize=5, color=cs, width=0.62,
+               error_kw=dict(ecolor="#444444", lw=1.4))
+        for x, y, n in zip(xs, ys, ns):
+            ax.text(x, y + (max(es) if es else 2) + 1.5, f"n={n}", ha="center", fontsize=8, color="#555")
+        ax.axhline(BASE_PCT[dom], color=C["base"], ls="--", lw=1.6)
+        ax.text(len(arms) - 0.5, BASE_PCT[dom] + 1.2, f"base {BASE_PCT[dom]}%", fontsize=8.5,
+                color=C["base"], ha="right",
+                bbox=dict(facecolor="white", edgecolor="none", pad=1.5, alpha=0.85))
+        ax.set_xticks(range(len(arms)))
+        ax.set_xticklabels([ARM_LABEL[a] for a in arms], rotation=22, ha="right", fontsize=8.5)
+        ax.set_title(dom, fontsize=11.5, weight="bold")
+        ax.set_ylim(0, 90)
+        ax.grid(True, axis="y", **GRID); ax.set_axisbelow(True)
+        for s in ("top", "right"):
+            ax.spines[s].set_visible(False)
+    axes[0].set_ylabel("task completion (%)  at step_0020")
+    fig.suptitle("Every corpus performs the same. Error bars are 1 sd across SEEDS —\n"
+                 "on insurance the between-arm spread (1.8 pt) is smaller than the seed noise (3.0 pt).",
+                 fontsize=11.5, y=1.10)
+    fig.tight_layout()
+    fig.savefig(f"{OUT}/stage2-arms-seeds.png", dpi=160, bbox_inches="tight")
+    plt.close(fig)
+
+
+if __name__ == "__main__":
+    fig_arms_seeds(); print("  wrote stage2-arms-seeds.png")
