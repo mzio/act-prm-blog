@@ -1,9 +1,10 @@
 """
 Generators (rollout harnesses) for LLM-based training.
 
-Lean Act-PRM fork of ``strl.generator``: the registry keeps only the local
-HuggingFace paths — the base env-rollout generator (``hf``) and the Act-PRM EM
-harness (``act_prm``).
+Lean Act-PRM fork of ``strl.generator``: the registry keeps the local HuggingFace
+paths — the base env-rollout generator (``hf``) and the Act-PRM EM harness
+(``act_prm``) — plus ``claude_agent_sdk``, which drives env rollouts with a Claude
+teacher to collect full thought+action expert trajectories.
 """
 
 from collections.abc import Callable
@@ -29,6 +30,11 @@ def get_generator_constructor(
         from .act_prm.base import ActPrmGenerator
 
         return partial(ActPrmGenerator, **kwargs)
+
+    if name in ["claude_agent_sdk", "claude_query"]:
+        from .claude_agent_sdk.teacher import ClaudeTeacherGenerator
+
+        return partial(ClaudeTeacherGenerator, **kwargs)
 
     if name in ["huggingface", "hf"]:
         from .huggingface.base import HuggingFaceGenerator

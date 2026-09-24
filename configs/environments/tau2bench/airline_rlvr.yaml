@@ -26,6 +26,14 @@ max_steps: 50               # tau2 AgentGymEnv step cap
 num_train_tasks: 40
 num_val_tasks: null
 num_test_tasks: 10
+# MUST be declared even as null: update_configs (main_pytorch.py:84) only applies a CLI
+# flag when the key already exists in the config, so without these lines --train_task_ids
+# / --eval_task_ids are SILENTLY DROPPED and the env falls back to task_id_map_file. That
+# is exactly what happened to the 2026-09-23 airline teacher collection: every shard ran
+# the map's same 32 train / 18 eval tasks instead of its own slice, so sharding did
+# nothing and the work was duplicated 2x. retail_rlvr.yaml already declares both.
+train_task_ids: null
+eval_task_ids: null
 
 # State compaction (wrapper-level) — HIDE-OBS regime, matches Stage-2 SFT
 # (the act_prm env used hide_observations + first_obs_to_show:1 / last_obs_to_show:1).

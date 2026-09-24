@@ -147,6 +147,18 @@ class Environment(ABC):
         else:
             self.datasets[split] = ds[indices]
 
+    async def close_rollout(self, state: Any = None) -> None:
+        """Per-rollout teardown hook; no-op by default.
+
+        Upstream `strl` envs that hold per-episode resources (a browser session, a remote
+        sandbox) release them here. Every env in this fork is stateless between rollouts --
+        `reset()` rebuilds whatever it needs -- so there is nothing to release. Defined on
+        the base class because the Claude Agent SDK generator calls it unconditionally in a
+        `finally:` (generator/claude_agent_sdk/query.py:545); without it every rollout dies
+        with AttributeError *after* completing its work.
+        """
+        return None
+
     def maybe_hide_observations(
         self,
         messages: list[dict[str, str]],

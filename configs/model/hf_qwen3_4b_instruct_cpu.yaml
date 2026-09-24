@@ -1,0 +1,22 @@
+# Tokenizer-only stand-in for the Claude-teacher collection path — loaded on CPU.
+#
+# Identical to hf_qwen3_4b_instruct.yaml except `device_map: cpu`. main_pytorch always
+# calls load_llm(), but the Claude teacher never forward-passes the local policy: it needs
+# only `hf_tokenizer`, and only for length accounting (the SDK generator renders prompts as
+# MARKDOWN, not via a chat template -- generator/claude_agent_sdk/utils.py). Keeping the
+# dead weights off the GPU lets teacher shards run beside a training job at ZERO VRAM.
+#
+# Same model as the real runs, so the tokenizer and chat template match exactly -- no
+# divergence risk. (Qwen3-0.6B would be lighter and is token-identical, but it is not in
+# the offline cache on this box: "does not appear to have a file named model.safetensors".)
+name: "hf_transformer"
+model_type: "huggingface"
+model_config:
+  pretrained_model_name_or_path: "Qwen/Qwen3-4B-Instruct-2507"
+  cache_dir: "/data/users/mzio/models/hf_cache/hub"
+  device_map: "cpu"
+  low_cpu_mem_usage: true
+  dtype: "bfloat16"
+generation_config:
+  do_sample: true
+  temperature: 1.0

@@ -44,7 +44,10 @@ class EpisodeStep(BaseModel):
     state_action_tokens: list[int]
     state_len: int
     old_logprobs: list[float]
-    temperature: float
+    # None when the sampler has no temperature to report -- e.g. the Claude Agent SDK
+    # teacher, which does not expose one. Nothing reads this field; it is provenance, so
+    # recording None is truthful where defaulting to 1.0 would invent a value.
+    temperature: float | None = None
 
     reward: float
     done: bool

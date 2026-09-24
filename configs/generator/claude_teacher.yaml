@@ -1,0 +1,44 @@
+# Claude Agent SDK teacher — collect FULL thought+action expert trajectories.
+#
+# Drives the env with a Claude policy instead of the local LoRA, so every step is captured
+# as (thinking, tool_call) at the source. The logged GPT-5-mini corpora carry a thought on
+# only 50-64% of turns (insurance 64.1%, retail 49.9%, airline 53.8%), which is why
+# `--require_thought` has to delete the rest; a Claude teacher has no such gap.
+#
+# Always run with --no_train: there is no local policy to update. Pair with
+# ACT_PRM_DUMP_TRAJECTORIES=1 so trainer/train.py writes trajectories.jsonl (full messages)
+# alongside rollouts_per_task.jsonl (per-task final_reward) -- together those let us filter
+# for the SUCCESSFUL trajectories afterwards.
+#
+# Auth: utils/claude_auth.load_dotenv_auth() reads .env and scrubs inherited launcher vars.
+# Needs the .venv-tau2 environment (only that venv has claude-agent-sdk installed).
+name: "claude_agent_sdk"
+
+# --- Claude policy
+model: "claude-sonnet-5"
+permission_mode: "default"
+effort: "low"
+# One Claude action per env step: we parse the <tool_call> out of a single assistant
+# response and execute it ourselves. Left higher, the CLI runs its own tool loop and
+# hallucinates <tool_result> blocks that get discarded (base.py:126-132).
+max_agent_turns: 1
+prompt_name: "chat"      # the only implemented template (prompts/default.py:12)
+method_name: "ClaudeTeacher"
+
+# --- rollout bookkeeping
+enable_thinking: false      # chat-template toggle for LOCAL models; inert here
+mean_center: false          # collecting demonstrations, not computing PG advantages
+verbose: true
+streamer: false
+timeout: 300                # per-query wait; teacher turns with thinking are slow
+
+# Extended thinking MUST be off. With it on (the default at any `effort`), Claude does its
+# reasoning inside a ThinkingBlock that comes back ENCRYPTED -- measured 2026-09-23: all 29
+# ThinkingBlocks in a 4-trajectory smoke had thinking='' with only a signature -- and then
+# emits a TextBlock that jumps straight to <tool_call>. Only 12-33% of tool calls carried a
+# visible thought, despite the chat template explicitly asking for a reasoning line first.
+# Disabling it forces the reasoning into the visible text, which is the half we need: the
+# thought only reaches the SFT target if it is in the message content.
+# Forwarded verbatim to ClaudeAgentOptions (base.py:_init_claude_options).
+thinking:
+  type: "disabled"
