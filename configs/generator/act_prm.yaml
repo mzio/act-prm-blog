@@ -10,6 +10,10 @@ verbose: false
 max_thought_tokens: 96      # length-penalty budget + max new tokens per thought
 thought_temperature: 1.0
 use_fewshot: true           # seed the reversal format with one worked example
+# Which domain's worked example seeds the reversal prompt. null -> infer from the
+# env config name (act_prm/snorkel_insurance -> insurance). One shared example
+# poisons any domain with the same task modality but a different subject.
+fewshot_domain: null
 max_steps_per_traj: null    # null -> use the environment's max_steps_per_traj
 
 # Reward / EM weighting

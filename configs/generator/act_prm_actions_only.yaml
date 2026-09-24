@@ -13,6 +13,10 @@ save_generations: true
 max_thought_tokens: 96
 thought_temperature: 1.0
 use_fewshot: true
+# Which domain's worked example seeds the reversal prompt. null -> infer from the
+# env config name (act_prm/snorkel_insurance -> insurance). One shared example
+# poisons any domain with the same task modality but a different subject.
+fewshot_domain: null
 max_steps_per_traj: null
 reward_method: "penalty"
 length_penalty: 0.15

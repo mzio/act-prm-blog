@@ -41,6 +41,7 @@ from .prompts import (
     build_scoring_messages,
     build_thought_prefix_messages,
     build_thought_prompt_messages,
+    resolve_fewshot,
 )
 
 logger = logging.getLogger(__name__)
@@ -76,6 +77,11 @@ class ActPrmGenerator(HuggingFaceGenerator):
         lift_c: float = 4.0,  # "lift" length denominator constant
         thought_temperature: float = 1.0,
         use_fewshot: bool = True,
+        # Which domain's worked example seeds the reversal prompt. None -> infer from
+        # the env config name. A single shared example poisons any domain matching its
+        # task modality but not its subject (see prompts.py), so this must track the
+        # domain, not the run.
+        fewshot_domain: str | None = None,
         max_steps_per_traj: int | None = None,
         # How the per-candidate rewards become EpisodeStep advantages:
         #   "em"       — clamped, group-normalized EM weights (>=0, sum 1) [EM/RL default]
@@ -110,6 +116,10 @@ class ActPrmGenerator(HuggingFaceGenerator):
         self.lift_c = lift_c
         self.thought_temperature = thought_temperature
         self.use_fewshot = use_fewshot
+        _dom = fewshot_domain or (self.cfg.get("env_config") if self.cfg else None)
+        self.fewshot = resolve_fewshot(_dom)
+        if use_fewshot:
+            logger.info("act_prm few-shot: domain=%r -> %d-message example", _dom, len(self.fewshot))
         self.max_steps_per_traj = max_steps_per_traj
         self.advantage_mode = advantage_mode
         self.grpo_normalize = grpo_normalize
@@ -223,7 +233,8 @@ class ActPrmGenerator(HuggingFaceGenerator):
         """Sample ``group_size`` candidate thoughts from the reversal prompt."""
         device = self.llm.model.device
         reversal_msgs = build_thought_prompt_messages(
-            state_messages, target_action, committed, use_fewshot=self.use_fewshot
+            state_messages, target_action, committed,
+            use_fewshot=self.use_fewshot, fewshot=self.fewshot,
         )
         model_inputs, _ = get_batch_model_inputs(
             input_messages=[reversal_msgs],

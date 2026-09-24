@@ -323,6 +323,18 @@ def get_args() -> argparse.Namespace:
     parser.add_argument("--length_penalty", type=float, default=None, help="Act-PRM thought length penalty (lambda)")
     parser.add_argument("--max_thought_tokens", type=int, help="Act-PRM max thought tokens (length-penalty budget)")
     parser.add_argument(
+        "--fewshot_domain",
+        type=str,
+        default=None,
+        help=(
+            "Which domain's worked example seeds the Act-PRM reversal prompt "
+            "(insurance|retail|airline|finance). Default infers it from --env_config. One "
+            "shared example poisons any domain with the same task modality but a different "
+            "subject: the finance/acme seed put finance vocabulary on 77.7% of the INSURANCE "
+            "thoughts (both are SQL/table tasks), while retail/airline were untouched."
+        ),
+    )
+    parser.add_argument(
         "--reward_method",
         type=str,
         default=None,
