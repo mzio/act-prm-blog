@@ -40,6 +40,7 @@ SOURCES = [
 ]
 
 ARMS = ["thoughts_policy_adamw30", "thoughts_base_adamw30", "expert_thoughts_all",
+        "thoughts_policy_fs2", "thoughts_base_fs2",
         "expert_thoughts", "thoughts_policy_g8top1", "thoughts_policy_g8top2",
         "thoughts_policy_g8top4", "thoughts_policy_g8top8", "thoughts_policy_1gen",
         "thoughts_policy", "thoughts_base", "actions_only", "BASE"]
@@ -94,12 +95,16 @@ def parse_tag(tag, domain):
 #   x3 / lr3e_3 / v3_* -> *_lr3e_3_nb150_heldout          (SGD-era: --optimizer defaulted
 #     to sgd before it was made explicit, so these are SGD despite the untagged name)
 OPTIMIZER = {
-    "sgdlr1e_3": ("sgd", "1e-3"), "sgdlr1e_3_rep2": ("sgd", "1e-3"),
+    "sgdlr1e_3": ("sgd", "1e-3"), "sgdlr1e_3_rep1": ("sgd", "1e-3"),
+    "sgdlr1e_3_rep2": ("sgd", "1e-3"),
     "sgdlr1e_3_rep3": ("sgd", "1e-3"), "sgd3e_3flat": ("sgd", "3e-3"),
     "sgd1e_3_nb1k": ("sgd", "1e-3"), "sgd1e_3_oldcorpus": ("sgd", "1e-3"),
     "g8top1": ("sgd", "1e-3"), "g8top2": ("sgd", "1e-3"),
     "g8top4": ("sgd", "1e-3"), "g8top8": ("sgd", "1e-3"),
     "flat32": ("adamw", "1e-3"), "lr1e4": ("adamw", "1e-4"),
+    # _fs2 = regenerated Stage-1 corpus under the per-domain few-shot; Stage-2 recipe is
+    # the same SGD 1e-3 / nb200 / flat32 generation as sgdlr1e_3.
+    "fs2": ("sgd", "1e-3"),
     "lr3e_3": ("sgd", "3e-3"), "lr3e_3_fixeval": ("sgd", "3e-3"),
     "lr3e_3_smoke": ("sgd", "3e-3"), "x3": ("sgd", "3e-3"),
     "x1": ("sgd", "3e-3"), "v3_fair": ("sgd", "3e-3"), "v3_hard": ("sgd", "3e-3"),
